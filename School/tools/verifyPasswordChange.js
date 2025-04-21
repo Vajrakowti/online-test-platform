@@ -2,7 +2,7 @@ const { MongoClient } = require('mongodb');
 const fetch = require('node-fetch');
 
 // Connection URL
-const url = 'mongodb://localhost:27017';
+const url = 'mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles';
 const client = new MongoClient(url);
 
 // Database Name

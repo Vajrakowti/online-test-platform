@@ -70,6 +70,11 @@ function calculateDuration(quizConfig) {
 }
 
 router.get('/:quizName', (req, res) => {
+    // Check if user is logged in and has student role
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+    
     const quizName = req.params.quizName;
     const quizzes = JSON.parse(fs.readFileSync(QUIZ_JSON_PATH));
     const quizConfig = quizzes.find(q => q.name === quizName);

@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -15,7 +13,7 @@ if (!fs.existsSync(ATTEMPTS_DIR)) {
 
 // Route to serve student.html
 router.get('/', (req, res) => {
-    if (req.session.fname) {
+    if (req.session.fname && req.session.role === 'student') {
         // Read the student.html file and replace the welcome message
         fs.readFile(path.join(__dirname, '../public/student.html'), 'utf8', (err, data) => {
             if (err) {
@@ -38,14 +36,14 @@ router.get('/', (req, res) => {
 
 // API endpoint to get student name
 router.get('/api/student/name', (req, res) => {
-    if (!req.session.fname) {
+    if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
     res.json({ name: req.session.fname });
 });
 
 router.get('/info', (req, res) => {
-    if (!req.session.username) {
+    if (!req.session.username || req.session.role !== 'student') {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
@@ -59,7 +57,7 @@ router.get('/info', (req, res) => {
 
 // Route to fetch quiz data - UPDATED TO FILTER BY CLASS
 router.get('/quizzes', (req, res) => {
-    if (!req.session.fname) {
+    if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
@@ -102,7 +100,7 @@ router.get('/quizzes', (req, res) => {
 
 // Route to get attempted quizzes for the current student
 router.get('/attempts', (req, res) => {
-    if (!req.session.fname || !req.session.username) {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
@@ -124,7 +122,7 @@ router.get('/attempts', (req, res) => {
 
 // Route to save quiz attempt
 router.post('/saveattempt', (req, res) => {
-    if (!req.session.fname || !req.session.username) {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
@@ -164,7 +162,7 @@ router.post('/saveattempt', (req, res) => {
 
 
 router.get('/quiz/:quizName', (req, res) => {
-    if (!req.session.fname) {
+    if (!req.session.fname || req.session.role !== 'student') {
         return res.redirect("/login");
     }
 
@@ -540,7 +538,7 @@ router.get('/quiz/:quizName', (req, res) => {
 
 // Attempt Result Page (unchanged)
 router.get('/result/:quizName', (req, res) => {
-    if (!req.session.fname || !req.session.username) {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
         return res.redirect('/login');
     }
 

@@ -9,7 +9,7 @@ const adminApp = express();
 const userApp = express();
 
 
-const url = "mongodb://localhost:27017/";
+const url = "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 let dbo;
 
 // Enhanced session configuration
@@ -27,58 +27,149 @@ const sessionConfig = {
         maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
         secure: false,
-        sameSite: 'lax'
+        sameSite: 'strict'
     }
 };
 
+// Generate a unique token for each session 
+function generateSecureToken() {
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15) + 
+           Date.now().toString(36);
+}
+
 // Common middleware setup function
-const setupApp = (app) => {
+const setupApp = (app, role) => {
     app.use(express.urlencoded({ extended: false }));
-    // app.use(express.static('public'));
     app.use(express.static(path.join(__dirname, 'public')));
     
-
-    // In the setupApp function, add this before other middleware:
     app.use('/student-photos', express.static(path.join(__dirname, 'public', 'student-photos')));
     app.use(express.json());
     
-    
     app.use(session(sessionConfig));
     
+    // Strong anti-session hijacking protection
     app.use((req, res, next) => {
-        if (req.session.fname) {
-            res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-            res.header('Expires', '-1');
-            res.header('Pragma', 'no-cache');
-        }
-        next();
-    });
-    
-    app.use((req, res, next) => {
-        // Add change-password route to public paths
-        if (req.path === '/login' || req.path === '/register' || req.path === '/' || 
-            req.path === '/change-password' || req.path.startsWith('/api/change-password')) {
+        // Define paths that don't need session protection
+        const publicPaths = [
+            '/login', 
+            '/register', 
+            '/', 
+            '/change-password',
+            '/api/change-password'
+        ];
+        
+        // Allow public paths to pass through
+        if (publicPaths.includes(req.path) || req.path.startsWith('/api/change-password')) {
             return next();
         }
         
+        // Create security token for new sessions
+        if (req.session && !req.session.securityToken) {
+            req.session.securityToken = generateSecureToken();
+            req.session.userAgent = req.headers['user-agent'];
+            req.session.ipAddress = req.ip || req.connection.remoteAddress;
+            req.session.lastAccessed = Date.now();
+        }
+        
+        // Skip validation for initial session creation
+        if (!req.session.securityToken) {
+            return next();
+        }
+        
+        // Validate existing sessions
+        const currentUserAgent = req.headers['user-agent'];
+        const currentIp = req.ip || req.connection.remoteAddress;
+        
+        // Multi-factor session validation
+        const userAgentValid = req.session.userAgent === currentUserAgent;
+        const ipValid = req.session.ipAddress === currentIp;
+        const timeValid = (Date.now() - req.session.lastAccessed) < (30 * 60 * 1000); // 30 minutes
+        
+        // Destroy session if validation fails
+        if (!userAgentValid || !ipValid || !timeValid) {
+            console.log('Session validation failed:', {
+                userAgentMatch: userAgentValid,
+                ipMatch: ipValid,
+                timeValid: timeValid
+            });
+            req.session.destroy(() => {
+                return res.redirect('/login?error=session_expired');
+            });
+            return;
+        }
+        
+        // Update last accessed time
+        req.session.lastAccessed = Date.now();
+        
+        // Set strong cache control headers to prevent caching
+        res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+        res.header('Expires', '-1');
+        res.header('Pragma', 'no-cache');
+        
+        next();
+    });
+    
+    // Role-specific route protection
+    app.use((req, res, next) => {
+        // Define paths that don't need authorization
+        const publicPaths = [
+            '/login', 
+            '/register', 
+            '/', 
+            '/change-password',
+            '/api/change-password',
+            '/logout',
+            '/api/check-session'
+        ];
+        
+        // Allow public paths to pass through
+        if (publicPaths.includes(req.path) || 
+            req.path.startsWith('/api/change-password') ||
+            req.path.startsWith('/logout')) {
+            return next();
+        }
+        
+        // For API requests
         if (req.path.startsWith('/api/') || req.query.partial) {
             if (!req.session.fname) {
                 return res.status(401).json({ error: 'Session expired' });
             }
+            
+            if (role && req.session.role !== role) {
+                return res.status(403).json({ error: 'Unauthorized access' });
+            }
+            
             return next();
         }
         
+        // Check if user is logged in
         if (!req.session.fname) {
             return res.redirect("/login");
+        }
+        
+        // Role-specific access check
+        if (role && req.session.role !== role) {
+            if (req.session.role === 'admin') {
+                return res.redirect("/admin"); 
+            } else if (req.session.role === 'student') {
+                return res.redirect("/student"); 
+            } else {
+                // Logout if role is invalid
+                req.session.destroy(() => {
+                    return res.redirect("/login?error=invalid_role");
+                });
+                return;
+            }
         }
         
         next();
     });
 };
 
-// Setup both apps
-setupApp(adminApp);
-setupApp(userApp);
+// Setup both apps with their respective roles
+setupApp(adminApp, 'admin');
+setupApp(userApp, 'student');
 
 // MongoDB connection
 MongoClient.connect(url)
@@ -121,8 +212,17 @@ MongoClient.connect(url)
                     if (result.length === 0) {
                         return res.redirect("/login?error=invalid_credentials");
                     }
+                    
+                    // Set user info
                     req.session.fname = result[0].Username;
                     req.session.role = 'admin';
+                    
+                    // Set security attributes
+                    req.session.securityToken = generateSecureToken();
+                    req.session.userAgent = req.headers['user-agent'];
+                    req.session.ipAddress = req.ip || req.connection.remoteAddress;
+                    req.session.lastAccessed = Date.now();
+                    
                     req.session.save(err => {
                         if (err) {
                             console.error('Session save error:', err);
@@ -147,15 +247,39 @@ MongoClient.connect(url)
         });
 
         const adminRoutes = require('./routes/admin');
-        adminApp.use('/admin', adminRoutes);
+        
+        // Extra middleware to protect admin routes with double validation
+        adminApp.use('/admin', (req, res, next) => {
+            // First check: active session with admin role
+            if (!req.session.fname || req.session.role !== 'admin' || !req.session.securityToken) {
+                console.log('Admin access denied: Invalid session');
+                return res.redirect('/login');
+            }
+            
+            // Second check: validate browser fingerprint
+            const currentUserAgent = req.headers['user-agent'];
+            const currentIp = req.ip || req.connection.remoteAddress;
+            
+            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
+                console.log('Admin access denied: Browser fingerprint mismatch');
+                req.session.destroy(() => {
+                    return res.redirect('/login?error=security_violation');
+                });
+                return;
+            }
+            
+            // Set strong no-cache headers on every admin page
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
+            
+            next();
+        }, adminRoutes);
 
         adminApp.get('/api/check-session', (req, res) => {
             res.json({ authenticated: !!req.session.fname });
         });
-
-
-
-        
 
         // User routes (port 7001)
         userApp.get('/', (req, res) => {
@@ -275,12 +399,9 @@ MongoClient.connect(url)
             const username = req.body.username;
             const password = req.body.pwd;
             
-            // console.log(`Login attempt for username: ${username}`);
-            
             try {
                 // First check the database connection
                 await dbo.command({ ping: 1 });
-                // console.log("Database connection confirmed for login");
                 
                 // Check credentials in the user collection
                 const userRecord = await dbo.collection("user").findOne({ 
@@ -292,15 +413,11 @@ MongoClient.connect(url)
                     return res.redirect("/login?error=invalid_credentials");
                 }
                 
-                // console.log(`User found: ${username}, Database password: ${userRecord.Password}, Entered password: ${password}`);
-                
                 // Verify password
                 if (userRecord.Password !== password) {
                     console.log(`Password mismatch for ${username}`);
                     return res.redirect("/login?error=invalid_credentials");
                 }
-                
-                // console.log(`Password verified for ${username}`);
                 
                 // Find student record in class collections
                 const collections = await dbo.listCollections().toArray();
@@ -320,14 +437,19 @@ MongoClient.connect(url)
                     console.log(`No student record found for username: ${username}`);
                     return res.status(401).send("Student record not found");
                 }
-    
-                req.session.fname = student.name; // Store actual name
-                req.session.username = username; // Store username separately
+
+                // Set user info
+                req.session.fname = student.name;
+                req.session.username = username;
                 req.session.class = student.class;
                 req.session.role = 'student';
                 req.session.photo = student.photo;
                 
-                // console.log(`Login successful for: ${username} (${student.name})`);
+                // Set security attributes
+                req.session.securityToken = generateSecureToken();
+                req.session.userAgent = req.headers['user-agent'];
+                req.session.ipAddress = req.ip || req.connection.remoteAddress;
+                req.session.lastAccessed = Date.now();
                 
                 req.session.save(err => {
                     if (err) {
@@ -352,9 +474,66 @@ MongoClient.connect(url)
         });
 
         const studentRoutes = require('./routes/student');
-        userApp.use('/student', studentRoutes);
+        
+        // Extra middleware to protect student routes with double validation
+        userApp.use('/student', (req, res, next) => {
+            // First check: active session with student role
+            if (!req.session.fname || req.session.role !== 'student' || !req.session.securityToken) {
+                console.log('Student access denied: Invalid session');
+                return res.redirect('/login');
+            }
+            
+            // Second check: validate browser fingerprint
+            const currentUserAgent = req.headers['user-agent'];
+            const currentIp = req.ip || req.connection.remoteAddress;
+            
+            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
+                console.log('Student access denied: Browser fingerprint mismatch');
+                req.session.destroy(() => {
+                    return res.redirect('/login?error=security_violation');
+                });
+                return;
+            }
+            
+            // Set strong no-cache headers on every student page
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
+            
+            next();
+        }, studentRoutes);
+
         const startQuizRoutes = require('./routes/startquiz');
-        userApp.use('/student/startquiz', startQuizRoutes);
+        
+        // Extra middleware to protect quiz routes
+        userApp.use('/student/startquiz', (req, res, next) => {
+            // First check: active session with student role
+            if (!req.session.fname || req.session.role !== 'student' || !req.session.securityToken) {
+                console.log('Quiz access denied: Invalid session');
+                return res.redirect('/login');
+            }
+            
+            // Second check: validate browser fingerprint
+            const currentUserAgent = req.headers['user-agent'];
+            const currentIp = req.ip || req.connection.remoteAddress;
+            
+            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
+                console.log('Quiz access denied: Browser fingerprint mismatch');
+                req.session.destroy(() => {
+                    return res.redirect('/login?error=security_violation');
+                });
+                return;
+            }
+            
+            // Set strong no-cache headers for quiz pages
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
+            
+            next();
+        }, startQuizRoutes);
 
         // Start both servers
         adminApp.listen(7000, () => console.log("Admin server running on port 7000"));

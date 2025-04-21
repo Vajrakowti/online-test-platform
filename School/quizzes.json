@@ -70,5 +70,13 @@
     "class": "5",
     "type": "excel",
     "file": "qq.xlsx"
+  },
+  {
+    "name": "rr",
+    "startTime": "15:00",
+    "endTime": "17:00",
+    "class": "7",
+    "type": "excel",
+    "file": "rr.xlsx"
   }
 ]

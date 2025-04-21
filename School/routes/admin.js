@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -174,7 +172,7 @@ function generateCredentials(name) {
 
 // Admin Home
 router.get('/', (req, res) => {
-  if (req.session.fname) {
+  if (req.session.fname && req.session.role === 'admin') {
     res.sendFile(path.join(__dirname, "../public/admin.html"));
   } else {
     res.redirect("/login");
@@ -183,7 +181,7 @@ router.get('/', (req, res) => {
 
 // Create Quiz Page
 router.get('/create-quiz', (req, res) => {
-  if (req.session.fname) {
+  if (req.session.fname && req.session.role === 'admin') {
     res.sendFile(path.join(__dirname, "../public/createquiz.html"));
   } else {
     res.redirect("/login");
@@ -192,7 +190,7 @@ router.get('/create-quiz', (req, res) => {
 
 // Add Student Page
 router.get('/add-student', (req, res) => {
-  if (req.session.fname) {
+  if (req.session.fname && req.session.role === 'admin') {
     res.sendFile(path.join(__dirname, "../public/addstudent.html"));
   } else {
     res.redirect("/login");
@@ -201,101 +199,105 @@ router.get('/add-student', (req, res) => {
 
 // Handle Student Creation
 router.post('/add-student', uploadStudentPhoto.single('photo'), async (req, res) => {
-    try {
-      if (!req.file) {
-        throw new Error('No photo uploaded or upload failed');
-      }
-  
-      const { name, email, phone, dob, studentClass } = req.body;
+  try {
+    if (!req.session.fname || req.session.role !== 'admin') {
+      return res.status(401).send('Unauthorized');
+    }
 
-      if (!name) {
-        throw new Error('Student name is required');
-      }
-      
-      // Generate credentials
-      const { username, password } = generateCredentials(name);
+    if (!req.file) {
+      throw new Error('No photo uploaded or upload failed');
+    }
 
-          // Sanitize the student name for filename
+    const { name, email, phone, dob, studentClass } = req.body;
+
+    if (!name) {
+      throw new Error('Student name is required');
+    }
+    
+    // Generate credentials
+    const { username, password } = generateCredentials(name);
+
+    // Sanitize the student name for filename
     const sanitizedName = name
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w\-]+/g, '')
-    .replace(/\-\-+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
-  
-  const ext = path.extname(req.file.originalname);
-  let filename = `${sanitizedName}${ext}`;
-  let counter = 1;
-  
-  // Check for existing files with same name
-  while (fs.existsSync(path.join(studentPhotoDir, filename))) {
-    filename = `${sanitizedName}-${counter}${ext}`;
-    counter++;
-  }
-  
-  // Rename the temp file to the final filename
-  const tempPath = path.join(studentPhotoDir, req.file.filename);
-  const newPath = path.join(studentPhotoDir, filename);
-  fs.renameSync(tempPath, newPath);
-      
-      // Student data with photo path
-      const studentData = {
-        name,
-        email,
-        phone,
-        dob,
-        class: studentClass,
-        username,
-        password,
-        photo: `/student-photos/${filename}`, // Path relative to public
-        role: 'student',
-        createdAt: new Date()
-      };
-  
-      // Connect to MongoDB
-      const client = new MongoClient("mongodb://localhost:27017/");
-      await client.connect();
-      const db = client.db("School");
-      
-      // Insert into the appropriate class collection
-      const collectionName = `class_${studentClass}`;
-      await db.collection(collectionName).insertOne(studentData);
-      
-      // Also store in LMS collection for authentication
-      await db.collection("user").insertOne({
-        Username: username,
-        Password: password,
-        role: 'student'
-      });
-  
-      client.close();
-  
-      res.redirect(`/admin/students/${studentClass}`);
-    } catch (err) {
-      console.error('Error adding student:', err);
-      
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+
+    const ext = path.extname(req.file.originalname);
+    let filename = `${sanitizedName}${ext}`;
+    let counter = 1;
+
+    // Check for existing files with same name
+    while (fs.existsSync(path.join(studentPhotoDir, filename))) {
+      filename = `${sanitizedName}-${counter}${ext}`;
+      counter++;
+    }
+
+    // Rename the temp file to the final filename
+    const tempPath = path.join(studentPhotoDir, req.file.filename);
+    const newPath = path.join(studentPhotoDir, filename);
+    fs.renameSync(tempPath, newPath);
+    
+    // Student data with photo path
+    const studentData = {
+      name,
+      email,
+      phone,
+      dob,
+      class: studentClass,
+      username,
+      password,
+      photo: `/student-photos/${filename}`, // Path relative to public
+      role: 'student',
+      createdAt: new Date()
+    };
+
+    // Connect to MongoDB using the updated connection string
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db("School");
+    
+    // Insert into the appropriate class collection
+    const collectionName = `class_${studentClass}`;
+    await db.collection(collectionName).insertOne(studentData);
+    
+    // Also store in user collection for authentication
+    await db.collection("user").insertOne({
+      Username: username,
+      Password: password,
+      role: 'student'
+    });
+
+    client.close();
+
+    res.redirect(`/admin/students/${studentClass}`);
+  } catch (err) {
+    console.error('Error adding student:', err);
+    
     // Delete uploaded file if error occurred
     if (req.file) {
-        const filePath = path.join(studentPhotoDir, req.file.filename);
-        fs.unlink(filePath, (unlinkErr) => {
-          if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
-        });
-      }
-  
-      res.status(500).send(`
-        <div style="padding: 20px; background: #ffeeee; color: #ff0000; border-radius: 5px;">
-          <h3>Error adding student</h3>
-          <p>${err.message}</p>
-          <a href="/admin/add-student" style="color: #007bff;">Try again</a>
-        </div>
-      `);
+      const filePath = path.join(studentPhotoDir, req.file.filename);
+      fs.unlink(filePath, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
+      });
     }
-  });
+
+    res.status(500).send(`
+      <div style="padding: 20px; background: #ffeeee; color: #ff0000; border-radius: 5px;">
+        <h3>Error adding student</h3>
+        <p>${err.message}</p>
+        <a href="/admin/add-student" style="color: #007bff;">Try again</a>
+      </div>
+    `);
+  }
+});
 
 // View Students Page (shows class buttons)
 router.get('/students', (req, res) => {
-  if (req.session.fname) {
+  if (req.session.fname && req.session.role === 'admin') {
     res.sendFile(path.join(__dirname, "../public/students.html"));
   } else {
     res.redirect("/login");
@@ -305,12 +307,12 @@ router.get('/students', (req, res) => {
 // View Students by Class (returns HTML fragment)
 router.get('/students/:class', async (req, res) => {
     try {
-        if (!req.session.fname) {
+        if (!req.session.fname || req.session.role !== 'admin') {
             return res.status(401).send('Unauthorized');
         }
 
         const classNumber = req.params.class;
-        const client = new MongoClient("mongodb://localhost:27017/");
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
         const db = client.db("School");
         
@@ -934,7 +936,7 @@ router.get('/students/:class', async (req, res) => {
 // Handle sending emails
 router.post('/send-email', uploadEmail.any(), async (req, res) => {
     try {
-        if (!req.session.fname) {
+        if (!req.session.fname || req.session.role !== 'admin') {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
@@ -981,12 +983,12 @@ router.post('/send-email', uploadEmail.any(), async (req, res) => {
 // student deletion in db.
 router.delete('/students/delete/:username', async (req, res) => {
     try {
-      if (!req.session.fname) {
+      if (!req.session.fname || req.session.role !== 'admin') {
         return res.status(401).send('Unauthorized');
       }
   
       const username = req.params.username;
-      const client = new MongoClient("mongodb://localhost:27017/");
+      const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
       await client.connect();
       const db = client.db("School");
       
@@ -1036,6 +1038,9 @@ router.delete('/students/delete/:username', async (req, res) => {
 
 // Handle Excel Quiz Creation
 router.post('/create-quiz', (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).send('Unauthorized');
+  }
   uploadExcel(req, res, function(err) {
     if (err instanceof multer.MulterError) {
       console.error('Multer error:', err);
@@ -1076,6 +1081,9 @@ router.post('/create-quiz', (req, res) => {
 
 // Handle Manual Quiz Creation
 router.post('/create-quiz-manual', (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).send('Unauthorized');
+  }
   uploadQuizImage(req, res, async function(err) {
     if (err instanceof multer.MulterError) {
       console.error('Multer error:', err);
@@ -1202,7 +1210,7 @@ router.post('/create-quiz-manual', (req, res) => {
 
 // Show Total Quizzes
 router.get('/total-quiz', (req, res) => {
-    if (!req.session.fname) {
+    if (!req.session.fname || req.session.role !== 'admin') {
       return res.redirect("/login");
     }
   
@@ -1509,7 +1517,7 @@ router.get('/total-quiz', (req, res) => {
 
 
 router.get('/quiz-results/:quizName', async (req, res) => {
-    if (!req.session.fname) {
+    if (!req.session.fname || req.session.role !== 'admin') {
         if (req.query.partial) {
             return res.status(401).json({ error: 'Session expired' });
         }
@@ -1521,7 +1529,7 @@ router.get('/quiz-results/:quizName', async (req, res) => {
     
     try {
         // Connect to MongoDB
-        const client = new MongoClient("mongodb://localhost:27017/");
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
         const db = client.db("School");
         
