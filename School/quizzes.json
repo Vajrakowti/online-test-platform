@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Quiz",
+    "startTime": "11:00",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "Quiz-manual.json"
+  },
+  {
+    "name": "Quiz",
+    "startTime": "11:50",
+    "endTime": "13:00",
+    "class": "7",
+    "type": "excel",
+    "file": "Quiz.xlsx"
+  },
+  {
+    "name": "final",
+    "startTime": "11:50",
+    "endTime": "13:00",
+    "class": "7",
+    "type": "excel",
+    "file": "final.xlsx"
+  },
+  {
+    "name": "ABC",
+    "startTime": "11:55",
+    "endTime": "13:00",
+    "class": "7",
+    "type": "manual",
+    "questionsFile": "ABC-manual.json"
+  },
+  {
+    "name": "aa",
+    "startTime": "12:00",
+    "endTime": "13:00",
+    "class": "7",
+    "type": "manual",
+    "questionsFile": "aa-manual.json"
+  },
+  {
+    "name": "Safe",
+    "startTime": "12:05",
+    "endTime": "12:30",
+    "class": "7",
+    "type": "excel",
+    "file": "Safe.xlsx"
+  },
+  {
+    "name": "Test1",
+    "startTime": "12:16",
+    "endTime": "12:46",
+    "class": "10",
+    "type": "excel",
+    "file": "Test1.xlsx"
+  },
+  {
+    "name": "Test2",
+    "startTime": "12:15",
+    "endTime": "12:45",
+    "class": "10",
+    "type": "excel",
+    "file": "Test2.xlsx"
+  },
+  {
+    "name": "qq",
+    "startTime": "11:59",
+    "endTime": "13:00",
+    "class": "5",
+    "type": "excel",
+    "file": "qq.xlsx"
+  }
+]
