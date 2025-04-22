@@ -1,0 +1,24 @@
+[
+  {
+    "text": "Hello",
+    "options": [
+      "11",
+      "12",
+      "131",
+      "144"
+    ],
+    "correctAnswer": 2,
+    "image": "/quiz-images/1745303599570-369281340.jpg"
+  },
+  {
+    "text": "Bye!",
+    "options": [
+      "qq",
+      "ww",
+      "ee",
+      "rr"
+    ],
+    "correctAnswer": 2,
+    "image": "/quiz-images/1745303599571-768318888.jpg"
+  }
+]

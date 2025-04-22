@@ -1978,4 +1978,105 @@ function renderResultsByClass(results) {
     return html;
 }
 
+// API endpoint for student statistics
+router.get('/stats/students', async (req, res) => {
+    try {
+        const db = req.app.locals.db;
+        const collections = await db.listCollections().toArray();
+        const classCollections = collections.filter(c => c.name.startsWith('class_'));
+        
+        let totalStudents = 0;
+        for (const collection of classCollections) {
+            const count = await db.collection(collection.name).countDocuments();
+            totalStudents += count;
+        }
+        
+        // For now, considering all students as active
+        const activeStudents = totalStudents;
+        
+        res.json({
+            total: totalStudents,
+            active: activeStudents
+        });
+    } catch (error) {
+        console.error('Error fetching student stats:', error);
+        res.status(500).json({ error: 'Failed to fetch student statistics' });
+    }
+});
+
+// API endpoint for quiz statistics
+router.get('/stats/quizzes', (req, res) => {
+    try {
+        const quizzes = readQuizzes();
+        const now = new Date();
+        
+        const activeQuizzes = quizzes.filter(quiz => {
+            const startTime = new Date(quiz.startTime);
+            const endTime = new Date(quiz.endTime);
+            return now >= startTime && now <= endTime;
+        });
+        
+        res.json({
+            total: quizzes.length,
+            active: activeQuizzes.length
+        });
+    } catch (error) {
+        console.error('Error fetching quiz stats:', error);
+        res.status(500).json({ error: 'Failed to fetch quiz statistics' });
+    }
+});
+
+// API endpoint for recent activity
+router.get('/recent-activity', async (req, res) => {
+    try {
+        const db = req.app.locals.db;
+        const collections = await db.listCollections().toArray();
+        const classCollections = collections.filter(c => c.name.startsWith('class_'));
+        
+        // Get recent student additions (last 24 hours)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        let recentStudents = [];
+        
+        for (const collection of classCollections) {
+            const students = await db.collection(collection.name)
+                .find({
+                    createdAt: { $gte: oneDayAgo }
+                })
+                .project({
+                    name: 1,
+                    class: 1,
+                    createdAt: 1,
+                    type: 'student_added'
+                })
+                .toArray();
+            
+            recentStudents = recentStudents.concat(students);
+        }
+        
+        // Get recent quiz attempts
+        const quizzes = readQuizzes();
+        const recentQuizAttempts = quizzes
+            .flatMap(quiz => (quiz.attempts || [])
+                .filter(attempt => new Date(attempt.timestamp) >= oneDayAgo)
+                .map(attempt => ({
+                    type: 'quiz_attempt',
+                    quizName: quiz.name,
+                    studentName: attempt.studentName,
+                    score: attempt.score,
+                    timestamp: attempt.timestamp
+                }))
+            );
+        
+        // Combine and sort all activities
+        const allActivities = [...recentStudents, ...recentQuizAttempts]
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, 10);  // Get only the 10 most recent activities
+        
+        res.json(allActivities);
+    } catch (error) {
+        console.error('Error fetching recent activity:', error);
+        res.status(500).json({ error: 'Failed to fetch recent activity' });
+    }
+});
+
 module.exports = router;

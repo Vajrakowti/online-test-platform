@@ -8,8 +8,14 @@ const MongoStore = require('connect-mongo');
 const adminApp = express();
 const userApp = express();
 
+// Import routes
+const adminRoutes = require('./routes/admin');
+const studentRoutes = require('./routes/student');
+const startQuizRoutes = require('./routes/startquiz');
+
 const url = "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 let dbo;
+let mongoClient = null;
 
 // MongoDB connection options
 const mongoOptions = {
@@ -214,8 +220,6 @@ setupApp(adminApp, 'admin');
 setupApp(userApp, 'student');
 
 // MongoDB connection
-let mongoClient = null;
-
 MongoClient.connect(url, mongoOptions)
     .then(client => {
         mongoClient = client; // Store the client for proper cleanup later
@@ -339,8 +343,6 @@ MongoClient.connect(url, mongoOptions)
             }
         });
 
-        const adminRoutes = require('./routes/admin');
-        
         // Extra middleware to protect admin routes with double validation
         adminApp.use('/admin', (req, res, next) => {
             // First check: active session with admin role
@@ -375,7 +377,10 @@ MongoClient.connect(url, mongoOptions)
             res.setHeader('Surrogate-Control', 'no-store');
             
             next();
-        }, adminRoutes);
+        });
+
+        // Mount admin routes
+        adminApp.use('/admin', adminRoutes);
 
         adminApp.get('/api/check-session', (req, res) => {
             res.json({ authenticated: !!req.session.fname });
@@ -579,8 +584,6 @@ MongoClient.connect(url, mongoOptions)
             }
         });
 
-        const studentRoutes = require('./routes/student');
-        
         // Extra middleware to protect student routes with double validation
         userApp.use('/student', (req, res, next) => {
             // First check: active session with student role
@@ -617,8 +620,6 @@ MongoClient.connect(url, mongoOptions)
             next();
         }, studentRoutes);
 
-        const startQuizRoutes = require('./routes/startquiz');
-        
         // Extra middleware to protect quiz routes
         userApp.use('/student/startquiz', (req, res, next) => {
             // First check: active session with student role
@@ -664,23 +665,7 @@ MongoClient.connect(url, mongoOptions)
         process.exit(1);
     });
 
-process.on('uncaughtException', err => {
-    console.error('Uncaught Exception:', err);
-    // Don't exit process on MongoDB connection errors
-    if (!err.message.includes('MongoDB') && !err.message.includes('mongo')) {
-        process.exit(1);
-    }
-});
-
-process.on('unhandledRejection', err => {
-    console.error('Unhandled Rejection:', err);
-    // Don't exit process on MongoDB connection errors
-    if (err && !err.message.includes('MongoDB') && !err.message.includes('mongo')) {
-        process.exit(1);
-    }
-});
-
-// Add error handlers at the end of the file
+// Add error handlers for graceful shutdown
 process.on('exit', () => {
     if (mongoClient) {
         console.log('Process exiting, closing MongoDB connection');
@@ -730,3 +715,19 @@ function reconnectToMongoDB() {
             setTimeout(reconnectToMongoDB, 10000);
         });
 }
+
+process.on('uncaughtException', err => {
+    console.error('Uncaught Exception:', err);
+    // Don't exit process on MongoDB connection errors
+    if (!err.message.includes('MongoDB') && !err.message.includes('mongo')) {
+        process.exit(1);
+    }
+});
+
+process.on('unhandledRejection', err => {
+    console.error('Unhandled Rejection:', err);
+    // Don't exit process on MongoDB connection errors
+    if (err && !err.message.includes('MongoDB') && !err.message.includes('mongo')) {
+        process.exit(1);
+    }
+});

@@ -166,5 +166,13 @@
     "class": "10",
     "type": "excel",
     "file": "Alex.xlsx"
+  },
+  {
+    "name": "class 10 final paper",
+    "startTime": "12:11",
+    "endTime": "13:11",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "class 10 final paper-manual.json"
   }
 ]
