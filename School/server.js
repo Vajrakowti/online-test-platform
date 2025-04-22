@@ -8,6 +8,10 @@ const MongoStore = require('connect-mongo');
 const adminApp = express();
 const userApp = express();
 
+// Import routes
+const adminRoutes = require('./routes/admin');
+const studentRoutes = require('./routes/student');
+const startQuizRoutes = require('./routes/startquiz');
 
 const url = "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 let dbo;
@@ -246,8 +250,6 @@ MongoClient.connect(url)
             });
         });
 
-        const adminRoutes = require('./routes/admin');
-        
         // Extra middleware to protect admin routes with double validation
         adminApp.use('/admin', (req, res, next) => {
             // First check: active session with admin role
@@ -275,7 +277,10 @@ MongoClient.connect(url)
             res.setHeader('Surrogate-Control', 'no-store');
             
             next();
-        }, adminRoutes);
+        });
+
+        // Mount admin routes
+        adminApp.use('/admin', adminRoutes);
 
         adminApp.get('/api/check-session', (req, res) => {
             res.json({ authenticated: !!req.session.fname });
@@ -473,8 +478,6 @@ MongoClient.connect(url)
             });
         });
 
-        const studentRoutes = require('./routes/student');
-        
         // Extra middleware to protect student routes with double validation
         userApp.use('/student', (req, res, next) => {
             // First check: active session with student role
@@ -504,8 +507,6 @@ MongoClient.connect(url)
             next();
         }, studentRoutes);
 
-        const startQuizRoutes = require('./routes/startquiz');
-        
         // Extra middleware to protect quiz routes
         userApp.use('/student/startquiz', (req, res, next) => {
             // First check: active session with student role

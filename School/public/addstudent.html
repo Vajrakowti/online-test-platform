@@ -4,69 +4,109 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Add Student</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     :root {
-      --primary-color: #4e73df;
-      --secondary-color: #f8f9fc;
-      --accent-color: #36b9cc;
-      --success-color: #1cc88a;
+      --primary-color: #4361ee;
+      --primary-light: #4f6ef2;
+      --secondary-color: #f6f8fd;
+      --accent-color: #00b4d8;
+      --success-color: #2ecc71;
       --danger-color: #e74a3b;
-      --text-color: #5a5c69;
-      --border-color: #e3e6f0;
+      --text-color: #2d3748;
+      --text-light: #718096;
+      --border-color: #e2e8f0;
+      --border-radius: 10px;
+      --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+      --transition: all 0.3s ease;
     }
     
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Inter', sans-serif;
     }
     
     body {
       background-color: var(--secondary-color);
       color: var(--text-color);
       line-height: 1.6;
-      padding: 20px;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
     }
     
-    /* Centered title */
+    /* Header Section */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
     .page-title {
-      font-size: 2rem;
-      font-weight: 700;
+      font-size: 1.875rem;
+      font-weight: 600;
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .page-title i {
       color: var(--primary-color);
-      margin: 20px 0 40px;
-      text-align: center;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      background-color: white;
+      color: var(--text-color);
+      border-radius: var(--border-radius);
+      text-decoration: none;
+      font-weight: 500;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+    }
+
+    .back-button:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
     }
     
     /* Form Styles */
     .form-container {
-      width: 100%;
-      max-width: 700px;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
-      padding: 30px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-md);
+      padding: 2rem;
     }
     
     .form-header {
-      margin-bottom: 30px;
-      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
     }
     
     .form-header h2 {
-      color: var(--primary-color);
-      font-size: 1.5rem;
-      margin-bottom: 10px;
+      color: var(--text-color);
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
     }
     
     .form-header p {
-      color: var(--text-color);
-      opacity: 0.8;
+      color: var(--text-light);
+      font-size: 0.875rem;
     }
 
     /* Photo Upload Section */
@@ -74,21 +114,22 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      margin-bottom: 30px;
-      gap: 15px;
+      margin-bottom: 2rem;
+      gap: 1rem;
     }
 
     .photo-preview {
-      width: 150px;
-      height: 150px;
+      width: 160px;
+      height: 160px;
       border-radius: 50%;
-      background-color: #f5f5f5;
+      background-color: var(--secondary-color);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      border: 3px solid var(--accent-color);
+      border: 3px solid var(--primary-color);
       position: relative;
+      box-shadow: var(--shadow-sm);
     }
 
     .photo-preview img {
@@ -99,7 +140,7 @@
 
     .photo-preview i {
       font-size: 3rem;
-      color: #ccc;
+      color: var(--text-light);
     }
 
     .photo-upload-btn {
@@ -118,41 +159,37 @@
     }
 
     .photo-upload-btn .btn-upload {
-      padding: 10px 20px;
-      background-color: var(--accent-color);
+      padding: 0.75rem 1.5rem;
+      background-color: var(--primary-color);
       color: white;
-      border-radius: 4px;
-      font-weight: 600;
+      border-radius: var(--border-radius);
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: var(--transition);
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 0.5rem;
     }
 
     .photo-upload-btn .btn-upload:hover {
-      background-color: #2a9db8;
-    }
-
-    .photo-upload-btn .btn-upload i {
-      font-size: 1rem;
+      background-color: var(--primary-light);
+      transform: translateY(-1px);
     }
 
     .photo-filename {
-      margin-top: 8px;
-      font-size: 0.9rem;
-      color: var(--text-color);
+      font-size: 0.875rem;
+      color: var(--text-light);
       text-align: center;
     }
     
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
+      gap: 1.5rem;
     }
     
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 1.5rem;
     }
     
     .form-group.full-width {
@@ -161,71 +198,99 @@
     
     label {
       display: block;
-      margin-bottom: 8px;
-      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
       color: var(--text-color);
+      font-size: 0.875rem;
     }
     
     input, select {
       width: 100%;
-      padding: 12px 15px;
+      padding: 0.75rem 1rem;
       border: 1px solid var(--border-color);
-      border-radius: 4px;
-      font-size: 14px;
-      transition: all 0.3s;
+      border-radius: var(--border-radius);
+      font-size: 0.875rem;
+      color: var(--text-color);
+      background-color: white;
+      transition: var(--transition);
     }
     
     input:focus, select:focus {
       outline: none;
       border-color: var(--primary-color);
-      box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
     }
     
     .button-group {
       display: flex;
       justify-content: flex-end;
-      gap: 15px;
-      margin-top: 30px;
-      padding-top: 20px;
+      gap: 1rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
       border-top: 1px solid var(--border-color);
     }
     
     .btn {
-      padding: 12px 25px;
-      border-radius: 4px;
-      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius);
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: var(--transition);
       border: none;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-    }
-    
-    .btn i {
-      margin-right: 8px;
+      gap: 0.5rem;
+      font-size: 0.875rem;
     }
     
     .btn-cancel {
-      background-color: var(--danger-color);
-      color: white;
+      background-color: white;
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
     }
     
     .btn-cancel:hover {
-      background-color: #d62c1a;
+      background-color: var(--secondary-color);
     }
     
     .btn-submit {
-      background-color: var(--success-color);
+      background-color: var(--primary-color);
       color: white;
     }
     
     .btn-submit:hover {
-      background-color: #17a673;
+      background-color: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    /* Form Validation Styles */
+    .form-group.error input {
+      border-color: var(--danger-color);
+    }
+
+    .error-message {
+      color: var(--danger-color);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      display: none;
+    }
+
+    .form-group.error .error-message {
+      display: block;
     }
     
     /* Responsive Design */
     @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
       .form-grid {
         grid-template-columns: 1fr;
       }
@@ -235,165 +300,149 @@
       }
       
       .button-group {
-        flex-direction: column;
+        flex-direction: column-reverse;
       }
       
       .btn {
         width: 100%;
+        justify-content: center;
+      }
+
+      .form-container {
+        padding: 1.5rem;
       }
     }
   </style>
 </head>
 <body>
-  <h1 class="page-title">Add New Student</h1>
-
-  <div class="form-container">
-    <div class="form-header">
-      <h2><i class="fas fa-user-plus"></i> Student Information</h2>
-      <p>Please fill in all required fields to add a new student</p>
+  <div class="container">
+    <div class="header">
+      <h1 class="page-title">
+        <i class="fas fa-user-plus"></i>
+        Add New Student
+      </h1>
+      <a href="/admin" class="back-button">
+        <i class="fas fa-arrow-left"></i>
+        Back to Dashboard
+      </a>
     </div>
-    
-    <form action="/admin/add-student" method="POST" enctype="multipart/form-data" id="studentForm">
-      <!-- Photo Upload Section -->
-      <div class="photo-upload-container">
-        <div class="photo-preview" id="photoPreview">
-          <i class="fas fa-user"></i>
-          <img id="previewImage" style="display: none;">
-        </div>
-        
-        <div class="photo-upload-btn">
-          <input type="file" id="photo" name="photo" accept="image/*" required>
-          <label for="photo" class="btn-upload">
-            <i class="fas fa-camera"></i> Choose Photo
-          </label>
-        </div>
-        <div class="photo-filename" id="photoFilename">No file selected</div>
+
+    <div class="form-container">
+      <div class="form-header">
+        <h2>Student Information</h2>
+        <p>Fill in the student details below. All fields marked with * are required.</p>
       </div>
-      
-      <!-- Student Details Form -->
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="name">Full Name <span style="color: var(--danger-color)">*</span></label>
-          <input type="text" id="name" name="name" placeholder="Enter student's full name" required>
+
+      <form id="addStudentForm" action="/admin/add-student" method="POST" enctype="multipart/form-data">
+        <div class="photo-upload-container">
+          <div class="photo-preview">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="photo-upload-btn">
+            <input type="file" name="photo" id="photo" accept="image/*" required>
+            <div class="btn-upload">
+              <i class="fas fa-camera"></i>
+              Upload Photo
+            </div>
+          </div>
+          <div class="photo-filename"></div>
         </div>
-        
-        <div class="form-group">
-          <label for="email">Email <span style="color: var(--danger-color)">*</span></label>
-          <input type="email" id="email" name="email" placeholder="Enter student's email" required>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="name">Full Name *</label>
+            <input type="text" id="name" name="name" required placeholder="Enter student's full name">
+            <div class="error-message">Please enter the student's name</div>
+          </div>
+
+          <div class="form-group">
+            <label for="studentClass">Class *</label>
+            <select id="studentClass" name="studentClass" required>
+              <option value="">Select a class</option>
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+            </select>
+            <div class="error-message">Please select a class</div>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address *</label>
+            <input type="email" id="email" name="email" required placeholder="Enter email address">
+            <div class="error-message">Please enter a valid email address</div>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone Number *</label>
+            <input type="tel" id="phone" name="phone" required placeholder="Enter phone number">
+            <div class="error-message">Please enter a valid phone number</div>
+          </div>
+
+          <div class="form-group">
+            <label for="dob">Date of Birth *</label>
+            <input type="date" id="dob" name="dob" required>
+            <div class="error-message">Please select the date of birth</div>
+          </div>
         </div>
-        
-        <div class="form-group">
-          <label for="phone">Phone Number <span style="color: var(--danger-color)">*</span></label>
-          <input type="tel" id="phone" name="phone" placeholder="Enter student's phone number" required>
+
+        <div class="button-group">
+          <button type="button" class="btn btn-cancel" onclick="window.location.href='/admin'">
+            <i class="fas fa-times"></i>
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-submit">
+            <i class="fas fa-check"></i>
+            Add Student
+          </button>
         </div>
-        
-        <div class="form-group">
-          <label for="dob">Date of Birth <span style="color: var(--danger-color)">*</span></label>
-          <input type="date" id="dob" name="dob" required>
-        </div>
-        
-        <div class="form-group full-width">
-          <label for="studentClass">Class <span style="color: var(--danger-color)">*</span></label>
-          <select id="studentClass" name="studentClass" required>
-            <option value="">Select Class</option>
-            <option value="1">1st Class</option>
-            <option value="2">2nd Class</option>
-            <option value="3">3rd Class</option>
-            <option value="4">4th Class</option>
-            <option value="5">5th Class</option>
-            <option value="6">6th Class</option>
-            <option value="7">7th Class</option>
-            <option value="8">8th Class</option>
-            <option value="9">9th Class</option>
-            <option value="10">10th Class</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="button-group">
-        <button type="button" class="btn btn-cancel" onclick="window.location.href='/admin'">
-          <i class="fas fa-times"></i> Cancel
-        </button>
-        <button type="submit" class="btn btn-submit">
-          <i class="fas fa-user-plus"></i> Add Student
-        </button>
-      </div>
-    </form>
+      </form>
+    </div>
   </div>
 
   <script>
     // Photo preview functionality
-    document.getElementById('photo').addEventListener('change', function(e) {
+    const photoInput = document.getElementById('photo');
+    const photoPreview = document.querySelector('.photo-preview');
+    const photoFilename = document.querySelector('.photo-filename');
+
+    photoInput.addEventListener('change', function(e) {
       const file = e.target.files[0];
-      const preview = document.getElementById('previewImage');
-      const filenameDisplay = document.getElementById('photoFilename');
-      const icon = document.querySelector('#photoPreview i');
-      
       if (file) {
-        // Display filename
-        filenameDisplay.textContent = file.name;
-        
-        // Check if file is an image
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          
-          reader.onload = function(e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-            icon.style.display = 'none';
-          }
-          
-          reader.readAsDataURL(file);
-        } else {
-          // Reset if not an image
-          preview.style.display = 'none';
-          icon.style.display = 'block';
-          filenameDisplay.textContent = 'Please select an image file';
-          e.target.value = '';
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          photoPreview.innerHTML = `<img src="${e.target.result}" alt="Student Photo">`;
+          photoFilename.textContent = file.name;
         }
-      } else {
-        // Reset if no file selected
-        preview.style.display = 'none';
-        icon.style.display = 'block';
-        filenameDisplay.textContent = 'No file selected';
+        reader.readAsDataURL(file);
       }
     });
 
     // Form validation
-    document.getElementById('studentForm').addEventListener('submit', function(e) {
-      const requiredFields = document.querySelectorAll('input[required], select[required]');
+    const form = document.getElementById('addStudentForm');
+    form.addEventListener('submit', function(e) {
       let isValid = true;
+      const requiredFields = form.querySelectorAll('[required]');
       
       requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-          field.style.borderColor = 'var(--danger-color)';
+        const formGroup = field.closest('.form-group');
+        if (!field.value) {
+          formGroup.classList.add('error');
           isValid = false;
         } else {
-          field.style.borderColor = 'var(--border-color)';
+          formGroup.classList.remove('error');
         }
       });
-      
-      // Special check for photo
-      const photoInput = document.getElementById('photo');
-      if (!photoInput.files || photoInput.files.length === 0) {
-        document.getElementById('photoFilename').style.color = 'var(--danger-color)';
-        isValid = false;
-      }
-      
+
       if (!isValid) {
         e.preventDefault();
-        alert('Please fill in all required fields');
-        return false;
       }
-      
-      return true;
-    });
-
-    // Reset field borders when user starts typing
-    document.querySelectorAll('input, select').forEach(field => {
-      field.addEventListener('input', function() {
-        this.style.borderColor = 'var(--border-color)';
-      });
     });
   </script>
 </body>
