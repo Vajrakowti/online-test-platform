@@ -22,10 +22,53 @@ router.get('/', (req, res) => {
             }
             
             // Replace the welcome message with the student's name
-            const updatedHtml = data.replace(
+            let updatedHtml = data.replace(
                 '<h2>Welcome, Student</h2>',
                 `<h2>Welcome, ${req.session.fname}</h2>`
             );
+            
+            // Add script to check sessionStorage for completed quizzes
+            const sessionStorageCheckScript = `
+            <script>
+                // Function to check sessionStorage for completed quizzes and update server
+                function checkSessionStorageForCompletedQuizzes() {
+                    const completedQuizzes = [];
+                    for (let i = 0; i < sessionStorage.length; i++) {
+                        const key = sessionStorage.key(i);
+                        if (key && key.startsWith('quiz_attempt_')) {
+                            const quizName = key.replace('quiz_attempt_', '').replace(/_/g, ' ');
+                            completedQuizzes.push(quizName);
+                        }
+                    }
+                    return completedQuizzes;
+                }
+                
+                // On page load, send completed quizzes to server
+                document.addEventListener('DOMContentLoaded', function() {
+                    const recentlyCompletedQuizzes = checkSessionStorageForCompletedQuizzes();
+                    if (recentlyCompletedQuizzes.length > 0) {
+                        fetch('/student/update-completed-quizzes', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ quizNames: recentlyCompletedQuizzes })
+                        })
+                        .then(response => response.json())
+                        .then(() => {
+                            // Reload quizzes display after updating
+                            if (window.refreshQuizLists) {
+                                window.refreshQuizLists();
+                            }
+                        })
+                        .catch(error => console.error('Error updating completed quizzes:', error));
+                    }
+                });
+            </script>
+            `;
+            
+            // Insert the script before the closing body tag
+            updatedHtml = updatedHtml.replace('</body>', sessionStorageCheckScript + '</body>');
             
             res.send(updatedHtml);
         });
@@ -63,6 +106,28 @@ router.get('/quizzes', (req, res) => {
 
     // Get student's class from session
     const studentClass = req.session.class || '1'; // Default to class 1 if not set
+    const studentUsername = req.session.username;
+    
+    // First get student's attempted quizzes
+    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
+    let attemptedQuizzes = [];
+    
+    if (fs.existsSync(attemptsFile)) {
+        try {
+            attemptedQuizzes = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'))
+                .map(attempt => attempt.quizName);
+        } catch (err) {
+            console.error("Failed to read attempts file:", err);
+            // Continue with empty attempts array
+        }
+    }
+    
+    // Also check session-stored completions (in case file hasn't been updated yet)
+    const sessionCompletedQuizzes = (req.session.completedQuizzes || [])
+        .map(quiz => quiz.quizName);
+    
+    // Combine both sources of completed quizzes
+    const completedQuizNames = [...new Set([...attemptedQuizzes, ...sessionCompletedQuizzes])];
     
     fs.readFile(QUIZ_FILE, 'utf-8', (err, data) => {
         if (err) {
@@ -71,9 +136,12 @@ router.get('/quizzes', (req, res) => {
         }
         try {
             const quizzes = JSON.parse(data);
-            // Filter quizzes by student's class and active time window
+            // Filter quizzes by student's class, active time window, and not attempted
             const now = new Date();
             const filteredQuizzes = quizzes.filter(q => {
+                // Skip if already completed
+                if (completedQuizNames.includes(q.name)) return false;
+                
                 // Check if quiz is for student's class
                 if (q.class !== studentClass) return false;
                 
@@ -96,6 +164,71 @@ router.get('/quizzes', (req, res) => {
             res.status(500).json({ error: "Invalid JSON format." });
         }
     });
+});
+
+// New route to update completed quizzes from sessionStorage
+router.post('/update-completed-quizzes', (req, res) => {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    const { quizNames } = req.body;
+    if (!quizNames || !Array.isArray(quizNames)) {
+        return res.status(400).json({ error: "Invalid request format" });
+    }
+    
+    const studentUsername = req.session.username;
+    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
+    
+    // First check if these quizzes are already recorded in the attempts file
+    let attempts = [];
+    let needsUpdate = false;
+    
+    if (fs.existsSync(attemptsFile)) {
+        try {
+            attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+            
+            // For each quiz name from sessionStorage, check if it's already in the attempts
+            quizNames.forEach(quizName => {
+                if (!attempts.some(attempt => attempt.quizName === quizName)) {
+                    // If not found, add a placeholder entry
+                    attempts.push({
+                        quizName,
+                        score: 0,  // We don't know the score
+                        totalQuestions: 0,  // We don't know the total
+                        attemptedAt: new Date().toISOString(),
+                        fromSessionStorage: true  // Mark as recovered from session storage
+                    });
+                    needsUpdate = true;
+                }
+            });
+            
+            // If we added any new entries, save the updated attempts file
+            if (needsUpdate) {
+                fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
+            }
+            
+        } catch (err) {
+            console.error("Failed to process attempts file:", err);
+        }
+    } else {
+        // If the attempts file doesn't exist yet, create it with the sessionStorage entries
+        const newAttempts = quizNames.map(quizName => ({
+            quizName,
+            score: 0,
+            totalQuestions: 0,
+            attemptedAt: new Date().toISOString(),
+            fromSessionStorage: true
+        }));
+        
+        try {
+            fs.writeFileSync(attemptsFile, JSON.stringify(newAttempts, null, 2));
+        } catch (err) {
+            console.error("Failed to create attempts file:", err);
+        }
+    }
+    
+    res.json({ success: true });
 });
 
 // Route to get attempted quizzes for the current student
@@ -874,6 +1007,19 @@ router.get('/result/:quizName', (req, res) => {
             </html>
         `);
     }
+});
+
+// Add endpoint to check completed quizzes from session
+router.get('/check-completed-quizzes', (req, res) => {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    // Return completed quizzes from session if available
+    const completedQuizzes = (req.session.completedQuizzes || [])
+        .map(quiz => quiz.quizName);
+    
+    res.json(completedQuizzes);
 });
 
 module.exports = router;

@@ -78,5 +78,93 @@
     "class": "7",
     "type": "excel",
     "file": "rr.xlsx"
+  },
+  {
+    "name": "Rak",
+    "startTime": "17:00",
+    "endTime": "18:00",
+    "class": "10",
+    "type": "excel",
+    "file": "Rak.xlsx"
+  },
+  {
+    "name": "tt",
+    "startTime": "09:50",
+    "endTime": "11:00",
+    "class": "10",
+    "type": "excel",
+    "file": "tt.xlsx"
+  },
+  {
+    "name": "rrr",
+    "startTime": "10:28",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "excel",
+    "file": "rrr.xlsx"
+  },
+  {
+    "name": "RRR",
+    "startTime": "11:00",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "excel",
+    "file": "RRR.xlsx"
+  },
+  {
+    "name": "Aa",
+    "startTime": "11:30",
+    "endTime": "13:00",
+    "class": "10",
+    "type": "excel",
+    "file": "Aa.xlsx"
+  },
+  {
+    "name": "Manual",
+    "startTime": "11:40",
+    "endTime": "12:40",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "Manual-manual.json"
+  },
+  {
+    "name": "egg",
+    "startTime": "12:00",
+    "endTime": "14:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "egg-manual.json"
+  },
+  {
+    "name": "zzz",
+    "startTime": "12:00",
+    "endTime": "13:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "zzz-manual.json"
+  },
+  {
+    "name": "SSS",
+    "startTime": "12:00",
+    "endTime": "13:09",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "SSS-manual.json"
+  },
+  {
+    "name": "Zz",
+    "startTime": "15:20",
+    "endTime": "17:00",
+    "class": "10",
+    "type": "excel",
+    "file": "Zz.xlsx"
+  },
+  {
+    "name": "Alex",
+    "startTime": "15:00",
+    "endTime": "17:00",
+    "class": "10",
+    "type": "excel",
+    "file": "Alex.xlsx"
   }
 ]

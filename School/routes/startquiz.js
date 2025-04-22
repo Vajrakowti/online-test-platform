@@ -7,6 +7,12 @@ const router = express.Router();
 const EXCEL_DIR = path.join(__dirname, '../uploads');
 const QUIZ_JSON_PATH = path.join(__dirname, '../quizzes.json');
 const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
+const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
+
+// Ensure attempts directory exists
+if (!fs.existsSync(ATTEMPTS_DIR)) {
+    fs.mkdirSync(ATTEMPTS_DIR);
+}
 
 function loadQuizData(quiz) {
   if (quiz.type === 'excel') {
@@ -69,18 +75,42 @@ function calculateDuration(quizConfig) {
     return durationSec;
 }
 
-router.get('/:quizName', (req, res) => {
-    // Check if user is logged in and has student role
-    if (!req.session.fname || req.session.role !== 'student') {
-        return res.redirect('/login');
+// Check if quiz has been attempted
+function hasAttemptedQuiz(username, quizName) {
+    const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
+    
+    if (!fs.existsSync(attemptsFile)) {
+        return false;
     }
     
+    try {
+        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+        return attempts.some(attempt => attempt.quizName === quizName);
+    } catch (err) {
+        console.error("Error checking quiz attempts:", err);
+        return false;
+    }
+}
+
+router.get('/:quizName', (req, res) => {
     const quizName = req.params.quizName;
     const quizzes = JSON.parse(fs.readFileSync(QUIZ_JSON_PATH));
     const quizConfig = quizzes.find(q => q.name === quizName);
 
+    // Check if user is logged in as a student
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+
+    // Check if quiz exists
     if (!quizConfig) {
         return res.status(404).send("Quiz not found");
+    }
+    
+    // Check if the quiz has already been attempted
+    if (hasAttemptedQuiz(req.session.username, quizName)) {
+        // Redirect to the result page instead of showing the quiz again
+        return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
     }
 
     try {
@@ -362,6 +392,14 @@ router.get('/:quizName', (req, res) => {
                 const MAX_FULLSCREEN_ATTEMPTS = 2;
                 let isFullscreen = false;
                 let quizSubmitted = false;
+                
+                // Check if we already have an attempt in sessionStorage to handle page refreshes
+                const attemptKey = 'quiz_attempt_' + quizName.replace(/\s+/g, '_');
+                
+                if (sessionStorage.getItem(attemptKey) === 'completed') {
+                    // This quiz was already completed in this session, redirect to results
+                    window.location.href = '/student/result/' + encodeURIComponent(quizName);
+                }
 
                 // Show start button initially
                 document.getElementById('startFullscreenBtn').style.display = 'block';
@@ -428,6 +466,18 @@ router.get('/:quizName', (req, res) => {
                     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
                     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
                     document.addEventListener('visibilitychange', handleVisibilityChange);
+                    
+                    // Add beforeunload event to prevent refreshing during quiz
+                    window.addEventListener('beforeunload', function(e) {
+                        if (quizSubmitted) {
+                            return undefined; // Allow leaving if quiz is submitted
+                        }
+                        
+                        // Standard way to show confirmation dialog
+                        const confirmationMessage = 'If you leave or refresh the page, your quiz will be submitted automatically. Are you sure?';
+                        e.returnValue = confirmationMessage;
+                        return confirmationMessage;
+                    });
                 }
 
                 function removeEventListeners() {
@@ -436,6 +486,9 @@ router.get('/:quizName', (req, res) => {
                     document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
                     document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
                     document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('beforeunload', function() {
+                        // Empty function as we just want to remove the listener
+                    });
                 }
 
                 function handleFullscreenChange() {
@@ -601,6 +654,9 @@ router.get('/:quizName', (req, res) => {
                     
                     document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + quiz.length;
                     
+                    // Mark this quiz as completed in sessionStorage
+                    sessionStorage.setItem(attemptKey, 'completed');
+                    
                     saveAttempt(score, quiz.length);
                     generateAnswerReview();
                 }
@@ -670,6 +726,51 @@ router.get('/:quizName', (req, res) => {
                         }
                     }
                 }
+                
+                function generateAnswerReview() {
+                    // Create review of answers
+                    const reviewContainer = document.getElementById('answerReview');
+                    reviewContainer.style.display = 'block';
+                    
+                    let reviewHTML = '<h3>Answer Review</h3>';
+                    
+                    for (let i = 0; i < quiz.length; i++) {
+                        const question = quiz[i][0];
+                        const userAnswer = userAnswers[i] || "Not answered";
+                        const correctAnswer = quiz[i][5];
+                        const isCorrect = userAnswer === correctAnswer;
+                        
+                        reviewHTML += '<div class="review-question">' +
+                            '<h3>Q' + (i+1) + ': ' + question + '</h3>' +
+                            '<div class="review-option ' + (isCorrect ? 'correct-answer' : 'wrong-answer') + '">' +
+                            'Your answer: ' + userAnswer +
+                            '</div>';
+                            
+                        if (!isCorrect) {
+                            reviewHTML += '<div class="review-option correct-answer">' +
+                                'Correct answer: ' + correctAnswer +
+                                '</div>';
+                        }
+                        
+                        reviewHTML += '</div>';
+                    }
+                    
+                    reviewContainer.innerHTML = reviewHTML;
+                }
+
+                // Add event listener for page load to detect if this is a page refresh during an active quiz
+                window.addEventListener('load', function() {
+                    // If the page is being refreshed during an active quiz (not already submitted)
+                    // and not just starting (still showing the start button)
+                    if (!quizSubmitted && 
+                        document.getElementById('quizContainer').style.display === 'block' && 
+                        document.getElementById('startFullscreenBtn').style.display === 'none') {
+                        
+                        // Page was refreshed during active quiz - auto submit
+                        alert("The page was refreshed during an active quiz. Your quiz will be automatically submitted.");
+                        submitQuiz(true);
+                    }
+                });
 
             </script>
         </body>

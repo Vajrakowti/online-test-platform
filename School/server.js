@@ -8,28 +8,60 @@ const MongoStore = require('connect-mongo');
 const adminApp = express();
 const userApp = express();
 
-
 const url = "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 let dbo;
 
-// Enhanced session configuration
-const sessionConfig = {
-    secret: "your-secret-key-here-please-change-this",
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
+// MongoDB connection options
+const mongoOptions = {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    family: 4
+};
+
+// Set max listeners to prevent memory leak warnings
+require('events').EventEmitter.defaultMaxListeners = 30;
+
+// Create MongoDB stores for sessions with proper event handling
+const createMongoStore = (collectionName) => {
+    const store = MongoStore.create({
         mongoUrl: url,
+        mongoOptions: mongoOptions,
         dbName: 'School',
-        collectionName: 'sessions',
-        ttl: 24 * 60 * 60
-    }),
+        collectionName: collectionName,
+        ttl: 24 * 60 * 60,
+        touchAfter: 60,
+        stringify: false,
+        autoRemove: 'native',
+        autoRemoveInterval: 10,
+        crypto: {
+            secret: false
+        }
+    });
+    
+    // Explicitly set max listeners on the store instance
+    store.setMaxListeners(30);
+    
+    return store;
+}
+
+// Create separate session configurations for admin and student apps
+const createSessionConfig = (name) => ({
+    secret: `your-secret-key-here-please-change-this-${name}`,
+    resave: false,
+    saveUninitialized: true,
+    store: createMongoStore(`sessions_${name}`),
     cookie: {
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
         httpOnly: true,
         secure: false,
-        sameSite: 'strict'
-    }
-};
+        sameSite: 'lax'
+    },
+    name: `session.id.${name}`
+});
+
+const adminSessionConfig = createSessionConfig('admin');
+const userSessionConfig = createSessionConfig('student');
 
 // Generate a unique token for each session 
 function generateSecureToken() {
@@ -46,7 +78,16 @@ const setupApp = (app, role) => {
     app.use('/student-photos', express.static(path.join(__dirname, 'public', 'student-photos')));
     app.use(express.json());
     
-    app.use(session(sessionConfig));
+    // Apply session middleware with error handling
+    app.use((req, res, next) => {
+        session(role === 'admin' ? adminSessionConfig : userSessionConfig)(req, res, (err) => {
+            if (err) {
+                console.error(`${role} Session error:`, err);
+                return res.redirect('/login?error=session_error');
+            }
+            next();
+        });
+    });
     
     // Strong anti-session hijacking protection
     app.use((req, res, next) => {
@@ -83,14 +124,15 @@ const setupApp = (app, role) => {
         
         // Multi-factor session validation
         const userAgentValid = req.session.userAgent === currentUserAgent;
-        const ipValid = req.session.ipAddress === currentIp;
-        const timeValid = (Date.now() - req.session.lastAccessed) < (30 * 60 * 1000); // 30 minutes
+        // IP validation can be problematic for users on mobile networks or VPNs
+        // const ipValid = req.session.ipAddress === currentIp;
+        // Just validate the session hasn't timed out (increased to 2 hours)
+        const timeValid = (Date.now() - req.session.lastAccessed) < (120 * 60 * 1000); // 2 hours
         
         // Destroy session if validation fails
-        if (!userAgentValid || !ipValid || !timeValid) {
-            console.log('Session validation failed:', {
+        if (!userAgentValid || !timeValid) {
+            console.log(`${role} Session validation failed:`, {
                 userAgentMatch: userAgentValid,
-                ipMatch: ipValid,
                 timeValid: timeValid
             });
             req.session.destroy(() => {
@@ -172,8 +214,11 @@ setupApp(adminApp, 'admin');
 setupApp(userApp, 'student');
 
 // MongoDB connection
-MongoClient.connect(url)
+let mongoClient = null;
+
+MongoClient.connect(url, mongoOptions)
     .then(client => {
+        mongoClient = client; // Store the client for proper cleanup later
         dbo = client.db("School");
         console.log("MongoDB connected!");
         
@@ -181,10 +226,52 @@ MongoClient.connect(url)
         adminApp.locals.db = dbo;
         userApp.locals.db = dbo;
         
+        // Clear any corrupted session data
+        try {
+            // Clear corrupted admin sessions
+            dbo.collection('sessions_admin').deleteMany({
+                "session.cookie": { $exists: false }
+            }).then(result => {
+                console.log("Cleared corrupted admin sessions:", result.deletedCount);
+            }).catch(err => {
+                console.error("Failed to clear corrupted admin sessions:", err);
+            });
+            
+            // Clear corrupted student sessions
+            dbo.collection('sessions_student').deleteMany({
+                "session.cookie": { $exists: false }
+            }).then(result => {
+                console.log("Cleared corrupted student sessions:", result.deletedCount);
+            }).catch(err => {
+                console.error("Failed to clear corrupted student sessions:", err);
+            });
+        } catch (err) {
+            console.error("Error attempting to clear sessions:", err);
+        }
+
         // Verify the database connection
         dbo.command({ ping: 1 })
             .then(() => console.log("Database ping successful"))
             .catch(err => console.error("Database ping failed:", err));
+
+        // Set up a heartbeat to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+            if (!dbo) {
+                console.log("Database connection lost. Clearing heartbeat.");
+                clearInterval(heartbeatInterval);
+                return;
+            }
+            
+            dbo.command({ ping: 1 })
+                .then(() => console.log("Heartbeat: MongoDB connection is alive"))
+                .catch(err => {
+                    console.error("Heartbeat: MongoDB connection error:", err);
+                    // If connection is lost, try to reconnect
+                    if (err.name === 'MongoNetworkError') {
+                        reconnectToMongoDB();
+                    }
+                });
+        }, 5 * 60 * 1000); // Every 5 minutes
 
         // Admin routes (port 7000)
         adminApp.get('/', (req, res) => {
@@ -238,12 +325,18 @@ MongoClient.connect(url)
         });
 
         adminApp.get("/logout", (req, res) => {
-            req.session.destroy(err => {
-                if (err) {
-                    console.error('Session destruction error:', err);
-                }
+            if (req.session) {
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Admin session destruction error:', err);
+                    }
+                    // Clear any admin session cookie in the browser
+                    res.clearCookie('session.id.admin');
+                    res.redirect("/login");
+                });
+            } else {
                 res.redirect("/login");
-            });
+            }
         });
 
         const adminRoutes = require('./routes/admin');
@@ -252,16 +345,23 @@ MongoClient.connect(url)
         adminApp.use('/admin', (req, res, next) => {
             // First check: active session with admin role
             if (!req.session.fname || req.session.role !== 'admin' || !req.session.securityToken) {
-                console.log('Admin access denied: Invalid session');
+                console.log('Admin access denied:', {
+                    hasSession: !!req.session,
+                    hasUserName: !!req.session?.fname,
+                    userRole: req.session?.role,
+                    hasSecurityToken: !!req.session?.securityToken
+                });
                 return res.redirect('/login');
             }
             
-            // Second check: validate browser fingerprint
+            // Second check: validate browser fingerprint - only check user-agent
             const currentUserAgent = req.headers['user-agent'];
-            const currentIp = req.ip || req.connection.remoteAddress;
             
-            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
-                console.log('Admin access denied: Browser fingerprint mismatch');
+            if (req.session.userAgent !== currentUserAgent) {
+                console.log('Admin access denied: Browser fingerprint mismatch', {
+                    sessionUA: req.session.userAgent?.substring(0, 20),
+                    currentUA: currentUserAgent?.substring(0, 20)
+                });
                 req.session.destroy(() => {
                     return res.redirect('/login?error=security_violation');
                 });
@@ -465,12 +565,18 @@ MongoClient.connect(url)
         });
 
         userApp.get("/logout", (req, res) => {
-            req.session.destroy(err => {
-                if (err) {
-                    console.error('Session destruction error:', err);
-                }
+            if (req.session) {
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Student session destruction error:', err);
+                    }
+                    // Clear any student session cookie in the browser
+                    res.clearCookie('session.id.student');
+                    res.redirect("/login");
+                });
+            } else {
                 res.redirect("/login");
-            });
+            }
         });
 
         const studentRoutes = require('./routes/student');
@@ -479,16 +585,23 @@ MongoClient.connect(url)
         userApp.use('/student', (req, res, next) => {
             // First check: active session with student role
             if (!req.session.fname || req.session.role !== 'student' || !req.session.securityToken) {
-                console.log('Student access denied: Invalid session');
+                console.log('Student access denied:', {
+                    hasSession: !!req.session,
+                    hasUserName: !!req.session?.fname,
+                    userRole: req.session?.role,
+                    hasSecurityToken: !!req.session?.securityToken
+                });
                 return res.redirect('/login');
             }
             
-            // Second check: validate browser fingerprint
+            // Second check: validate browser fingerprint - only check user agent
             const currentUserAgent = req.headers['user-agent'];
-            const currentIp = req.ip || req.connection.remoteAddress;
             
-            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
-                console.log('Student access denied: Browser fingerprint mismatch');
+            if (req.session.userAgent !== currentUserAgent) {
+                console.log('Student access denied: Browser fingerprint mismatch', {
+                    sessionUA: req.session.userAgent?.substring(0, 20),
+                    currentUA: currentUserAgent?.substring(0, 20)
+                });
                 req.session.destroy(() => {
                     return res.redirect('/login?error=security_violation');
                 });
@@ -510,16 +623,23 @@ MongoClient.connect(url)
         userApp.use('/student/startquiz', (req, res, next) => {
             // First check: active session with student role
             if (!req.session.fname || req.session.role !== 'student' || !req.session.securityToken) {
-                console.log('Quiz access denied: Invalid session');
+                console.log('Quiz access denied:', {
+                    hasSession: !!req.session,
+                    hasUserName: !!req.session?.fname,
+                    userRole: req.session?.role,
+                    hasSecurityToken: !!req.session?.securityToken
+                });
                 return res.redirect('/login');
             }
             
-            // Second check: validate browser fingerprint
+            // Second check: validate browser fingerprint - only check user agent
             const currentUserAgent = req.headers['user-agent'];
-            const currentIp = req.ip || req.connection.remoteAddress;
             
-            if (req.session.userAgent !== currentUserAgent || req.session.ipAddress !== currentIp) {
-                console.log('Quiz access denied: Browser fingerprint mismatch');
+            if (req.session.userAgent !== currentUserAgent) {
+                console.log('Quiz access denied: Browser fingerprint mismatch', {
+                    sessionUA: req.session.userAgent?.substring(0, 20),
+                    currentUA: currentUserAgent?.substring(0, 20)
+                });
                 req.session.destroy(() => {
                     return res.redirect('/login?error=security_violation');
                 });
@@ -546,8 +666,67 @@ MongoClient.connect(url)
 
 process.on('uncaughtException', err => {
     console.error('Uncaught Exception:', err);
+    // Don't exit process on MongoDB connection errors
+    if (!err.message.includes('MongoDB') && !err.message.includes('mongo')) {
+        process.exit(1);
+    }
 });
 
 process.on('unhandledRejection', err => {
     console.error('Unhandled Rejection:', err);
+    // Don't exit process on MongoDB connection errors
+    if (err && !err.message.includes('MongoDB') && !err.message.includes('mongo')) {
+        process.exit(1);
+    }
 });
+
+// Add error handlers at the end of the file
+process.on('exit', () => {
+    if (mongoClient) {
+        console.log('Process exiting, closing MongoDB connection');
+        mongoClient.close().catch(err => {
+            console.error('Error closing MongoDB connection on exit:', err);
+        });
+    }
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT, closing connections and exiting');
+    if (mongoClient) {
+        mongoClient.close().catch(err => {
+            console.error('Error closing MongoDB connection on SIGINT:', err);
+        });
+    }
+    process.exit(0);
+});
+
+// Reconnect function
+function reconnectToMongoDB() {
+    console.log('Attempting to reconnect to MongoDB...');
+    
+    if (mongoClient) {
+        try {
+            mongoClient.close().catch(err => {
+                console.error('Error closing previous MongoDB connection:', err);
+            });
+        } catch (err) {
+            console.error('Error during client.close():', err);
+        }
+    }
+    
+    MongoClient.connect(url, mongoOptions)
+        .then(client => {
+            mongoClient = client;
+            dbo = client.db("School");
+            console.log("Successfully reconnected to MongoDB!");
+            
+            // Update the database reference
+            adminApp.locals.db = dbo;
+            userApp.locals.db = dbo;
+        })
+        .catch(err => {
+            console.error('Failed to reconnect to MongoDB:', err);
+            // Try again after a delay
+            setTimeout(reconnectToMongoDB, 10000);
+        });
+}

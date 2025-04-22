@@ -240,30 +240,70 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTodayQuizzes(quizzes) {
       todayTbody.innerHTML = '';
 
-      const availableQuizzes = quizzes.filter(quiz => {
-        return !attemptedQuizzes.some(attempt => attempt.quizName === quiz.name);
-      });
-
-      if (availableQuizzes.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="3" class="no-quizzes">No available quizzes found.</td>`;
-        todayTbody.appendChild(row);
-      } else {
-        availableQuizzes.forEach(quiz => {
-          const row = document.createElement('tr');
-          row.classList.add("quiz-row");
-          row.innerHTML = `
-            <td>${quiz.name}</td>
-            <td>${quiz.startTime}</td>
-            <td>${quiz.endTime}</td>
-          `;
-          row.addEventListener('click', () => {
-            const encodedName = encodeURIComponent(quiz.name);
-            window.location.href = '/student/quiz/' + encodedName;
+      // Check for completed quizzes in both session storage and attempted list
+      fetch('/student/check-completed-quizzes')
+        .then(res => res.json())
+        .then(sessionCompletedQuizzes => {
+          // Combine both sources of completed quizzes
+          const completedQuizNames = [
+            ...attemptedQuizzes.map(a => a.quizName),
+            ...sessionCompletedQuizzes
+          ];
+          
+          // Filter out quizzes that have been completed
+          const availableQuizzes = quizzes.filter(quiz => {
+            return !completedQuizNames.includes(quiz.name);
           });
-          todayTbody.appendChild(row);
+
+          if (availableQuizzes.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="3" class="no-quizzes">No available quizzes found.</td>`;
+            todayTbody.appendChild(row);
+          } else {
+            availableQuizzes.forEach(quiz => {
+              const row = document.createElement('tr');
+              row.classList.add("quiz-row");
+              row.innerHTML = `
+                <td>${quiz.name}</td>
+                <td>${quiz.startTime}</td>
+                <td>${quiz.endTime}</td>
+              `;
+              row.addEventListener('click', () => {
+                const encodedName = encodeURIComponent(quiz.name);
+                window.location.href = '/student/quiz/' + encodedName;
+              });
+              todayTbody.appendChild(row);
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching completed quizzes:', err);
+          // Fallback to only using attempted quizzes
+          const availableQuizzes = quizzes.filter(quiz => {
+            return !attemptedQuizzes.some(attempt => attempt.quizName === quiz.name);
+          });
+          
+          if (availableQuizzes.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="3" class="no-quizzes">No available quizzes found.</td>`;
+            todayTbody.appendChild(row);
+          } else {
+            availableQuizzes.forEach(quiz => {
+              const row = document.createElement('tr');
+              row.classList.add("quiz-row");
+              row.innerHTML = `
+                <td>${quiz.name}</td>
+                <td>${quiz.startTime}</td>
+                <td>${quiz.endTime}</td>
+              `;
+              row.addEventListener('click', () => {
+                const encodedName = encodeURIComponent(quiz.name);
+                window.location.href = '/student/quiz/' + encodedName;
+              });
+              todayTbody.appendChild(row);
+            });
+          }
         });
-      }
     }
 
     function renderAttemptedQuizzes(attempts = attemptedQuizzes) {
@@ -310,11 +350,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search filter for Today's Quizzes
     todaySearchInput.addEventListener('input', () => {
       const searchTerm = todaySearchInput.value.toLowerCase();
-      const filtered = allQuizzes.filter(q => 
-        q.name.toLowerCase().includes(searchTerm) &&
-        !attemptedQuizzes.some(attempt => attempt.quizName === q.name)
-      );
-      renderTodayQuizzes(filtered);
+      
+      // First get the completed quizzes from session
+      fetch('/student/check-completed-quizzes')
+        .then(res => res.json())
+        .then(sessionCompletedQuizzes => {
+          // Combine both sources of completed quizzes
+          const completedQuizNames = [
+            ...attemptedQuizzes.map(a => a.quizName),
+            ...sessionCompletedQuizzes
+          ];
+          
+          // Filter quizzes that match search term and aren't completed
+          const filtered = allQuizzes.filter(q => 
+            q.name.toLowerCase().includes(searchTerm) &&
+            !completedQuizNames.includes(q.name)
+          );
+          
+          renderTodayQuizzes(filtered);
+        })
+        .catch(err => {
+          console.error('Error fetching completed quizzes for search:', err);
+          // Fallback to only using attempted quizzes
+          const filtered = allQuizzes.filter(q => 
+            q.name.toLowerCase().includes(searchTerm) &&
+            !attemptedQuizzes.some(attempt => attempt.quizName === q.name)
+          );
+          renderTodayQuizzes(filtered);
+        });
     });
 
     // Search filter for Attempted Quizzes

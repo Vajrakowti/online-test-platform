@@ -1,0 +1,13 @@
+[
+  {
+    "text": "Hello",
+    "options": [
+      "11",
+      "12",
+      "13",
+      "14"
+    ],
+    "correctAnswer": 2,
+    "image": "/quiz-images/1745302552794-973434689.jpg"
+  }
+]
