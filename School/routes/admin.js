@@ -144,6 +144,56 @@ const uploadQuizImage = multer({
   { name: 'questionImage_7', maxCount: 1 },
   { name: 'questionImage_8', maxCount: 1 },
   { name: 'questionImage_9', maxCount: 1 },
+  // Option images for question 0
+  { name: 'questionOption1Image_0', maxCount: 1 },
+  { name: 'questionOption2Image_0', maxCount: 1 },
+  { name: 'questionOption3Image_0', maxCount: 1 },
+  { name: 'questionOption4Image_0', maxCount: 1 },
+  // Option images for question 1
+  { name: 'questionOption1Image_1', maxCount: 1 },
+  { name: 'questionOption2Image_1', maxCount: 1 },
+  { name: 'questionOption3Image_1', maxCount: 1 },
+  { name: 'questionOption4Image_1', maxCount: 1 },
+  // Option images for question 2
+  { name: 'questionOption1Image_2', maxCount: 1 },
+  { name: 'questionOption2Image_2', maxCount: 1 },
+  { name: 'questionOption3Image_2', maxCount: 1 },
+  { name: 'questionOption4Image_2', maxCount: 1 },
+  // Option images for question 3
+  { name: 'questionOption1Image_3', maxCount: 1 },
+  { name: 'questionOption2Image_3', maxCount: 1 },
+  { name: 'questionOption3Image_3', maxCount: 1 },
+  { name: 'questionOption4Image_3', maxCount: 1 },
+  // Option images for question 4
+  { name: 'questionOption1Image_4', maxCount: 1 },
+  { name: 'questionOption2Image_4', maxCount: 1 },
+  { name: 'questionOption3Image_4', maxCount: 1 },
+  { name: 'questionOption4Image_4', maxCount: 1 },
+  // Option images for question 5
+  { name: 'questionOption1Image_5', maxCount: 1 },
+  { name: 'questionOption2Image_5', maxCount: 1 },
+  { name: 'questionOption3Image_5', maxCount: 1 },
+  { name: 'questionOption4Image_5', maxCount: 1 },
+  // Option images for question 6
+  { name: 'questionOption1Image_6', maxCount: 1 },
+  { name: 'questionOption2Image_6', maxCount: 1 },
+  { name: 'questionOption3Image_6', maxCount: 1 },
+  { name: 'questionOption4Image_6', maxCount: 1 },
+  // Option images for question 7
+  { name: 'questionOption1Image_7', maxCount: 1 },
+  { name: 'questionOption2Image_7', maxCount: 1 },
+  { name: 'questionOption3Image_7', maxCount: 1 },
+  { name: 'questionOption4Image_7', maxCount: 1 },
+  // Option images for question 8
+  { name: 'questionOption1Image_8', maxCount: 1 },
+  { name: 'questionOption2Image_8', maxCount: 1 },
+  { name: 'questionOption3Image_8', maxCount: 1 },
+  { name: 'questionOption4Image_8', maxCount: 1 },
+  // Option images for question 9
+  { name: 'questionOption1Image_9', maxCount: 1 },
+  { name: 'questionOption2Image_9', maxCount: 1 },
+  { name: 'questionOption3Image_9', maxCount: 1 },
+  { name: 'questionOption4Image_9', maxCount: 1 },
   // Add more if needed
 ]);
 
@@ -1146,6 +1196,33 @@ router.post('/create-quiz-manual', (req, res) => {
         const uploadedFiles = req.files ? (req.files[`questionImage_${index}`] || []) : [];
         if (uploadedFiles.length > 0) {
           questionObj.image = `/quiz-images/${uploadedFiles[0].filename}`;
+        }
+
+        // Check if there are option images for this question
+        questionObj.optionImages = [null, null, null, null]; // Initialize with nulls
+
+        // Check for option 1 image
+        const option1Images = req.files ? (req.files[`questionOption1Image_${index}`] || []) : [];
+        if (option1Images.length > 0) {
+          questionObj.optionImages[0] = `/quiz-images/${option1Images[0].filename}`;
+        }
+
+        // Check for option 2 image
+        const option2Images = req.files ? (req.files[`questionOption2Image_${index}`] || []) : [];
+        if (option2Images.length > 0) {
+          questionObj.optionImages[1] = `/quiz-images/${option2Images[0].filename}`;
+        }
+
+        // Check for option 3 image
+        const option3Images = req.files ? (req.files[`questionOption3Image_${index}`] || []) : [];
+        if (option3Images.length > 0) {
+          questionObj.optionImages[2] = `/quiz-images/${option3Images[0].filename}`;
+        }
+
+        // Check for option 4 image
+        const option4Images = req.files ? (req.files[`questionOption4Image_${index}`] || []) : [];
+        if (option4Images.length > 0) {
+          questionObj.optionImages[3] = `/quiz-images/${option4Images[0].filename}`;
         }
 
         questions.push(questionObj);

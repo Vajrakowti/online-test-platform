@@ -312,6 +312,26 @@
       padding: 5px 10px;
       cursor: pointer;
     }
+
+    .option-image-container {
+      margin-top: 5px;
+      padding: 8px;
+      background-color: #f9f9fc;
+      border-radius: 6px;
+      border: 1px dashed #ddd;
+    }
+    
+    .option-row {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 10px;
+    }
+    
+    .option-row label {
+      margin-bottom: 5px;
+      font-size: 0.85rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -585,7 +605,7 @@
         </div>
         <div class="form-group">
           <label>Question Image:</label>
-          <input type="file" name="questionImage_${questionCounter}" accept="image/*" onchange="previewImage(this, ${questionCounter})">
+          <input type="file" name="questionImage_${questionCounter}" accept="image/*" onchange="previewImage(this, 'preview-${questionCounter}')">
           <img id="preview-${questionCounter}" class="image-preview">
         </div>
         <div class="form-group">
@@ -593,8 +613,14 @@
           <div style="position: relative;">
             <input type="text" name="questionOption1_${questionCounter}" id="questionOption1_${questionCounter}" required>
             
-            
             </button>
+          </div>
+          <div class="option-image-container">
+            <div class="option-row">
+              <label>Option 1 Image (Optional):</label>
+              <input type="file" name="questionOption1Image_${questionCounter}" accept="image/*" onchange="previewImage(this, 'preview-opt1-${questionCounter}')">
+              <img id="preview-opt1-${questionCounter}" class="image-preview">
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -604,6 +630,13 @@
 
             </button>
           </div>
+          <div class="option-image-container">
+            <div class="option-row">
+              <label>Option 2 Image (Optional):</label>
+              <input type="file" name="questionOption2Image_${questionCounter}" accept="image/*" onchange="previewImage(this, 'preview-opt2-${questionCounter}')">
+              <img id="preview-opt2-${questionCounter}" class="image-preview">
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="required">Option 3:</label>
@@ -612,6 +645,13 @@
 
             </button>
           </div>
+          <div class="option-image-container">
+            <div class="option-row">
+              <label>Option 3 Image (Optional):</label>
+              <input type="file" name="questionOption3Image_${questionCounter}" accept="image/*" onchange="previewImage(this, 'preview-opt3-${questionCounter}')">
+              <img id="preview-opt3-${questionCounter}" class="image-preview">
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="required">Option 4:</label>
@@ -619,6 +659,13 @@
             <input type="text" name="questionOption4_${questionCounter}" id="questionOption4_${questionCounter}" required>
  
             </button>
+          </div>
+          <div class="option-image-container">
+            <div class="option-row">
+              <label>Option 4 Image (Optional):</label>
+              <input type="file" name="questionOption4Image_${questionCounter}" accept="image/*" onchange="previewImage(this, 'preview-opt4-${questionCounter}')">
+              <img id="preview-opt4-${questionCounter}" class="image-preview">
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -661,8 +708,8 @@
       });
     }
 
-    function previewImage(input, questionIndex) {
-      const preview = document.getElementById('preview-' + questionIndex);
+    function previewImage(input, previewId) {
+      const preview = document.getElementById(previewId);
       if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {

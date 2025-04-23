@@ -174,5 +174,69 @@
     "class": "10",
     "type": "manual",
     "questionsFile": "class 10 final paper-manual.json"
+  },
+  {
+    "name": "WWW",
+    "startTime": "16:00",
+    "endTime": "17:00",
+    "class": "10",
+    "type": "excel",
+    "file": "WWW.xlsx"
+  },
+  {
+    "name": "InceptMode",
+    "startTime": "16:30",
+    "endTime": "18:00",
+    "class": "10",
+    "type": "excel",
+    "file": "InceptMode.xlsx"
+  },
+  {
+    "name": "In",
+    "startTime": "16:55",
+    "endTime": "18:00",
+    "class": "10",
+    "type": "excel",
+    "file": "In.xlsx"
+  },
+  {
+    "name": "Aa",
+    "startTime": "10:00",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "Aa-manual.json"
+  },
+  {
+    "name": "GG",
+    "startTime": "10:00",
+    "endTime": "11:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "GG-manual.json"
+  },
+  {
+    "name": "OI",
+    "startTime": "10:30",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "OI-manual.json"
+  },
+  {
+    "name": "lll",
+    "startTime": "10:30",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "lll-manual.json"
+  },
+  {
+    "name": "WW",
+    "startTime": "10:00",
+    "endTime": "11:00",
+    "class": "10",
+    "type": "manual",
+    "questionsFile": "WW-manual.json"
   }
 ]
