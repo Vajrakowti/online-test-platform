@@ -28,11 +28,14 @@ function loadQuizData(quiz) {
     );
     
     // Convert to the same format as Excel data
+    // Format: [question, option1, option2, option3, option4, correctAnswer, questionImage, 
+    //          option1Image, option2Image, option3Image, option4Image]
     return questionsData.map(q => [
       q.text,
       ...q.options,
       q.options[q.correctAnswer],
-      q.image || null
+      q.image || null,
+      ...(q.optionImages || [null, null, null, null]) // Add option images or default to nulls
     ]);
   }
   throw new Error('Invalid quiz type');
@@ -320,6 +323,14 @@ router.get('/:quizName', (req, res) => {
                     border-radius: 8px;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }
+                .option-image {
+                    max-width: 150px;
+                    max-height: 150px;
+                    margin: 10px 0;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    display: block;
+                }
                 /* Add a new class for hiding images after submission */
                 .quiz-completed #questionImage {
                     display: none !important;
@@ -331,9 +342,61 @@ router.get('/:quizName', (req, res) => {
                     position: absolute !important;
                     pointer-events: none !important;
                 }
+                .quiz-completed .option-image {
+                    display: none !important;
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                    height: 0 !important;
+                    width: 0 !important;
+                    overflow: hidden !important;
+                    position: absolute !important;
+                    pointer-events: none !important;
+                }
+                /* Style for inspect element warning */
+                .devtools-warning {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(220, 53, 69, 0.9);
+                    color: white;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                    font-size: 24px;
+                    text-align: center;
+                    padding: 20px;
+                }
+                .devtools-warning h2 {
+                    margin-bottom: 20px;
+                    color: white;
+                }
+                .continue-btn {
+                    background: white;
+                    color: #dc3545;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    margin-top: 20px;
+                    cursor: pointer;
+                }
+                .continue-btn:hover {
+                    background: #f8f9fa;
+                }
             </style>
         </head>
         <body>
+            <div id="devtools-warning" class="devtools-warning" style="display:none;">
+                <h2>Developer Tools Detected!</h2>
+                <p>Use of developer tools is not allowed during the quiz.</p>
+                <p>Please close developer tools to continue.</p>
+                <button class="continue-btn" onclick="checkAndContinue()">Continue Quiz</button>
+            </div>
+            
             <div class="fullscreen-overlay" id="fullscreenOverlay"></div>
             <div class="fullscreen-warning" id="fullscreenWarning" style="display:none;">
                 <h3>Warning!</h3>
@@ -400,6 +463,10 @@ router.get('/:quizName', (req, res) => {
                     // This quiz was already completed in this session, redirect to results
                     window.location.href = '/student/result/' + encodeURIComponent(quizName);
                 }
+
+                // Developer tools detection variables
+                let devToolsOpen = false;
+                let devToolsCheckInterval;
 
                 // Show start button initially
                 document.getElementById('startFullscreenBtn').style.display = 'block';
@@ -478,6 +545,9 @@ router.get('/:quizName', (req, res) => {
                         e.returnValue = confirmationMessage;
                         return confirmationMessage;
                     });
+
+                    // Setup dev tools detection
+                    setupDevToolsDetection();
                 }
 
                 function removeEventListeners() {
@@ -489,6 +559,9 @@ router.get('/:quizName', (req, res) => {
                     window.removeEventListener('beforeunload', function() {
                         // Empty function as we just want to remove the listener
                     });
+                    
+                    // Remove dev tools detection
+                    removeDevToolsDetection();
                 }
 
                 function handleFullscreenChange() {
@@ -536,6 +609,11 @@ router.get('/:quizName', (req, res) => {
                 }
 
                 function startTimer() {
+                    // Clear any existing timer interval
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                    }
+                    
                     const timerEl = document.getElementById('timer');
                     updateTimerColor();
                     timerEl.textContent = formatTime(timeLeft);
@@ -580,14 +658,21 @@ router.get('/:quizName', (req, res) => {
                     }
 
                     const options = row.slice(1, 5);
-                    const list = options.map((opt) => \`
-                        <li>
-                            <label>
-                                <input type="radio" name="option" value="\${opt}" \${userAnswers[index] === opt ? 'checked' : ''}>
-                                \${opt}
-                            </label>
-                        </li>
-                    \`).join("");
+                    const list = options.map((opt, optIndex) => {
+                        // Check if there's an image for this option (option images start at index 7)
+                        const optionImageIndex = 7 + optIndex;
+                        const optionImage = row[optionImageIndex];
+                        
+                        return \`
+                            <li>
+                                <label>
+                                    <input type="radio" name="option" value="\${opt}" \${userAnswers[index] === opt ? 'checked' : ''}>
+                                    \${opt}
+                                    \${optionImage ? '<br><img src="' + optionImage + '" class="option-image" alt="Option image">' : ''}
+                                </label>
+                            </li>
+                        \`;
+                    }).join("");
                     document.getElementById('options').innerHTML = list;
 
                     document.getElementById('prevBtn').style.display = (index > 0) ? 'inline-block' : 'none';
@@ -758,6 +843,96 @@ router.get('/:quizName', (req, res) => {
                     reviewContainer.innerHTML = reviewHTML;
                 }
 
+                // Setup multiple methods to detect developer tools
+                function setupDevToolsDetection() {
+                    // Method 1: Using window size and dimensions
+                    window.addEventListener('resize', checkDevToolsOpen);
+                    
+                    // Method 2: Using console.clear interference
+                    devToolsCheckInterval = setInterval(function() {
+                        if (!quizSubmitted) {
+                            const before = performance.now();
+                            console.clear();
+                            const after = performance.now();
+                            const diff = after - before;
+                            
+                            // If console clearing takes too long, dev tools might be open
+                            if (diff > 20 && !devToolsOpen) {
+                                handleDevToolsOpen();
+                            }
+                            
+                            // Method 3: Check window dimensions periodically
+                            checkDevToolsOpen();
+                        }
+                    }, 1000);
+                }
+                
+                function removeDevToolsDetection() {
+                    window.removeEventListener('resize', checkDevToolsOpen);
+                    if (devToolsCheckInterval) {
+                        clearInterval(devToolsCheckInterval);
+                    }
+                }
+                
+                function checkDevToolsOpen() {
+                    if (quizSubmitted) return;
+                    
+                    // Method 1: Check window dimensions
+                    const heightDiff = window.outerHeight - window.innerHeight;
+                    const widthDiff = window.outerWidth - window.innerWidth;
+                    
+                    // Different threshold for different browsers
+                    const threshold = 150;
+                    
+                    if (heightDiff > threshold || widthDiff > threshold) {
+                        handleDevToolsOpen();
+                    }
+                    
+                    // Method 2: Check for custom browser objects
+                    if (window.Firebug && window.Firebug.chrome && window.Firebug.chrome.isInitialized) {
+                        handleDevToolsOpen();
+                    }
+                    
+                    // Method 3: Firefox-specific
+                    if (typeof InstallTrigger !== 'undefined' && widthDiff > 80) {
+                        handleDevToolsOpen();
+                    }
+                }
+                
+                function handleDevToolsOpen() {
+                    if (devToolsOpen || quizSubmitted) return;
+                    
+                    devToolsOpen = true;
+                    const warningEl = document.getElementById('devtools-warning');
+                    warningEl.style.display = 'flex';
+                    
+                    // Pause the quiz timer while warning is shown
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                    }
+                }
+                
+                function checkAndContinue() {
+                    // Check if developer tools are still open
+                    const heightDiff = window.outerHeight - window.innerHeight;
+                    const widthDiff = window.outerWidth - window.innerWidth;
+                    const threshold = 150;
+                    
+                    if (heightDiff > threshold || widthDiff > threshold || 
+                        (window.Firebug && window.Firebug.chrome && window.Firebug.chrome.isInitialized) ||
+                        (typeof InstallTrigger !== 'undefined' && widthDiff > 80)) {
+                        // Still open, show alert
+                        alert("Please close developer tools before continuing");
+                    } else {
+                        // Developer tools closed, continue quiz
+                        devToolsOpen = false;
+                        document.getElementById('devtools-warning').style.display = 'none';
+                        
+                        // Resume the quiz timer
+                        startTimer();
+                    }
+                }
+
                 // Add event listener for page load to detect if this is a page refresh during an active quiz
                 window.addEventListener('load', function() {
                     // If the page is being refreshed during an active quiz (not already submitted)
@@ -770,6 +945,28 @@ router.get('/:quizName', (req, res) => {
                         alert("The page was refreshed during an active quiz. Your quiz will be automatically submitted.");
                         submitQuiz(true);
                     }
+                    
+                    // Disable context menu during quiz to prevent right-click inspect
+                    document.addEventListener('contextmenu', function(e) {
+                        if (!quizSubmitted && document.getElementById('quizContainer').style.display === 'block') {
+                            e.preventDefault();
+                            return false;
+                        }
+                    });
+                    
+                    // Disable keyboard shortcuts for developer tools
+                    document.addEventListener('keydown', function(e) {
+                        if (!quizSubmitted && document.getElementById('quizContainer').style.display === 'block') {
+                            // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, F12
+                            if (
+                                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+                                (e.key === 'F12')
+                            ) {
+                                e.preventDefault();
+                                return false;
+                            }
+                        }
+                    });
                 });
 
             </script>

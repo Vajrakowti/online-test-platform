@@ -1,12 +1,13 @@
 [
   {
-    "text": "1 + 2 =",
+    "text": "Yy",
     "options": [
-      "54",
-      "3",
-      "33",
-      "333"
+      "a",
+      "b",
+      "c",
+      "d"
     ],
-    "correctAnswer": 1
+    "correctAnswer": 3,
+    "image": "/quiz-images/1745383365027-858160347.jpg"
   }
 ]

@@ -1,0 +1,18 @@
+[
+  {
+    "text": " 2 + 2 = ?",
+    "options": [
+      "1",
+      "10",
+      "4",
+      "55"
+    ],
+    "correctAnswer": 2,
+    "optionImages": [
+      "/quiz-images/1745384838318-562300351.jpg",
+      "/quiz-images/1745384838319-957181818.jpg",
+      null,
+      null
+    ]
+  }
+]
