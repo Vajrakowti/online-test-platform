@@ -3,239 +3,404 @@
 <head>
   <meta charset="UTF-8">
   <title>Student Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 30px;
-      background: #f5f7fa;
-      color: #333;
+    :root {
+      --primary-color: #4361ee;
+      --primary-light: #4f6ef2;
+      --primary-gradient: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+      --secondary-color: #f6f8fd;
+      --accent-color: #00b4d8;
+      --active-color: #6366f1;
+      --active-gradient: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
+      --completed-color: #10b981;
+      --completed-gradient: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      --text-color: #2d3748;
+      --text-light: #718096;
+      --border-color: #e2e8f0;
+      --border-radius: 12px;
+      --shadow-sm: 0 2px 8px rgba(67, 97, 238, 0.07);
+      --shadow-md: 0 4px 12px rgba(67, 97, 238, 0.1);
+      --shadow-lg: 0 8px 24px rgba(67, 97, 238, 0.15);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    h2 {
-      margin-bottom: 20px;
-      color: #2c3e50;
-      padding-bottom: 10px;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f6f8fd 0%, #ffffff 100%);
+      color: var(--text-color);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .student-profile {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(67, 97, 238, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .student-profile::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--primary-gradient);
+    }
+
+    .profile-photo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--primary-color);
+      box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+      transition: var(--transition);
+    }
+
+    .profile-photo:hover {
+      transform: scale(1.05);
+    }
+
+    #studentName {
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--text-color);
+      margin: 0;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .tables-container {
-      display: flex;
-      gap: 50px;
-      flex-wrap: wrap;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 2rem;
+      margin-top: 1rem;
     }
 
     .table-section {
-      flex: 1;
-      min-width: 500px;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      padding: 20px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-md);
+      padding: 1.5rem;
+      border: 1px solid rgba(67, 97, 238, 0.1);
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .table-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .table-section:first-child::before {
+      background: var(--active-gradient);
+    }
+
+    .table-section:last-child::before {
+      background: var(--completed-gradient);
+    }
+
+    .table-section:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
     }
 
     .table-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 15px;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border-color);
     }
 
     h3 {
-      margin: 0;
-      font-size: 1.3rem;
-      color: #2c3e50;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      background-color: #fff;
-      margin-bottom: 20px;
-    }
-
-    th, td {
-      border: 1px solid #e0e0e0;
-      padding: 12px 15px;
-      text-align: left;
-    }
-
-    #todayTable thead th {
-      background-color: #e74c3c;
-      color: white;
+      font-size: 1.5rem;
       font-weight: 600;
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
-    #attemptedTable thead th {
-      background-color: #2ecc71;
-      color: white;
-      font-weight: 600;
+    .table-section:first-child h3 i {
+      color: var(--active-color);
     }
 
-    tr:nth-child(even) {
-      background-color: #f8f9fa;
+    .table-section:last-child h3 i {
+      color: var(--completed-color);
     }
 
     .search-input {
-      margin-bottom: 15px;
-      padding: 10px 1px;
       width: 100%;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-      transition: border 0.3s;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: 0.875rem;
+      transition: var(--transition);
+      margin-bottom: 1rem;
     }
 
     .search-input:focus {
       outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
     }
 
-    .quiz-row:hover {
-      background-color: #e3f2fd !important;
-      cursor: pointer;
-      transform: translateX(2px);
-      transition: all 0.2s ease;
+    .table-section:first-child .search-input:focus {
+      border-color: var(--active-color);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
-    
-    .no-quizzes {
-      padding: 20px;
-      color: #7f8c8d;
-      font-style: italic;
-      text-align: center;
+
+    .table-section:last-child .search-input:focus {
+      border-color: var(--completed-color);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-bottom: 1rem;
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      font-weight: 600;
+      color: white;
+      position: relative;
+    }
+
+    .table-section:first-child th {
+      background: var(--active-gradient);
+    }
+
+    .table-section:last-child th {
+      background: var(--completed-gradient);
+    }
+
+    th:first-child {
+      border-top-left-radius: var(--border-radius);
+    }
+
+    th:last-child {
+      border-top-right-radius: var(--border-radius);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .quiz-row {
+      transition: var(--transition);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .table-section:first-child .quiz-row:hover {
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.1));
+      transform: translateX(5px);
+    }
+
+    .table-section:last-child .quiz-row:hover {
+      background: linear-gradient(to right, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.1));
+      transform: translateX(5px);
     }
 
     .status-badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .active-badge {
-      background-color: #e74c3c;
+      background: var(--active-gradient);
       color: white;
     }
 
     .completed-badge {
-      background-color: #2ecc71;
+      background: var(--completed-gradient);
       color: white;
     }
 
-    .student-profile {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-  }
-  
-  .profile-photo {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #3498db;
-  }
-  
-  #studentName {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: #2c3e50;
-    font-size: 40px;
-  }
+    .no-quizzes {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-light);
+      font-style: italic;
+      border-radius: var(--border-radius);
+      margin-top: 1rem;
+    }
+
+    .table-section:first-child .no-quizzes {
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .table-section:last-child .no-quizzes {
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .tables-container {
+        grid-template-columns: 1fr;
+      }
+
+      .table-section {
+        min-width: unset;
+        overflow-x: auto;
+      }
+
+      .student-profile {
+        flex-direction: column;
+        text-align: center;
+        padding: 1.5rem;
+      }
+
+      #studentName {
+        font-size: 1.5rem;
+      }
+
+      .profile-photo {
+        width: 60px;
+        height: 60px;
+      }
+    }
   </style>
 </head>
 <body>
-  <!-- <h2>Welcome, Student</h2> -->
-
-  <div class="student-profile">
-    <img id="studentPhoto" src="" alt="Student Photo" class="profile-photo" 
-         onerror="this.onerror=null;this.src='/default-profile.jpg';this.style.border='none'">
-    <h2>Welcome <span id="studentName"></span></h2>
-  </div>
-
-  <div class="tables-container">
-    <!-- Today's Quizzes -->
-    <div class="table-section">
-      <div class="table-header">
-        <h3>Today's Tests</h3>
-        <span class="status-badge active-badge">Active</span>
-      </div>
-      <input type="text" id="todaySearchInput" class="search-input" placeholder="Search quiz names...">
-      <table id="todayTable">
-        <thead>
-          <tr>
-            <th>Quiz Name</th>
-            <th>Start Time</th>
-            <th>End Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Quiz rows will be dynamically inserted here -->
-        </tbody>
-      </table>
+  <div class="container">
+    <div class="student-profile">
+      <img id="studentPhoto" src="" alt="Student Photo" class="profile-photo" 
+           onerror="this.onerror=null;this.src='/default-profile.jpg';this.style.border='none'">
+      <h2 id="studentName"></h2>
     </div>
 
-    <!-- Attempted Quizzes -->
-    <div class="table-section">
-      <div class="table-header">
-        <h3>Attempted Tests</h3>
-        <span class="status-badge completed-badge">Completed</span>
+    <div class="tables-container">
+      <div class="table-section">
+        <div class="table-header">
+          <h3><i class="fas fa-clock"></i> Today's Tests</h3>
+          <span class="status-badge active-badge">Active</span>
+        </div>
+        <input type="text" class="search-input" placeholder="Search quiz names..." oninput="filterTable('todayTable', this.value)">
+        <table id="todayTable">
+          <thead>
+            <tr>
+              <th>Quiz Name</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic content -->
+          </tbody>
+        </table>
       </div>
-      <input type="text" id="attemptedSearchInput" class="search-input" placeholder="Search attempted quizzes...">
-      <table id="attemptedTable">
-        <thead>
-          <tr>
-            <th>Quiz Name</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Attempted quiz rows will be dynamically inserted here -->
-        </tbody>
-      </table>
+
+      <div class="table-section">
+        <div class="table-header">
+          <h3><i class="fas fa-check-circle"></i> Attempted Tests</h3>
+          <span class="status-badge completed-badge">Completed</span>
+        </div>
+        <input type="text" class="search-input" placeholder="Search attempted quizzes..." oninput="filterTable('attemptedTable', this.value)">
+        <table id="attemptedTable">
+          <thead>
+            <tr>
+              <th>Quiz Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic content -->
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
-
-document.addEventListener('DOMContentLoaded', () => {
-    fetch('/student/info')
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
-      .then(data => {
-        console.log('Student info response:', data); // Debug log
-        
-        if (data.name) {
-          document.getElementById('studentName').textContent = data.name;
-        }
-        
-        if (data.photo) {
-          const img = document.getElementById('studentPhoto');
-          // Prepend a forward slash if not present
-          const photoPath = data.photo.startsWith('/') ? data.photo : `/${data.photo}`;
-          img.src = photoPath;
+    document.addEventListener('DOMContentLoaded', () => {
+      fetch('/student/info')
+        .then(res => {
+          if (!res.ok) throw new Error('Network response was not ok');
+          return res.json();
+        })
+        .then(data => {
+          console.log('Student info response:', data); // Debug log
           
-          img.onerror = () => {
-            console.error('Failed to load student photo:', photoPath);
-            img.src = '/default-profile.jpg';
-            img.style.border = 'none';
-          };
-        }
-      })
-      .catch(err => {
-        console.error('Error loading student info:', err);
-        document.getElementById('studentPhoto').src = '/default-profile.jpg';
-      });
-});
+          if (data.name) {
+            document.getElementById('studentName').textContent = data.name;
+          }
+          
+          if (data.photo) {
+            const img = document.getElementById('studentPhoto');
+            // Prepend a forward slash if not present
+            const photoPath = data.photo.startsWith('/') ? data.photo : `/${data.photo}`;
+            img.src = photoPath;
+            
+            img.onerror = () => {
+              console.error('Failed to load student photo:', photoPath);
+              img.src = '/default-profile.jpg';
+              img.style.border = 'none';
+            };
+          }
+        })
+        .catch(err => {
+          console.error('Error loading student info:', err);
+          document.getElementById('studentPhoto').src = '/default-profile.jpg';
+        });
+    });
+
     let allQuizzes = [];
     let attemptedQuizzes = [];
     const todayTbody = document.querySelector('#todayTable tbody');
     const attemptedTbody = document.querySelector('#attemptedTable tbody');
-    const todaySearchInput = document.getElementById('todaySearchInput');
-    const attemptedSearchInput = document.getElementById('attemptedSearchInput');
+    const todaySearchInput = document.querySelector('.search-input[placeholder="Search quiz names..."]');
+    const attemptedSearchInput = document.querySelector('.search-input[placeholder="Search attempted quizzes..."]');
 
     function renderTodayQuizzes(quizzes) {
       todayTbody.innerHTML = '';

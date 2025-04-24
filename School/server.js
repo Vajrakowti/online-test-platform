@@ -97,6 +97,9 @@ const setupApp = (app, role) => {
     
     // Strong anti-session hijacking protection
     app.use((req, res, next) => {
+        // Add response sent tracker to req object
+        req.responseSent = false;
+
         // Define paths that don't need session protection
         const publicPaths = [
             '/login', 
@@ -141,10 +144,19 @@ const setupApp = (app, role) => {
                 userAgentMatch: userAgentValid,
                 timeValid: timeValid
             });
-            req.session.destroy(() => {
-                return res.redirect('/login?error=session_expired');
+            
+            // Use the responseSent flag to prevent multiple responses
+            req.session.destroy(err => {
+                if (err) {
+                    console.error('Session destruction error:', err);
+                }
+                
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    res.redirect('/login?error=session_expired');
+                }
             });
-            return;
+            return; // Important: Return here to prevent next() from being called
         }
         
         // Update last accessed time
@@ -193,19 +205,38 @@ const setupApp = (app, role) => {
         
         // Check if user is logged in
         if (!req.session.fname) {
-            return res.redirect("/login");
+            if (!req.responseSent) {
+                req.responseSent = true;
+                return res.redirect("/login");
+            }
+            return;
         }
         
         // Role-specific access check
         if (role && req.session.role !== role) {
             if (req.session.role === 'admin') {
-                return res.redirect("/admin"); 
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    return res.redirect("/admin");
+                }
+                return;
             } else if (req.session.role === 'student') {
-                return res.redirect("/student"); 
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    return res.redirect("/student");
+                }
+                return;
             } else {
                 // Logout if role is invalid
-                req.session.destroy(() => {
-                    return res.redirect("/login?error=invalid_role");
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Session destruction error:', err);
+                    }
+                    
+                    if (!req.responseSent) {
+                        req.responseSent = true;
+                        res.redirect("/login?error=invalid_role");
+                    }
                 });
                 return;
             }
@@ -353,7 +384,12 @@ MongoClient.connect(url, mongoOptions)
                     userRole: req.session?.role,
                     hasSecurityToken: !!req.session?.securityToken
                 });
-                return res.redirect('/login');
+                
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    return res.redirect('/login');
+                }
+                return;
             }
             
             // Second check: validate browser fingerprint - only check user-agent
@@ -364,8 +400,16 @@ MongoClient.connect(url, mongoOptions)
                     sessionUA: req.session.userAgent?.substring(0, 20),
                     currentUA: currentUserAgent?.substring(0, 20)
                 });
-                req.session.destroy(() => {
-                    return res.redirect('/login?error=security_violation');
+                
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Session destruction error:', err);
+                    }
+                    
+                    if (!req.responseSent) {
+                        req.responseSent = true;
+                        res.redirect('/login?error=security_violation');
+                    }
                 });
                 return;
             }
@@ -594,7 +638,12 @@ MongoClient.connect(url, mongoOptions)
                     userRole: req.session?.role,
                     hasSecurityToken: !!req.session?.securityToken
                 });
-                return res.redirect('/login');
+                
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    return res.redirect('/login');
+                }
+                return;
             }
             
             // Second check: validate browser fingerprint - only check user agent
@@ -605,8 +654,16 @@ MongoClient.connect(url, mongoOptions)
                     sessionUA: req.session.userAgent?.substring(0, 20),
                     currentUA: currentUserAgent?.substring(0, 20)
                 });
-                req.session.destroy(() => {
-                    return res.redirect('/login?error=security_violation');
+                
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Session destruction error:', err);
+                    }
+                    
+                    if (!req.responseSent) {
+                        req.responseSent = true;
+                        res.redirect('/login?error=security_violation');
+                    }
                 });
                 return;
             }
@@ -630,7 +687,12 @@ MongoClient.connect(url, mongoOptions)
                     userRole: req.session?.role,
                     hasSecurityToken: !!req.session?.securityToken
                 });
-                return res.redirect('/login');
+                
+                if (!req.responseSent) {
+                    req.responseSent = true;
+                    return res.redirect('/login');
+                }
+                return;
             }
             
             // Second check: validate browser fingerprint - only check user agent
@@ -641,8 +703,16 @@ MongoClient.connect(url, mongoOptions)
                     sessionUA: req.session.userAgent?.substring(0, 20),
                     currentUA: currentUserAgent?.substring(0, 20)
                 });
-                req.session.destroy(() => {
-                    return res.redirect('/login?error=security_violation');
+                
+                req.session.destroy(err => {
+                    if (err) {
+                        console.error('Session destruction error:', err);
+                    }
+                    
+                    if (!req.responseSent) {
+                        req.responseSent = true;
+                        res.redirect('/login?error=security_violation');
+                    }
                 });
                 return;
             }

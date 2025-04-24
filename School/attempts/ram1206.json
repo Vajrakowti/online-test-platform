@@ -1,5 +1,11 @@
 [
   {
+<<<<<<< HEAD
+    "quizName": "Rak",
+    "score": 1,
+    "totalQuestions": 1,
+    "attemptedAt": "2025-04-22T12:00:50.286Z"
+=======
     "quizName": "WWW",
     "score": 2,
     "totalQuestions": 5,
@@ -23,5 +29,6 @@
     "totalQuestions": 0,
     "attemptedAt": "2025-04-22T11:24:54.336Z",
     "fromSessionStorage": true
+>>>>>>> 7285aa9b535f19a4da073300b42ed7e93915236f
   }
 ]
