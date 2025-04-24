@@ -1,0 +1,19 @@
+[
+  {
+    "text": "1 + 12",
+    "options": [
+      "3",
+      "4",
+      "33",
+      "66666666666666666666"
+    ],
+    "correctAnswer": 1,
+    "image": "/quiz-images/1745475935092-967573444.jpg",
+    "optionImages": [
+      null,
+      null,
+      null,
+      "/quiz-images/1745475935095-819372631.jpg"
+    ]
+  }
+]

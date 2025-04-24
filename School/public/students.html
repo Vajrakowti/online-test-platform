@@ -38,12 +38,89 @@
             background: linear-gradient(135deg, #f6f8fd 0%, #ffffff 100%);
             color: var(--text-color);
             min-height: 100vh;
-            padding: 1.5rem;
+        }
+        
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+            background-color: #4361ee;
+            color: white;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+        }
+        
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-header i {
+            font-size: 2.5rem;
+            margin-right: 12px;
+        }
+        
+        .sidebar-title {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-title h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        
+        .sidebar-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin: 15px 0;
+        }
+        
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-radius: 0;
+        }
+        
+        .sidebar-item:hover,
+        .sidebar-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0;
+        }
+        
+        .sidebar-item i {
+            font-size: 1.25rem;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 20px;
             animation: fadeIn 0.6s ease-out;
         }
 
@@ -199,8 +276,19 @@
             position: relative;
             overflow: hidden;
             box-shadow: var(--shadow-sm);
-            transition: var(--transition);
             border: 1px solid rgba(67, 97, 238, 0.1);
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .class-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-color);
         }
 
         .class-card::before {
@@ -208,201 +296,268 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 3px;
-            background: var(--accent-gradient);
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
             transform: scaleX(0);
-            transition: transform 0.3s ease;
+            transform-origin: center;
+            transition: transform 0.4s ease;
         }
 
         .class-card:hover::before {
             transform: scaleX(1);
         }
 
-        .class-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--primary-color);
-        }
-
-        .class-number {
-            font-size: 2.5rem;
-            font-weight: 700;
+        .class-icon {
+            width: 48px;
+            height: 48px;
             background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.5rem;
-            transition: var(--transition);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+            color: white;
+            font-size: 1.5rem;
         }
 
-        .class-card:hover .class-number {
-            transform: scale(1.1);
+        .class-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
         }
 
-        .class-label {
+        .student-count {
             font-size: 0.875rem;
             color: var(--text-light);
             font-weight: 500;
-            position: relative;
         }
 
-        @media (max-width: 768px) {
-            body {
-                padding: 1rem;
-            }
-
-            .page-title {
-                font-size: 1.5rem;
-            }
-
-            .page-title i {
-                font-size: 1.75rem;
-            }
-
-            .class-grid {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 0.75rem;
-            }
-
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .action-btn {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
-            }
-
-            .class-card {
-                min-height: 120px;
-                padding: 1rem;
-            }
-
-            .class-number {
-                font-size: 2rem;
-            }
+        .loading-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(67, 97, 238, 0.2);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 0.5rem;
         }
 
-        /* Loading animation with gradient */
-        .loading {
-            background: linear-gradient(90deg, 
-                rgba(67, 97, 238, 0.1) 25%, 
-                rgba(67, 97, 238, 0.2) 50%, 
-                rgba(67, 97, 238, 0.1) 75%
-            );
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton-loader {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
-            border-radius: 4px;
+            border-radius: var(--border-radius);
+        }
+
+        .class-card.skeleton {
+            height: 150px;
+        }
+        
+        /* Current page styling */
+        .sidebar-item[href="/admin/students"] {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
         }
 
         @keyframes shimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
         }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+                padding: 15px 0;
+            }
+            
+            .sidebar-header {
+                padding: 0 15px;
+                justify-content: center;
+            }
+            
+            .sidebar-title,
+            .sidebar-item span {
+                display: none;
+            }
+            
+            .sidebar-header i {
+                margin-right: 0;
+            }
+            
+            .sidebar-item {
+                justify-content: center;
+                padding: 12px;
+            }
+            
+            .sidebar-item i {
+                margin-right: 0;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1 class="page-title">
-                <i class="fas fa-users"></i>
-                Student Management
-            </h1>
-        </div>
-
-        <div class="stats-container">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-value">10</div>
-                    <div class="stat-label">Total Classes</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="totalStudents">--</div>
-                    <div class="stat-label">Total Students</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="activeStudents">--</div>
-                    <div class="stat-label">Active Students</div>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-graduation-cap"></i>
+                <div class="sidebar-title">
+                    <h1>Test</h1>
+                    <h1>Platform</h1>
                 </div>
             </div>
-        </div>
+            <div class="sidebar-divider"></div>
+            <nav class="sidebar-menu">
+                <a href="/admin" class="sidebar-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/students" class="sidebar-item">
+                    <i class="fas fa-users"></i>
+                    <span>Students</span>
+                </a>
+                <a href="/admin/total-quiz" class="sidebar-item">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Quizzes</span>
+                </a>
+            </nav>
+        </aside>
 
-        <div class="action-buttons">
-            <a href="/admin/add-student" class="action-btn btn-primary">
-                <i class="fas fa-user-plus"></i>
-                Add New Student
-            </a>
-            <a href="/admin" class="action-btn btn-secondary">
-                <i class="fas fa-arrow-left"></i>
-                Back to Dashboard
-            </a>
-        </div>
+        <main class="main-content">
+            <div class="header">
+                <h1 class="page-title">
+                    <i class="fas fa-users"></i>
+                    Student Management
+                </h1>
+            </div>
 
-        <div class="class-grid">
-            <a href="/admin/students/1" class="class-card">
-                <div class="class-number">1</div>
-                <div class="class-label">Class One</div>
-            </a>
-            <a href="/admin/students/2" class="class-card">
-                <div class="class-number">2</div>
-                <div class="class-label">Class Two</div>
-            </a>
-            <a href="/admin/students/3" class="class-card">
-                <div class="class-number">3</div>
-                <div class="class-label">Class Three</div>
-            </a>
-            <a href="/admin/students/4" class="class-card">
-                <div class="class-number">4</div>
-                <div class="class-label">Class Four</div>
-            </a>
-            <a href="/admin/students/5" class="class-card">
-                <div class="class-number">5</div>
-                <div class="class-label">Class Five</div>
-            </a>
-            <a href="/admin/students/6" class="class-card">
-                <div class="class-number">6</div>
-                <div class="class-label">Class Six</div>
-            </a>
-            <a href="/admin/students/7" class="class-card">
-                <div class="class-number">7</div>
-                <div class="class-label">Class Seven</div>
-            </a>
-            <a href="/admin/students/8" class="class-card">
-                <div class="class-number">8</div>
-                <div class="class-label">Class Eight</div>
-            </a>
-            <a href="/admin/students/9" class="class-card">
-                <div class="class-number">9</div>
-                <div class="class-label">Class Nine</div>
-            </a>
-            <a href="/admin/students/10" class="class-card">
-                <div class="class-number">10</div>
-                <div class="class-label">Class Ten</div>
-            </a>
-        </div>
+            <div class="stats-container">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">10</div>
+                        <div class="stat-label">Total Classes</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalStudents">--</div>
+                        <div class="stat-label">Total Students</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="activeStudents">--</div>
+                        <div class="stat-label">Active Students</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <a href="/admin/add-student" class="action-btn btn-primary">
+                    <i class="fas fa-user-plus"></i>
+                    Add New Student
+                </a>
+                <a href="/admin" class="action-btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Dashboard
+                </a>
+            </div>
+
+            <div class="class-grid" id="classGrid">
+                <!-- Class cards will be generated dynamically -->
+                <a href="/admin/students/1" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 1</div>
+                    <div class="student-count" id="class1-count">Loading...</div>
+                </a>
+                <a href="/admin/students/2" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 2</div>
+                    <div class="student-count" id="class2-count">Loading...</div>
+                </a>
+                <a href="/admin/students/3" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 3</div>
+                    <div class="student-count" id="class3-count">Loading...</div>
+                </a>
+                <a href="/admin/students/4" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 4</div>
+                    <div class="student-count" id="class4-count">Loading...</div>
+                </a>
+                <a href="/admin/students/5" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 5</div>
+                    <div class="student-count" id="class5-count">Loading...</div>
+                </a>
+                <a href="/admin/students/6" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 6</div>
+                    <div class="student-count" id="class6-count">Loading...</div>
+                </a>
+                <a href="/admin/students/7" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 7</div>
+                    <div class="student-count" id="class7-count">Loading...</div>
+                </a>
+                <a href="/admin/students/8" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 8</div>
+                    <div class="student-count" id="class8-count">Loading...</div>
+                </a>
+                <a href="/admin/students/9" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 9</div>
+                    <div class="student-count" id="class9-count">Loading...</div>
+                </a>
+                <a href="/admin/students/10" class="class-card">
+                    <div class="class-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="class-name">Class 10</div>
+                    <div class="student-count" id="class10-count">Loading...</div>
+                </a>
+            </div>
+        </main>
     </div>
 
     <script>
-        // Add loading state to stats
-        document.getElementById('totalStudents').classList.add('loading');
-        document.getElementById('activeStudents').classList.add('loading');
-
-        // Fetch student statistics
+        // Fetch student statistics from API
         fetch('/admin/stats/students')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
-                // Remove loading state
-                document.getElementById('totalStudents').classList.remove('loading');
-                document.getElementById('activeStudents').classList.remove('loading');
-                
-                // Update values with animation
-                animateNumber('totalStudents', data.total);
-                animateNumber('activeStudents', data.active);
+                // Update total and active student counts
+                document.getElementById('totalStudents').textContent = data.total;
+                document.getElementById('activeStudents').textContent = data.active;
             })
             .catch(error => {
                 console.error('Error fetching student stats:', error);
@@ -410,26 +565,27 @@
                 document.getElementById('activeStudents').textContent = 'Error';
             });
 
-        // Number animation function
-        function animateNumber(elementId, final) {
-            const element = document.getElementById(elementId);
-            const duration = 1000;
-            const start = 0;
-            const increment = final / (duration / 16);
-            let current = start;
-
-            const animate = () => {
-                current += increment;
-                if (current >= final) {
-                    element.textContent = final;
-                } else {
-                    element.textContent = Math.floor(current);
-                    requestAnimationFrame(animate);
+        // Fetch student counts per class (for demonstration - in a real app, you'd make backend calls)
+        // This would be replaced with actual API calls to get the count for each class
+        function fetchClassCounts() {
+            // For a real implementation, you would fetch this data from your server
+            // For example: fetch('/admin/stats/class/1') for class 1, etc.
+            // Here we're just simulating with random counts
+            for (let i = 1; i <= 10; i++) {
+                const countElement = document.getElementById(`class${i}-count`);
+                if (countElement) {
+                    // Simulate network delay
+                    setTimeout(() => {
+                        // Random count between 0 and 30
+                        const count = Math.floor(Math.random() * 31);
+                        countElement.textContent = `${count} students`;
+                    }, 500 + Math.random() * 1000); // Random delay between 500ms and 1500ms
                 }
-            };
-
-            animate();
+            }
         }
+
+        // Call the function when page loads
+        document.addEventListener('DOMContentLoaded', fetchClassCounts);
     </script>
 </body>
 </html>

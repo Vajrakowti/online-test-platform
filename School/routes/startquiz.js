@@ -9,6 +9,13 @@ const QUIZ_JSON_PATH = path.join(__dirname, '../quizzes.json');
 const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
 const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
 
+// Ensure directories exist
+if (!fs.existsSync(EXCEL_DIR)) {
+    fs.mkdirSync(EXCEL_DIR, { recursive: true });
+}
+if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
+    fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
+}
 // Ensure attempts directory exists
 if (!fs.existsSync(ATTEMPTS_DIR)) {
     fs.mkdirSync(ATTEMPTS_DIR);
@@ -17,14 +24,33 @@ if (!fs.existsSync(ATTEMPTS_DIR)) {
 function loadQuizData(quiz) {
   if (quiz.type === 'excel') {
     // Load Excel quiz
-    const workbook = xlsx.readFile(path.join(EXCEL_DIR, quiz.file));
+    const excelFilePath = path.join(EXCEL_DIR, quiz.file);
+    
+    // Check if the file exists before attempting to read it
+    if (!fs.existsSync(excelFilePath)) {
+      throw new Error(`Excel file not found: ${quiz.file}. Please contact the administrator.`);
+    }
+    
+    try {
+      const workbook = xlsx.readFile(excelFilePath);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     return xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1);
+    } catch (err) {
+      throw new Error(`Error reading Excel file: ${err.message}`);
+    }
   } else if (quiz.type === 'manual') {
     // Load manual quiz
+    const questionsFilePath = path.join(MANUAL_QUESTIONS_DIR, quiz.questionsFile);
+    
+    // Check if the file exists before attempting to read it
+    if (!fs.existsSync(questionsFilePath)) {
+      throw new Error(`Questions file not found: ${quiz.questionsFile}. Please contact the administrator.`);
+    }
+    
+    try {
     const questionsData = JSON.parse(
-      fs.readFileSync(path.join(MANUAL_QUESTIONS_DIR, quiz.questionsFile))
+        fs.readFileSync(questionsFilePath, 'utf8')
     );
     
     // Convert to the same format as Excel data
@@ -37,6 +63,9 @@ function loadQuizData(quiz) {
       q.image || null,
       ...(q.optionImages || [null, null, null, null]) // Add option images or default to nulls
     ]);
+    } catch (err) {
+      throw new Error(`Error reading questions file: ${err.message}`);
+    }
   }
   throw new Error('Invalid quiz type');
 }
@@ -97,6 +126,17 @@ function hasAttemptedQuiz(username, quizName) {
 
 router.get('/:quizName', (req, res) => {
     const quizName = req.params.quizName;
+    
+    try {
+        // Check if quizzes.json exists
+        if (!fs.existsSync(QUIZ_JSON_PATH)) {
+            return res.status(500).send(`
+                <h1>System Error</h1>
+                <p>Quiz configuration file not found. Please contact the administrator.</p>
+                <a href="/student">Back to Dashboard</a>
+            `);
+        }
+        
     const quizzes = JSON.parse(fs.readFileSync(QUIZ_JSON_PATH));
     const quizConfig = quizzes.find(q => q.name === quizName);
 
@@ -107,7 +147,11 @@ router.get('/:quizName', (req, res) => {
 
     // Check if quiz exists
     if (!quizConfig) {
-        return res.status(404).send("Quiz not found");
+            return res.status(404).send(`
+                <h1>Quiz Not Found</h1>
+                <p>The quiz "${quizName}" does not exist.</p>
+                <a href="/student">Back to Dashboard</a>
+            `);
     }
     
     // Check if the quiz has already been attempted
@@ -974,12 +1018,38 @@ router.get('/:quizName', (req, res) => {
         </html>
     `);
     } catch (err) {
-        console.error('Error loading quiz:', err);
-        if (err.message === "This quiz has already ended") {
-            res.status(400).send(err.message);
+            console.error('Error loading quiz data:', err);
+            if (err.message.includes('Excel file not found') || err.message.includes('Questions file not found')) {
+                // File not found error (more specific)
+                return res.status(404).send(`
+                    <h1>Quiz Resource Not Found</h1>
+                    <p>${err.message}</p>
+                    <p>The administrator may need to re-upload the quiz file.</p>
+                    <a href="/student">Back to Dashboard</a>
+                `);
+            } else if (err.message === "This quiz has already ended") {
+                // Quiz timing error
+                return res.status(400).send(`
+                    <h1>Quiz Unavailable</h1>
+                    <p>${err.message}</p>
+                    <a href="/student">Back to Dashboard</a>
+                `);
         } else {
-            res.status(500).send("Error loading quiz");
+                // Generic error
+                return res.status(500).send(`
+                    <h1>Error Loading Quiz</h1>
+                    <p>There was a problem loading the quiz: ${err.message}</p>
+                    <a href="/student">Back to Dashboard</a>
+                `);
         }
+        }
+    } catch (err) {
+        console.error('Error processing quiz request:', err);
+        res.status(500).send(`
+            <h1>System Error</h1>
+            <p>An unexpected error occurred: ${err.message}</p>
+            <a href="/student">Back to Dashboard</a>
+        `);
     }
 });
 

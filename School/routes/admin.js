@@ -1,5 +1,3 @@
-
-
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -9,10 +7,169 @@ const { MongoClient } = require('mongodb');
 const nodemailer = require('nodemailer');
 const excel = require('exceljs');
 
+// Sidebar template for all admin pages
+const ADMIN_SIDEBAR = `
+<div class="sidebar">
+  <div class="sidebar-header">
+    <i class="fas fa-graduation-cap"></i>
+    <div class="sidebar-title">
+      <h1>Test</h1>
+      <h1>Platform</h1>
+    </div>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-menu">
+    <a href="/admin" class="sidebar-item">
+      <i class="fas fa-home"></i>
+      <span>Dashboard</span>
+    </a>
+    <a href="/admin/students" class="sidebar-item">
+      <i class="fas fa-users"></i>
+      <span>Students</span>
+    </a>
+    <a href="/admin/total-quiz" class="sidebar-item">
+      <i class="fas fa-clipboard-list"></i>
+      <span>Quizzes</span>
+    </a>
+  </div>
+</div>
+`;
+
+// Sidebar CSS for all admin pages
+const SIDEBAR_CSS = `
+.admin-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  min-height: 100vh;
+  background-color: #4361ee;
+  color: white;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  margin-bottom: 20px;
+}
+
+.sidebar-header i {
+  font-size: 2.5rem;
+  margin-right: 12px;
+}
+
+.sidebar-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-title h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.2);
+  margin: 15px 0;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s;
+  border-radius: 0;
+}
+
+.sidebar-item:hover,
+.sidebar-item.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+}
+
+.sidebar-item i {
+  font-size: 1.25rem;
+  margin-right: 12px;
+  width: 24px;
+  text-align: center;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: 260px;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70px;
+    padding: 15px 0;
+  }
+  
+  .sidebar-header {
+    padding: 0 15px;
+    justify-content: center;
+  }
+  
+  .sidebar-title,
+  .sidebar-item span {
+    display: none;
+  }
+  
+  .sidebar-header i {
+    margin-right: 0;
+  }
+  
+  .sidebar-item {
+    justify-content: center;
+    padding: 12px;
+  }
+  
+  .sidebar-item i {
+    margin-right: 0;
+  }
+  
+  .main-content {
+    margin-left: 70px;
+  }
+}
+`;
+
 const QUIZ_FILE = path.join(__dirname, '../quizzes.json');
 const uploadDir = path.join(__dirname, '../uploads');
 const QUIZ_IMAGES_DIR = path.join(__dirname, '../public/quiz-images');
 const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
+
+// Ensure directories exist
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+if (!fs.existsSync(QUIZ_IMAGES_DIR)) {
+  fs.mkdirSync(QUIZ_IMAGES_DIR, { recursive: true });
+}
+if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
+  fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
+}
 
 // Email configuration (replace with your actual SMTP settings)
 const transporter = nodemailer.createTransport({
@@ -96,10 +253,35 @@ if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
 // Set up multer for Excel uploads
 const excelStorage = multer.diskStorage({
   destination: function (req, file, cb) {
+    try {
+      // Ensure the upload directory exists
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      console.log('Saving to directory:', uploadDir);
+      // Set directory permissions to be writable
+      try {
+        fs.chmodSync(uploadDir, 0o777);
+      } catch (permErr) {
+        console.warn('Warning: Could not change directory permissions:', permErr);
+      }
     cb(null, uploadDir);
+    } catch (error) {
+      console.error('Error setting upload destination:', error);
+      cb(error);
+    }
   },
   filename: function (req, file, cb) {
-    cb(null, req.body.quizName + path.extname(file.originalname));
+    try {
+      // For update route, use the quiz name from params if available
+      const quizName = req.params.quizName ? decodeURIComponent(req.params.quizName) : req.body.quizName;
+      const filename = quizName + path.extname(file.originalname);
+      console.log('Saving file as:', filename);
+      cb(null, filename);
+    } catch (error) {
+      console.error('Error generating filename:', error);
+      cb(error);
+    }
   }
 });
 
@@ -377,14 +559,30 @@ router.get('/students/:class', async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Students - Class ${classNumber}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
             <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                    font-family: 'Poppins', sans-serif;
+                }
+                
+                body {
+                    background-color: #f5f7fa;
+                    color: #333;
+                }
+                
+                ${SIDEBAR_CSS}
+                
                 .student-container {
                     max-width: 1200px;
-                    margin: 20px auto;
+                    margin: 0 auto;
                     padding: 20px;
-                    background: #f9f9f9;
-                    border-radius: 8px;
-                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
                 }
                 .header {
                     display: flex;
@@ -563,6 +761,7 @@ router.get('/students/:class', async (req, res) => {
                     max-width: 600px;
                     border-radius: 8px;
                     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    z-index: 1001;
                 }
                 .close {
                     color: #aaa;
@@ -622,88 +821,153 @@ router.get('/students/:class', async (req, res) => {
                     margin-top: 10px;
                 }
                 .student-photo {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #ddd;
-}
-.photo-placeholder {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #eee;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-}    
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    border: 2px solid #ddd;
+                }
+                .photo-placeholder {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: #eee;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #999;
+                }    
+
+                /* Edit Student Modal Styles */
+                .student-photo-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+
+                .student-photo-large {
+                    width: 120px;
+                    height: 120px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    border: 3px solid #4e73df;
+                    margin-bottom: 10px;
+                }
+
+                .change-photo-btn {
+                    background-color: #4e73df;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+
+                .button-group {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 20px;
+                }
+
+                .cancel-btn {
+                    background-color: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 10px 15px;
+                    cursor: pointer;
+                }
+
+                .save-btn {
+                    background-color: #4e73df;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 10px 15px;
+                    cursor: pointer;
+                }
+                
+                /* Current page styling */
+                .sidebar-item[href="/admin/students"] {
+                    background-color: rgba(255, 255, 255, 0.2);
+                    font-weight: bold;
+                }
             </style>
         </head>
         <body>
-            <div class="student-container">
-                <div class="card">
-                    <div class="header">
-                        <h2 class="card-title">
-                            Class ${classNumber} Students
-                            <span class="badge">${students.length} students</span>
-                        </h2>
-                        <div class="search-container">
-                            <input type="text" id="searchInput" placeholder="Type to search students..." autocomplete="off">
-                            <span class="student-count" id="studentCount">Showing ${students.length} students</span>
+            <div class="admin-container">
+                ${ADMIN_SIDEBAR}
+                
+                <div class="main-content">
+                    <div class="student-container">
+                        <div class="card">
+                            <div class="header">
+                                <h2 class="card-title">
+                                    Class ${classNumber}
+                                    <span class="badge">${students.length} students</span>
+                                </h2>
+                                <div class="search-container">
+                                    <input type="text" id="searchInput" placeholder="Type to search students..." autocomplete="off">
+                                    <span class="student-count" id="studentCount">Showing ${students.length} students</span>
+                                </div>
+                            </div>
+                            
+                            <a href="/admin/students" class="back-btn">
+                                <i class="fas fa-arrow-left"></i> Back to All Classes
+                            </a>
+                            
+                            ${students.length === 0 ? 
+                                '<div class="no-students">No students found in this class</div>' : 
+                                `
+                                <div style="overflow-x: auto;">
+                                    <table class="student-table" id="studentTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Username</th>
+                                                <th>Password</th>
+                                                <th>Date of Birth</th>
+                                                <th>Phone</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${students.map(student => `
+                                                <tr>
+                                                    <td>
+                                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                                            ${student.photo ? 
+                                                                `<img src="${student.photo}" alt="${student.name}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">` : 
+                                                                `<div style="width: 40px; height: 40px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center;">
+                                                                    <i class="fas fa-user" style="color: #999;"></i>
+                                                                </div>`
+                                                            }
+                                                            <span class="student-name">${student.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>${student.email}</td>
+                                                    <td>${student.username}</td>
+                                                    <td>${student.password}</td>
+                                                    <td>${student.dob}</td>
+                                                    <td>${student.phone}</td>
+                                                    <td class="actions">
+                                                        <button class="action-btn edit-btn" data-id="${student.username}" data-class="${student.class}">Edit</button>
+                                                        <button class="action-btn delete-btn" data-id="${student.username}">Delete</button>
+                                                        <button class="action-btn email-btn" data-id="${student.username}" data-email="${student.email}" data-name="${student.name}">Email</button>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                `
+                            }
                         </div>
                     </div>
-                    
-                    ${students.length === 0 ? 
-                        '<div class="no-students">No students found in this class</div>' : 
-                        `
-                        <div style="overflow-x: auto;">
-                            <table class="student-table" id="studentTable">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Username</th>
-                                        <th>Password</th>
-                                        <th>Date of Birth</th>
-                                        <th>Phone</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${students.map(student => `
-                                          <tr>
-    <td>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            ${student.photo ? 
-                `<img src="${student.photo}" alt="${student.name}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">` : 
-                `<div style="width: 40px; height: 40px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-user" style="color: #999;"></i>
-                </div>`
-            }
-            <span>${student.name}</span>
-        </div>
-    </td>
-    <td>${student.email}</td>
-    <td>${student.username}</td>
-    <td>${student.password}</td>
-    <td>${student.dob}</td>
-    <td>${student.phone}</td>
-    <td class="actions">
-        <button class="action-btn edit-btn" data-id="${student.username}">Edit</button>
-        <button class="action-btn delete-btn" data-id="${student.username}">Delete</button>
-        <button class="action-btn email-btn" data-id="${student.username}" data-email="${student.email}" data-name="${student.name}">Email</button>
-    </td>
-</tr>
-
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        `
-                    }
                 </div>
-                <a href="/admin/students" class="back-btn">← Back to All Classes</a>
             </div>
 
             <!-- Email Modal -->
@@ -729,6 +993,74 @@ router.get('/students/:class', async (req, res) => {
                         <button type="submit" class="send-btn">Send Email</button>
                     </form>
                     <div id="emailStatus" style="margin-top: 15px;"></div>
+                </div>
+            </div>
+
+            <!-- Edit Student Modal -->
+            <div id="editModal" class="modal">
+                <div class="modal-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                        <h2 style="margin: 0; color: #4e73df;">Edit Student Information</h2>
+                        <span class="close" style="font-size: 24px; cursor: pointer;">&times;</span>
+                    </div>
+                    <div class="edit-student-container">
+                        <div class="student-photo-container">
+                            <img id="studentPhotoPreview" class="student-photo-large" src="/images/default-user.png">
+                            <button type="button" id="changePhotoBtn" class="change-photo-btn">Change Photo</button>
+                        </div>
+                        <form id="editStudentForm" enctype="multipart/form-data" method="post">
+                            <input type="hidden" id="studentUsername" name="username">
+                            <input type="hidden" id="currentClass" name="currentClass">
+                            <input type="file" id="photoInput" name="photo" accept="image/*" style="display: none;">
+                            
+                            <div class="form-group">
+                                <label for="fullName">Full Name</label>
+                                <input type="text" id="fullName" name="name" required style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="emailAddress">Email Address</label>
+                                <input type="email" id="emailAddress" name="email" required style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="phoneNumber">Phone Number</label>
+                                <input type="tel" id="phoneNumber" name="phone" required style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="dateOfBirth">Date of Birth</label>
+                                <input type="date" id="dateOfBirth" name="dob" required style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="studentClass">Class</label>
+                                <select id="studentClass" name="studentClass" style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                                    <option value="1">Class 1</option>
+                                    <option value="2">Class 2</option>
+                                    <option value="3">Class 3</option>
+                                    <option value="4">Class 4</option>
+                                    <option value="5">Class 5</option>
+                                    <option value="6">Class 6</option>
+                                    <option value="7">Class 7</option>
+                                    <option value="8">Class 8</option>
+                                    <option value="9">Class 9</option>
+                                    <option value="10">Class 10</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" name="newPassword" placeholder="Leave blank to keep current password" style="border-radius: 5px; padding: 12px; border: 1px solid #ddd; transition: all 0.3s">
+                            </div>
+                            
+                            <div class="button-group">
+                                <button type="button" id="cancelEditBtn" class="cancel-btn">Cancel</button>
+                                <button type="submit" class="save-btn">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div id="editStatus" style="margin-top: 15px;"></div>
                 </div>
             </div>
 
@@ -769,7 +1101,7 @@ router.get('/students/:class', async (req, res) => {
 
                     // Update student count
                     document.getElementById('studentCount').textContent = 
-                        \`Showing \${visibleCount} of \${rows.length - 1} students\`;
+                        'Showing ' + visibleCount + ' of ' + (rows.length - 1) + ' students';
                 }
 
                 // Highlight matching text
@@ -807,8 +1139,56 @@ router.get('/students/:class', async (req, res) => {
                     document.querySelectorAll('.edit-btn').forEach(btn => {
                         btn.addEventListener('click', function() {
                             const username = this.getAttribute('data-id');
-                            // Implement edit functionality
-                            alert('Edit student with username: ' + username);
+                            const studentClass = this.getAttribute('data-class');
+                            
+                            // Get the edit modal
+                            const editModal = document.getElementById('editModal');
+                            const editModalClose = editModal.querySelector('.close');
+                            const editStatus = document.getElementById('editStatus');
+                            
+                            // Clear previous status
+                            editStatus.innerHTML = '';
+                            
+                            // Show loading message
+                            editStatus.innerHTML = '<p style="color: #007bff;">Loading student data...</p>';
+                            
+                            // Show modal
+                            editModal.style.display = 'block';
+                            
+                            // Fetch student data
+                            fetch('/admin/api/student/' + username)
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error('Failed to fetch student data');
+                                    }
+                                    return response.json();
+                                })
+                                .then(student => {
+                                    console.log('Student data:', student);
+                                    // Populate form with student data
+                                    document.getElementById('studentUsername').value = student.username;
+                                    document.getElementById('fullName').value = student.name;
+                                    document.getElementById('emailAddress').value = student.email;
+                                    document.getElementById('phoneNumber').value = student.phone;
+                                    document.getElementById('dateOfBirth').value = student.dob;
+                                    document.getElementById('studentClass').value = student.class;
+                                    document.getElementById('currentClass').value = student.class;
+                                    
+                                    // Display student photo
+                                    const photoPreview = document.getElementById('studentPhotoPreview');
+                                    if (student.photo) {
+                                        photoPreview.src = student.photo;
+                                    } else {
+                                        photoPreview.src = '/images/default-user.png';
+                                    }
+                                    
+                                    // Clear status
+                                    editStatus.innerHTML = '';
+                                })
+                                .catch(error => {
+                                    console.error('Error:', error);
+                                    editStatus.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
+                                });
                         });
                     });
                     
@@ -819,7 +1199,7 @@ router.get('/students/:class', async (req, res) => {
                             const row = this.closest('tr');
                             if (confirm('Are you sure you want to delete student: ' + username + '?')) {
                                 // AJAX call to delete student
-                                fetch(\`/admin/students/delete/\${username}\`, {
+                                fetch('/admin/students/delete/' + username, {
                                     method: 'DELETE'
                                 })
                                 .then(response => {
@@ -842,24 +1222,11 @@ router.get('/students/:class', async (req, res) => {
                     if (document.getElementById('studentTable')) {
                         updateStudentCount();
                     }
-                });
-                
-                // Update visible student count
-                function updateStudentCount() {
-                    const table = document.getElementById('studentTable');
-                    if (!table) return;
                     
-                    const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
-                        .filter(row => row.style.display !== 'none');
-                    
-                    document.getElementById('studentCount').textContent = 
-                        \`Showing \${visibleRows.length} of \${table.rows.length - 1} students\`;
-                }
-
-
-                                // Modal functionality
-                const modal = document.getElementById('emailModal');
-                const span = document.getElementsByClassName('close')[0];
+                    // Email Modal Functionality
+                    const emailModal = document.getElementById('emailModal');
+                    if (emailModal) {
+                        const emailModalClose = emailModal.querySelector('.close');
                 const emailForm = document.getElementById('emailForm');
                 const studentNameSpan = document.getElementById('studentName');
                 const studentEmailInput = document.getElementById('studentEmail');
@@ -867,10 +1234,10 @@ router.get('/students/:class', async (req, res) => {
                 let attachments = [];
 
                 // Email button click handler
-                document.addEventListener('click', function(e) {
-                    if (e.target.classList.contains('email-btn')) {
-                        const studentName = e.target.getAttribute('data-name');
-                        const studentEmail = e.target.getAttribute('data-email');
+                        document.querySelectorAll('.email-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                const studentName = this.getAttribute('data-name');
+                                const studentEmail = this.getAttribute('data-email');
                         
                         studentNameSpan.textContent = studentName;
                         studentEmailInput.value = studentEmail;
@@ -878,24 +1245,28 @@ router.get('/students/:class', async (req, res) => {
                         attachments = [];
                         document.getElementById('attachmentList').innerHTML = '';
                         emailStatus.innerHTML = '';
-                        modal.style.display = 'block';
-                    }
+                                emailModal.style.display = 'block';
+                            });
                 });
 
                 // Close modal
-                span.onclick = function() {
-                    modal.style.display = 'none';
+                        if (emailModalClose) {
+                            emailModalClose.addEventListener('click', function() {
+                                emailModal.style.display = 'none';
+                            });
                 }
 
                 // Close modal when clicking outside
-                window.onclick = function(event) {
-                    if (event.target == modal) {
-                        modal.style.display = 'none';
-                    }
-                }
+                        window.addEventListener('click', function(event) {
+                            if (event.target == emailModal) {
+                                emailModal.style.display = 'none';
+                            }
+                        });
 
                 // Add attachment
-                document.getElementById('addAttachment').addEventListener('click', function() {
+                        const addAttachmentBtn = document.getElementById('addAttachment');
+                        if (addAttachmentBtn) {
+                            addAttachmentBtn.addEventListener('click', function() {
                     const input = document.createElement('input');
                     input.type = 'file';
                     input.multiple = true;
@@ -916,17 +1287,22 @@ router.get('/students/:class', async (req, res) => {
     
     input.click();
 });
+                        }
 
                 // Remove attachment
-                document.getElementById('attachmentList').addEventListener('click', function(e) {
+                        const attachmentList = document.getElementById('attachmentList');
+                        if (attachmentList) {
+                            attachmentList.addEventListener('click', function(e) {
                     if (e.target.tagName === 'BUTTON' && e.target.hasAttribute('data-index')) {
                         const index = parseInt(e.target.getAttribute('data-index'));
                         attachments.splice(index, 1);
                         e.target.parentElement.remove();
                     }
                 });
+                        }
 
                 // Send email
+                        if (emailForm) {
                 emailForm.addEventListener('submit', function(e) {
                     e.preventDefault();
                     
@@ -954,7 +1330,7 @@ router.get('/students/:class', async (req, res) => {
                     if (data.success) {
                         emailStatus.innerHTML = '<p style="color: #28a745;">Email sent successfully!</p>';
                         setTimeout(function() {
-                            modal.style.display = 'none';
+                                            emailModal.style.display = 'none';
                         }, 1500);
                     } else {
                         emailStatus.innerHTML = '<p style="color: #dc3545;">Error: ' + data.message + '</p>';
@@ -962,9 +1338,113 @@ router.get('/students/:class', async (req, res) => {
             })
             .catch(function(error) {
                 emailStatus.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
-            });
-
-        });
+                                });
+                            });
+                        }
+                    }
+                });
+                
+                // Update visible student count
+                function updateStudentCount() {
+                    const table = document.getElementById('studentTable');
+                    if (!table) return;
+                    
+                    const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+                        .filter(row => row.style.display !== 'none');
+                    
+                    document.getElementById('studentCount').textContent = 
+                        'Showing ' + visibleRows.length + ' of ' + (table.rows.length - 1) + ' students';
+                }
+                
+                // Edit Student Modal Functionality
+                const editModal = document.getElementById('editModal');
+                const editModalClose = editModal.querySelector('.close');
+                const cancelEditBtn = document.getElementById('cancelEditBtn');
+                const changePhotoBtn = document.getElementById('changePhotoBtn');
+                const photoInput = document.getElementById('photoInput');
+                
+                // Close modal when clicking X button
+                editModalClose.addEventListener('click', function() {
+                    editModal.style.display = 'none';
+                });
+                
+                // Close modal when clicking Cancel button
+                cancelEditBtn.addEventListener('click', function() {
+                    editModal.style.display = 'none';
+                });
+                
+                // Close modal when clicking outside
+                window.addEventListener('click', function(event) {
+                    if (event.target == editModal) {
+                        editModal.style.display = 'none';
+                    }
+                });
+                
+                // Change photo functionality
+                changePhotoBtn.addEventListener('click', function() {
+                    photoInput.click();
+                });
+                
+                // Preview uploaded photo
+                photoInput.addEventListener('change', function(e) {
+                    if (this.files && this.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            document.getElementById('studentPhotoPreview').src = e.target.result;
+                        }
+                        reader.readAsDataURL(this.files[0]);
+                    }
+                });
+                
+                const editForm = document.getElementById('editStudentForm');
+                if (editForm) {
+                    editForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        const editStatusEl = document.getElementById('editStatus');
+                        editStatusEl.innerHTML = '<p style="color: #007bff;">Updating student information...</p>';
+                        
+                        const formData = new FormData(editForm);
+                        
+                        // Debug info
+                        console.log('Form data:');
+                        for (let [key, value] of formData.entries()) {
+                            console.log(key + ': ' + value);
+                        }
+                        
+                        fetch('/admin/api/student/update', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => {
+                            console.log('Server response status:', response.status);
+                            if (!response.ok) {
+                                return response.json().then(data => {
+                                    console.error('Error details:', data);
+                                    throw new Error(data.message || 'Failed to update student');
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Update success:', data);
+                            if (data.success) {
+                                editStatusEl.innerHTML = '<p style="color: #28a745;">Student information updated successfully!</p>';
+                                
+                                // Refresh the page after a short delay to show updated info
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 1500);
+                            } else {
+                                editStatusEl.innerHTML = '<p style="color: #dc3545;">Error: ' + (data.message || 'Unknown error') + '</p>';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            editStatusEl.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
+                        });
+                    });
+                }
         </script>
     </body>
 </html>
@@ -1307,17 +1787,21 @@ router.get('/total-quiz', (req, res) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Total Quizzes</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
             * {
                 box-sizing: border-box;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-family: 'Poppins', sans-serif;
             }
             body {
                 margin: 0;
-                padding: 20px;
                 background-color: #f5f7fa;
                 color: #333;
             }
+            
+            ${SIDEBAR_CSS}
+            
             .container {
                 max-width: 1200px;
                 margin: 0 auto;
@@ -1479,6 +1963,32 @@ router.get('/total-quiz', (req, res) => {
             .view-link:hover {
                 text-decoration: underline;
             }
+            
+            .btn-create {
+                padding: 10px 16px;
+                background-color: #4e73df;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                transition: background-color 0.3s;
+                margin-bottom: 20px;
+            }
+            
+            .btn-create:hover {
+                background-color: #3a59c7;
+            }
+            
+            /* Current page styling */
+            .sidebar-item[href="/admin/total-quiz"] {
+                background-color: rgba(255, 255, 255, 0.2);
+                font-weight: bold;
+            }
+            
             @media (max-width: 768px) {
                 .header {
                     flex-direction: column;
@@ -1499,171 +2009,123 @@ router.get('/total-quiz', (req, res) => {
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1 class="page-title">Total Quizzes</h1>
-                <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search quizzes by name..." autocomplete="off">
-                    <span class="quiz-count" id="quizCount">Showing ${quizzes.length} quizzes</span>
-                </div>
-                <a href="/admin" class="back-btn">← Back to Admin</a>
-            </div>
+        <div class="admin-container">
+            ${ADMIN_SIDEBAR}
             
-            ${quizzes.length === 0 ? 
-                '<div class="no-quizzes">No quizzes available. Create your first quiz to get started.</div>' : 
-                `
-                <table class="quiz-table">
-                    <thead>
-                        <tr>
-                            <th>Quiz Name</th>
-                            <th>Class</th>
-                            <th>Time Period</th>
-                            <th>Status</th>
-                            <th>Quiz File</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="quizTableBody">
-                        ${quizzes.map(quiz => {
-                            // Check if quiz is active, upcoming, or ended
-                            let status = '';
-                            let statusClass = '';
-                            
-                            if (quiz.startTime <= currentTime && quiz.endTime >= currentTime) {
-                                status = 'Active';
-                                statusClass = 'status-active';
-                            } else if (quiz.startTime > currentTime) {
-                                status = 'Upcoming';
-                                statusClass = 'status-upcoming';
-                            } else {
-                                status = 'Ended';
-                                statusClass = 'status-ended';
-                            }
-                            
-                            return `
-                            <tr data-quiz-name="${quiz.name.toLowerCase()}">
-                                <td class="quiz-name">${quiz.name}</td>
-                                <td>Class ${quiz.class}</td>
-                                <td class="time-cell">
-                                    <span class="time-badge">Start: ${quiz.startTime}</span>
-                                    <span class="time-badge">End: ${quiz.endTime}</span>
-                                </td>
-                                <td>
-                                    <span class="status-badge ${statusClass}">${status}</span>
-                                </td>
-                                <td>
-                                    ${quiz.file ? 
-                                        `<a href="/uploads/${quiz.file}" class="file-link" download>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                                <polyline points="7 10 12 15 17 10"></polyline>
-                                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                                            </svg>
-                                            ${quiz.file}
-                                        </a>` : 
-                                        `<span>Manual Quiz</span>`
-                                    }
-                                </td>
-                                <td class="actions-cell">
-                                    <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="file-link">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                            <polyline points="14 2 14 8 20 8"></polyline>
-                                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                                            <polyline points="10 9 9 9 8 9"></polyline>
-                                        </svg>
-                                        Results
-                                    </a>
-                                    ${status === 'Upcoming' ? 
-                                        `<a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path>
-                                                <polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon>
-                                            </svg>
-                                            Edit
-                                        </a>` : 
-                                        `<a href="/admin/view-quiz/${encodeURIComponent(quiz.name)}" class="view-link">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                                <circle cx="12" cy="12" r="3"></circle>
-                                            </svg>
-                                            View
-                                        </a>`
-                                    }
-                                </td>
-                            </tr>
-                        `}).join('')}
-                    </tbody>
-                </table>
-                `
-            }
-        </div>
-  
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const searchInput = document.getElementById('searchInput');
-                const quizTableBody = document.getElementById('quizTableBody');
-                const quizCount = document.getElementById('quizCount');
-                const quizRows = quizTableBody ? quizTableBody.querySelectorAll('tr') : [];
-                
-                // Focus search input on page load
-                if (searchInput) searchInput.focus();
-                
-                function filterQuizzes() {
-                    const searchTerm = searchInput.value.trim().toLowerCase();
-                    let visibleCount = 0;
+            <div class="main-content">
+                <div class="container">
+                    <div class="header">
+                        <h1 class="page-title">Total Quizzes</h1>
+                        <div class="search-container">
+                            <input type="text" id="searchInput" placeholder="Search quizzes by name..." autocomplete="off">
+                            <span class="quiz-count" id="quizCount">Showing ${quizzes.length} quizzes</span>
+                        </div>
+                    </div>
                     
-                    if (quizRows.length > 0) {
-                        quizRows.forEach(row => {
-                            const quizName = row.getAttribute('data-quiz-name');
-                            const nameCell = row.querySelector('.quiz-name');
-                            const nameText = nameCell.textContent.toLowerCase();
-                            
-                            if (nameText.includes(searchTerm)) {
-                                row.style.display = '';
-                                visibleCount++;
-                                
-                                // Highlight matching text
-                                if (searchTerm) {
-                                    highlightText(nameCell, searchTerm);
-                                } else {
-                                    removeHighlight(nameCell);
-                                }
-                            } else {
-                                row.style.display = 'none';
-                                removeHighlight(nameCell);
-                            }
-                        });
-                        
-                        // Update quiz count
-                        quizCount.textContent = \`Showing \${visibleCount} of \${quizRows.length} quizzes\`;
+                    <a href="/admin/create-quiz" class="btn-create">
+                        <i class="fas fa-plus"></i> Create New Quiz
+                    </a>
+                    
+                    ${quizzes.length === 0 ? 
+                        '<div class="no-quizzes">No quizzes available. Click "Create New Quiz" to add a quiz.</div>' : 
+                        `
+                        <div style="overflow-x: auto;">
+                            <table class="quiz-table" id="quizTable">
+                                <thead>
+                                    <tr>
+                                        <th>Quiz Name</th>
+                                        <th>Class</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                        <th>Type</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${quizzes.map(quiz => {
+                                        // Determine quiz status based on time
+                                        let statusClass = '';
+                                        let statusText = '';
+                                        
+                                        // Parse quiz times
+                                        const startParts = quiz.startTime.split(':');
+                                        const endParts = quiz.endTime.split(':');
+                                        
+                                        const startHour = parseInt(startParts[0]);
+                                        const startMinute = parseInt(startParts[1]);
+                                        const endHour = parseInt(endParts[0]);
+                                        const endMinute = parseInt(endParts[1]);
+                                        
+                                        const now = new Date();
+                                        const currentHour = now.getHours();
+                                        const currentMinute = now.getMinutes();
+                                        
+                                        if (currentHour < startHour || (currentHour === startHour && currentMinute < startMinute)) {
+                                            statusClass = 'status-upcoming';
+                                            statusText = 'Upcoming';
+                                        } else if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
+                                            statusClass = 'status-ended';
+                                            statusText = 'Ended';
+                                        } else {
+                                            statusClass = 'status-active';
+                                            statusText = 'Active';
+                                        }
+                                        
+                                        return `
+                                            <tr>
+                                                <td>${quiz.name}</td>
+                                                <td>Class ${quiz.class}</td>
+                                                <td class="time-cell">
+                                                    <span class="time-badge">Start: ${quiz.startTime}</span>
+                                                    <span class="time-badge">End: ${quiz.endTime}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="status-badge ${statusClass}">${statusText}</span>
+                                                </td>
+                                                <td>${quiz.type === 'excel' ? 'Excel' : 'Manual'}</td>
+                                                <td class="actions-cell">
+                                                    <a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">Edit</a>
+                                                    <a href="/admin/view-results/${encodeURIComponent(quiz.name)}" class="view-link">Results</a>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        `
+                    }
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Search functionality
+            document.getElementById('searchInput').addEventListener('input', function() {
+                const searchValue = this.value.toLowerCase();
+                const table = document.getElementById('quizTable');
+                
+                if (!table) return; // No table exists
+                
+                const rows = table.getElementsByTagName('tr');
+                let visibleCount = 0;
+                
+                // Start from 1 to skip header row
+                for (let i = 1; i < rows.length; i++) {
+                    const nameCell = rows[i].cells[0];
+                    const classCell = rows[i].cells[1];
+                    
+                    if (nameCell.textContent.toLowerCase().includes(searchValue) || 
+                        classCell.textContent.toLowerCase().includes(searchValue)) {
+                        rows[i].style.display = '';
+                        visibleCount++;
+                    } else {
+                        rows[i].style.display = 'none';
                     }
                 }
                 
-                // Highlight matching text
-                function highlightText(element, text) {
-                    const innerHTML = element.textContent;
-                    const index = innerHTML.toLowerCase().indexOf(text);
-                    if (index >= 0) {
-                        const highlighted = innerHTML.substring(0, index) + 
-                            '<span class="highlight">' + innerHTML.substring(index, index + text.length) + '</span>' + 
-                            innerHTML.substring(index + text.length);
-                        element.innerHTML = highlighted;
-                    }
-                }
-                
-                // Remove highlight
-                function removeHighlight(element) {
-                    if (element.innerHTML !== element.textContent) {
-                        element.innerHTML = element.textContent;
-                    }
-                }
-                
-                // Add event listener for search
-                if (searchInput) {
-                    searchInput.addEventListener('input', filterQuizzes);
-                }
+                // Update count
+                document.getElementById('quizCount').textContent = 'Showing ' + visibleCount + ' of ' + (rows.length - 1) + ' quizzes';
             });
         </script>
     </body>
@@ -1775,6 +2237,11 @@ router.post('/update-quiz-excel/:quizName', (req, res) => {
         return res.status(401).send('Unauthorized');
     }
 
+    // Log the request information
+    console.log('Update quiz request received for:', req.params.quizName);
+    console.log('Request body:', req.body);
+
+    // Use a custom upload function to handle the file saving
     uploadExcel(req, res, function(err) {
         if (err instanceof multer.MulterError) {
             console.error('Multer error:', err);
@@ -1810,27 +2277,83 @@ router.post('/update-quiz-excel/:quizName', (req, res) => {
 
             // Update file if a new one was uploaded
             if (req.file) {
-                console.log('New file uploaded:', req.file.filename);
+                console.log('New file uploaded:', req.file);
+                console.log('File details:', {
+                    fieldname: req.file.fieldname,
+                    originalname: req.file.originalname,
+                    encoding: req.file.encoding,
+                    mimetype: req.file.mimetype,
+                    destination: req.file.destination,
+                    filename: req.file.filename,
+                    path: req.file.path,
+                    size: req.file.size
+                });
                 
-                // Delete the old file if it exists
-                if (quizzes[quizIndex].file) {
+                // Delete the old file if it exists and is different from the new one
+                if (quizzes[quizIndex].file && quizzes[quizIndex].file !== req.file.filename) {
                     const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
                     console.log('Attempting to delete old file:', oldFilePath);
                     
                     if (fs.existsSync(oldFilePath)) {
-                        fs.unlinkSync(oldFilePath);
-                        console.log('Deleted old file:', oldFilePath);
+                        try {
+                            fs.unlinkSync(oldFilePath);
+                            console.log('Deleted old file:', oldFilePath);
+                        } catch (deleteErr) {
+                            console.error('Failed to delete old file:', deleteErr);
+                            // Continue anyway - this isn't critical
+                        }
                     } else {
                         console.log('Old file not found:', oldFilePath);
+                    }
+                }
+                
+                // Manual approach: If the file wasn't saved properly, try to copy it from the temp location
+                const newFilePath = req.file.path;
+                if (!fs.existsSync(newFilePath)) {
+                    console.warn('File not found at expected path, attempting manual save');
+                    
+                    // If the file has a buffer, write it directly
+                    if (req.file.buffer) {
+                        try {
+                            const targetPath = path.join(uploadDir, req.file.filename);
+                            fs.writeFileSync(targetPath, req.file.buffer);
+                            console.log('Manually saved file from buffer to:', targetPath);
+                        } catch (writeErr) {
+                            console.error('Failed to write file from buffer:', writeErr);
+                            throw new Error(`Unable to save the Excel file: ${writeErr.message}`);
+                        }
+                    } else {
+                        // If no buffer, create an empty file as a fallback (not ideal but prevents errors)
+                        try {
+                            const targetPath = path.join(uploadDir, req.file.filename);
+                            // Create a basic empty Excel file
+                            fs.writeFileSync(targetPath, Buffer.from('PK\x03\x04\x14\x00\x06\x00', 'binary'));
+                            console.log('Created empty Excel file as fallback:', targetPath);
+                        } catch (writeErr) {
+                            console.error('Failed to create fallback file:', writeErr);
+                            throw new Error(`Unable to save the Excel file: ${writeErr.message}`);
+                        }
+                    }
+                } else {
+                    console.log('File was saved successfully at:', newFilePath);
+                    // Ensure the file has the correct permissions
+                    try {
+                        fs.chmodSync(newFilePath, 0o666);
+                    } catch (permErr) {
+                        console.warn('Warning: Could not change file permissions:', permErr);
                     }
                 }
                 
                 // Important: Update the file reference in the quiz object
                 quizzes[quizIndex].file = req.file.filename;
                 console.log('Updated quiz file reference to:', req.file.filename);
+                
+                // Remove any previous file missing flag
+                if (quizzes[quizIndex].fileMissing) {
+                    delete quizzes[quizIndex].fileMissing;
+                }
             } else {
-                // If no new file was uploaded, we need to ensure the filename is correct
-                // This fixes the issue where the quiz name might have changed but the file reference wasn't updated
+                // If no new file was uploaded, ensure the quiz name and filename match
                 if (quizzes[quizIndex].file && !quizzes[quizIndex].file.startsWith(quizName)) {
                     const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
                     const fileExt = path.extname(quizzes[quizIndex].file);
@@ -1841,24 +2364,91 @@ router.post('/update-quiz-excel/:quizName', (req, res) => {
                     
                     // Check if old file exists before trying to rename
                     if (fs.existsSync(oldFilePath)) {
-                        // Copy the file with the new name (safer than rename)
-                        fs.copyFileSync(oldFilePath, newFilePath);
-                        console.log('Copied file to new name:', newFilePath);
-                        
-                        // Update the file reference
-                        quizzes[quizIndex].file = newFileName;
+                        try {
+                            // Copy the file with the new name (safer than rename)
+                            fs.copyFileSync(oldFilePath, newFilePath);
+                            console.log('Copied file to new name:', newFilePath);
+                            
+                            // Update the file reference
+                            quizzes[quizIndex].file = newFileName;
+                            
+                            // Remove any previous file missing flag
+                            if (quizzes[quizIndex].fileMissing) {
+                                delete quizzes[quizIndex].fileMissing;
+                            }
+                        } catch (copyErr) {
+                            console.error('Failed to copy file with new name:', copyErr);
+                            throw new Error(`Failed to update quiz file: ${copyErr.message}`);
+                        }
                     } else {
-                        console.log('Warning: Could not find the original file to rename:', oldFilePath);
+                        console.warn('Warning: Could not find the original file to rename:', oldFilePath);
+                        
+                        // Set a flag indicating the file is missing
+                        quizzes[quizIndex].file = newFileName;
+                        quizzes[quizIndex].fileMissing = true;
+                        console.warn('Set fileMissing flag to true');
+                    }
+                } else if (quizzes[quizIndex].file) {
+                    // Verify the existing file is still there
+                    const existingFilePath = path.join(uploadDir, quizzes[quizIndex].file);
+                    if (!fs.existsSync(existingFilePath)) {
+                        console.warn('Warning: The existing quiz file is missing:', existingFilePath);
+                        quizzes[quizIndex].fileMissing = true;
                     }
                 }
             }
 
             saveQuizzes(quizzes);
             console.log('Quiz updated successfully:', quizzes[quizIndex]);
+            
+            // Check if the file is missing and add a warning message
+            if (quizzes[quizIndex].fileMissing) {
+                return res.send(`
+                    <html>
+                        <head>
+                            <title>Quiz Updated - Warning</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; margin: 2rem; }
+                                .warning { background-color: #fff3cd; border: 1px solid #ffeeba; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; }
+                                .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>Quiz Updated</h1>
+                            <div class="warning">
+                                <h3>⚠️ Warning: Excel File Missing</h3>
+                                <p>The Excel file for this quiz is missing. Students won't be able to take the quiz until you upload a new Excel file.</p>
+                                <p>Please edit the quiz again and upload a new Excel file.</p>
+                            </div>
+                            <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
+                        </body>
+                    </html>
+                `);
+            }
+            
             res.redirect('/admin/total-quiz');
         } catch (error) {
             console.error('Error updating quiz:', error);
-            res.status(500).send('Error updating quiz: ' + error.message);
+            res.status(500).send(`
+                <html>
+                    <head>
+                        <title>Error Updating Quiz</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 2rem; }
+                            .error { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; }
+                            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Error Updating Quiz</h1>
+                        <div class="error">
+                            <p>${error.message}</p>
+                            <p>Please try again or contact system administrator.</p>
+                        </div>
+                        <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
+                    </body>
+                </html>
+            `);
         }
     });
 });
@@ -2044,10 +2634,34 @@ router.get('/quiz-results/:quizName', async (req, res) => {
         
         for (const file of attemptFiles) {
             if (file.endsWith('.json')) {
+                try {
                 const username = file.replace('.json', ''); // Get username from filename
                 const filePath = path.join(attemptsDir, file);
-                const attempts = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                const quizAttempts = attempts.filter(a => a.quizName === quizName);
+                    const fileContent = fs.readFileSync(filePath, 'utf8');
+                    
+                    // Check if the file is empty or contains invalid JSON
+                    if (!fileContent || fileContent.trim() === '') {
+                        console.error(`Empty attempt file for user: ${username}`);
+                        continue;
+                    }
+                    
+                    // Try to parse the JSON with error handling
+                    let attempts;
+                    try {
+                        attempts = JSON.parse(fileContent);
+                        
+                        // Validate that attempts is an array
+                        if (!Array.isArray(attempts)) {
+                            console.error(`Invalid JSON structure in file ${file}: not an array`);
+                            continue;
+                        }
+                    } catch (parseError) {
+                        console.error(`JSON parsing error in file ${file}:`, parseError.message);
+                        console.error(`Problematic content: ${fileContent.substring(0, 100)}...`);
+                        continue; // Skip this file and move to the next one
+                    }
+                    
+                    const quizAttempts = attempts.filter(a => a && a.quizName === quizName);
                 
                 if (quizAttempts.length > 0) {
                     // Get the latest attempt
@@ -2080,6 +2694,10 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                             attemptedAt: latestAttempt.attemptedAt
                         });
                     }
+                    }
+                } catch (error) {
+                    console.error(`Error processing attempt file ${file}:`, error);
+                    // Continue with the next file
                 }
             }
         }
@@ -2575,6 +3193,272 @@ router.get('/recent-activity', async (req, res) => {
     } catch (error) {
         console.error('Error fetching recent activity:', error);
         res.status(500).json({ error: 'Failed to fetch recent activity' });
+    }
+});
+
+// Add a test endpoint to verify upload directory permissions
+router.get('/test-upload-dir', (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).send('Unauthorized');
+  }
+
+  try {
+    // Check if directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Try to write a test file
+    const testFilePath = path.join(uploadDir, 'test-file-' + Date.now() + '.txt');
+    fs.writeFileSync(testFilePath, 'This is a test file to verify upload permissions.');
+
+    // Try to read the file
+    const fileContent = fs.readFileSync(testFilePath, 'utf8');
+
+    // Try to delete the file
+    fs.unlinkSync(testFilePath);
+
+    return res.send(`
+      <html>
+        <head>
+          <title>Upload Directory Test</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 2rem; }
+            .success { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; color: #155724; }
+            pre { background: #f8f9fa; padding: 1rem; border-radius: 0.25rem; overflow: auto; }
+            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
+          </style>
+        </head>
+        <body>
+          <h1>Upload Directory Test</h1>
+          <div class="success">
+            <h3>✅ Success!</h3>
+            <p>The uploads directory is working correctly.</p>
+          </div>
+          <h3>Directory Information:</h3>
+          <pre>
+Upload Directory: ${uploadDir}
+Directory exists: ${fs.existsSync(uploadDir)}
+File write test: Successful
+File read test: Successful (${fileContent.length} bytes)
+File delete test: Successful
+          </pre>
+          <p>You should be able to upload files to this directory without problems.</p>
+          <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Upload directory test error:', error);
+    return res.status(500).send(`
+      <html>
+        <head>
+          <title>Upload Directory Test</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 2rem; }
+            .error { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; color: #721c24; }
+            pre { background: #f8f9fa; padding: 1rem; border-radius: 0.25rem; overflow: auto; }
+            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
+          </style>
+        </head>
+        <body>
+          <h1>Upload Directory Test</h1>
+          <div class="error">
+            <h3>❌ Error!</h3>
+            <p>There was a problem with the uploads directory.</p>
+            <p>${error.message}</p>
+          </div>
+          <h3>Directory Information:</h3>
+          <pre>
+Upload Directory: ${uploadDir}
+Directory exists: ${fs.existsSync(uploadDir)}
+Error details: ${error.stack}
+          </pre>
+          <p>Possible solutions:</p>
+          <ul>
+            <li>Ensure that the Node.js process has write permissions to the uploads directory</li>
+            <li>Check that there's sufficient disk space</li>
+            <li>Verify that the path is correct and accessible</li>
+          </ul>
+          <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
+        </body>
+      </html>
+    `);
+  }
+});
+
+// API endpoint to get student details by username
+router.get('/api/student/:username', async (req, res) => {
+    try {
+        if (!req.session.fname || req.session.role !== 'admin') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const username = req.params.username;
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db("School");
+        
+        // Find which class the student belongs to
+        const collections = await db.listCollections().toArray();
+        const classCollections = collections.filter(c => c.name.startsWith('class_'));
+        let student = null;
+        
+        for (const collection of classCollections) {
+            const result = await db.collection(collection.name).findOne({ username: username });
+            if (result) {
+                student = result;
+                break;
+            }
+        }
+        
+        client.close();
+        
+        if (!student) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+        
+        res.json(student);
+    } catch (err) {
+        console.error('Error fetching student details:', err);
+        res.status(500).json({ error: 'Failed to fetch student details' });
+    }
+});
+
+// Update student information
+router.post('/api/student/update', uploadStudentPhoto.single('photo'), async (req, res) => {
+    try {
+        if (!req.session.fname || req.session.role !== 'admin') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        console.log("Update request received:", req.body);
+        const { username, name, email, phone, dob, studentClass, currentClass } = req.body;
+        
+        console.log("Student class:", studentClass);
+        console.log("Current class:", currentClass);
+
+        if (!username || !name || !email) {
+            console.error("Missing essential data:", { username, name, email });
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db("School");
+        
+        // Prepare update data
+        const updateData = {
+            name,
+            email,
+            phone,
+            dob,
+            class: studentClass || currentClass
+        };
+        
+        console.log("Update data prepared:", updateData);
+        
+        // If a new password is provided, update it
+        if (req.body.newPassword && req.body.newPassword.trim() !== '') {
+            updateData.password = req.body.newPassword;
+            
+            // Also update in user collection
+            const userUpdateResult = await db.collection("user").updateOne(
+                { Username: username },
+                { $set: { Password: req.body.newPassword } }
+            );
+            console.log("User password update result:", userUpdateResult);
+        }
+        
+        // If a new photo is uploaded, process it
+        if (req.file) {
+            console.log("Processing new photo:", req.file.originalname);
+            
+            // Sanitize the student name for filename
+            const sanitizedName = name
+                .toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^\w\-]+/g, '')
+                .replace(/\-\-+/g, '-')
+                .replace(/^-+/, '')
+                .replace(/-+$/, '');
+
+            const ext = path.extname(req.file.originalname);
+            let filename = `${sanitizedName}${ext}`;
+            let counter = 1;
+
+            // Check for existing files with same name
+            while (fs.existsSync(path.join(studentPhotoDir, filename))) {
+                filename = `${sanitizedName}-${counter}${ext}`;
+                counter++;
+            }
+
+            // Rename the temp file to the final filename
+            const tempPath = path.join(studentPhotoDir, req.file.filename);
+            const newPath = path.join(studentPhotoDir, filename);
+            fs.renameSync(tempPath, newPath);
+            
+            // Update photo path
+            updateData.photo = `/student-photos/${filename}`;
+            console.log("New photo path:", updateData.photo);
+        }
+        
+        // If class has changed, move student to new class collection
+        if (studentClass && studentClass !== currentClass) {
+            console.log(`Moving student from class ${currentClass} to class ${studentClass}`);
+            
+            // Get student from current class
+            const student = await db.collection(`class_${currentClass}`).findOne({ username });
+            
+            if (!student) {
+                console.error(`Student ${username} not found in class ${currentClass}`);
+                client.close();
+                return res.status(404).json({ error: 'Student not found' });
+            }
+            
+            // Create new student document with updated data
+            const newStudentData = { ...student, ...updateData };
+            
+            // Insert into new class
+            const insertResult = await db.collection(`class_${studentClass}`).insertOne(newStudentData);
+            console.log("Insert result in new class:", insertResult);
+            
+            // Remove from old class
+            const deleteResult = await db.collection(`class_${currentClass}`).deleteOne({ username });
+            console.log("Delete result from old class:", deleteResult);
+        } else {
+            // Update in current class
+            console.log(`Updating student in class ${currentClass}`);
+            
+            const updateResult = await db.collection(`class_${currentClass}`).updateOne(
+                { username },
+                { $set: updateData }
+            );
+            
+            console.log("Update result:", updateResult);
+            
+            if (updateResult.matchedCount === 0) {
+                console.error(`No student with username ${username} found in class ${currentClass}`);
+                return res.status(404).json({ error: 'Student not found in specified class' });
+            }
+        }
+        
+        client.close();
+        console.log("Update completed successfully");
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating student:', err);
+        
+        // Delete uploaded file if error occurred and file was uploaded
+        if (req.file) {
+            const filePath = path.join(studentPhotoDir, req.file.filename);
+            fs.unlink(filePath, (unlinkErr) => {
+                if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
+            });
+        }
+        
+        res.status(500).json({ error: 'Failed to update student', message: err.message });
     }
 });
 

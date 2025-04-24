@@ -289,7 +289,7 @@
       <input type="hidden" name="quizType" value="excel">
       <div class="form-group">
         <label class="required">Quiz Name:</label>
-        <input type="text" name="quizName" id="excelQuizName" placeholder="Enter quiz name" required>
+        <input type="text" name="quizName" id="excelQuizName" placeholder="Enter quiz name" required readonly>
       </div>
       
       <div class="form-group">
@@ -330,6 +330,12 @@
             <i class="fas fa-file-excel"></i> Choose Excel File
           </label>
           <div id="fileName" class="file-name">No file chosen</div>
+          <div id="uploadProgress" style="display:none; margin-top: 10px;">
+            <div style="height: 5px; width: 100%; background-color: #f0f0f0; border-radius: 3px;">
+              <div id="progressBar" style="height: 100%; width: 0; background-color: var(--primary-color); border-radius: 3px;"></div>
+            </div>
+            <div id="progressStatus" style="font-size: 12px; margin-top: 5px; text-align: center;">Preparing upload...</div>
+          </div>
         </div>
       </div>
       
@@ -487,6 +493,33 @@
       if (minutesToStart < 30 && minutesToStart > 0) {
         showAlert('warning', `Warning: This quiz will start in less than ${minutesToStart} minutes. Please complete your edits promptly.`);
       }
+
+      // Add event listener for file upload
+      document.getElementById('quizFile').addEventListener('change', function(e) {
+        const fileInput = e.target;
+        const fileName = fileInput.files[0] ? fileInput.files[0].name : 'No file chosen';
+        document.getElementById('fileName').textContent = fileName;
+        
+        // Reset progress
+        document.getElementById('uploadProgress').style.display = 'none';
+        document.getElementById('progressBar').style.width = '0';
+        
+        // Validate file type
+        if (fileInput.files[0]) {
+          const validExtensions = ['.xlsx', '.xls'];
+          const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+          
+          if (!validExtensions.includes(fileExt)) {
+            showAlert('error', 'Invalid file type. Please select an Excel file (.xlsx or .xls)');
+            fileInput.value = ''; // Clear the selection
+            document.getElementById('fileName').textContent = 'No file chosen';
+          } else if (fileInput.files[0].size > 10 * 1024 * 1024) { // 10MB limit
+            showAlert('error', 'File is too large. Maximum size is 10MB.');
+            fileInput.value = ''; // Clear the selection
+            document.getElementById('fileName').textContent = 'No file chosen';
+          }
+        }
+      });
     }
 
     // Display questions for manual quiz
@@ -733,12 +766,6 @@
       }, 5000);
     }
 
-    // Display selected file name for Excel upload
-    document.getElementById('quizFile').addEventListener('change', function(e) {
-      const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-      document.getElementById('fileName').textContent = fileName;
-    });
-
     // Form validation
     document.getElementById('manualQuizForm').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -770,6 +797,28 @@
 
       // If everything is valid, submit the form
       this.submit();
+    });
+
+    // Add form submission handler
+    document.getElementById('excelQuizForm').addEventListener('submit', function(event) {
+      if (document.getElementById('quizFile').files.length > 0) {
+        // Show upload progress when a file is selected
+        document.getElementById('uploadProgress').style.display = 'block';
+        document.getElementById('progressBar').style.width = '10%';
+        document.getElementById('progressStatus').textContent = 'Starting upload...';
+        
+        // Simulate progress (since we can't track actual progress with standard form submission)
+        let progress = 10;
+        const progressInterval = setInterval(function() {
+          progress += 5;
+          if (progress <= 90) {
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('progressStatus').textContent = 'Uploading... ' + progress + '%';
+          } else {
+            clearInterval(progressInterval);
+          }
+        }, 300);
+      }
     });
   </script>
 </body>

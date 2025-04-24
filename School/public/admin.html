@@ -33,241 +33,258 @@
             min-height: 100vh;
         }
 
-        .container {
+        .admin-container {
             display: flex;
             min-height: 100vh;
         }
 
         .sidebar {
-            width: 280px;
-            background: linear-gradient(135deg, #4361ee, #3f37c9);
+            width: 260px;
+            min-height: 100vh;
+            background-color: #4361ee;
             color: white;
-            padding: 2rem;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
             position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+            left: 0;
+            top: 0;
+            bottom: 0;
         }
-
-        .logo {
+        
+        .sidebar-header {
             display: flex;
             align-items: center;
-            margin-bottom: 2.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+            padding: 0 20px;
+            margin-bottom: 20px;
         }
-
-        .logo i {
-            font-size: 2.2rem;
-            margin-right: 1rem;
-            color: #fff;
-            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        
+        .sidebar-header i {
+            font-size: 2.5rem;
+            margin-right: 12px;
         }
-
-        .logo h1 {
-            font-size: 1.4rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+        
+        .sidebar-title {
+            display: flex;
+            flex-direction: column;
         }
-
-        .nav-item {
-            margin-bottom: 0.8rem;
+        
+        .sidebar-title h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            line-height: 1.2;
         }
-
-        .nav-link {
+        
+        .sidebar-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin: 15px 0;
+        }
+        
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .sidebar-item {
             display: flex;
             align-items: center;
-            padding: 1rem 1.2rem;
-            color: rgba(255, 255, 255, 0.9);
-            text-decoration: none;
-            border-radius: var(--border-radius);
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background-color: rgba(255, 255, 255, 0.15);
+            padding: 12px 20px;
             color: white;
-            transform: translateX(5px);
+            text-decoration: none;
+            transition: all 0.3s;
+            border-radius: 0;
         }
-
-        .nav-link i {
-            margin-right: 1rem;
-            font-size: 1.2rem;
+        
+        .sidebar-item:hover,
+        .sidebar-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0;
+        }
+        
+        .sidebar-item i {
+            font-size: 1.25rem;
+            margin-right: 12px;
             width: 24px;
             text-align: center;
         }
-
+        
         .main-content {
             flex: 1;
-            margin-left: 280px;
-            padding: 2.5rem;
+            margin-left: 260px;
+            padding: 20px;
         }
 
         .header {
-            background-color: white;
-            padding: 1.8rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-bottom: 2.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-left: 5px solid var(--primary-color);
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
         .welcome-message {
-            font-size: 1.8rem;
+            font-size: 1.75rem;
             font-weight: 700;
             color: var(--dark-color);
-            letter-spacing: -0.5px;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            background-color: rgba(67, 97, 238, 0.1);
-            padding: 0.8rem 1.2rem;
-            border-radius: 50px;
+            gap: 10px;
+            font-weight: 500;
         }
 
         .user-info i {
-            font-size: 1.8rem;
-            color: var(--primary-color);
-            margin-right: 0.8rem;
-        }
-
-        .user-info span {
-            font-weight: 600;
+            font-size: 1.5rem;
             color: var(--primary-color);
         }
 
         .card-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2.5rem;
+            gap: 1.5rem;
         }
 
         .card {
-            background-color: white;
+            background: white;
             border-radius: var(--border-radius);
+            padding: 1.5rem;
             box-shadow: var(--card-shadow);
-            padding: 2rem;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border-top: 4px solid var(--primary-color);
         }
 
         .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
         }
 
         .card-header {
             display: flex;
             align-items: center;
-            margin-bottom: 1.5rem;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
         .card-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
+            width: 56px;
+            height: 56px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 1.2rem;
-            font-size: 1.8rem;
+            border-radius: 50%;
+            font-size: 1.5rem;
             color: white;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .card-icon.students {
-            background: linear-gradient(135deg, #4361ee, #3f37c9);
+        .students {
+            background: linear-gradient(135deg, #4361ee, #3a0ca3);
         }
 
-        .card-icon.quizzes {
-            background: linear-gradient(135deg, #4895ef, #4cc9f0);
+        .quizzes {
+            background: linear-gradient(135deg, #4cc9f0, #4895ef);
         }
 
         .card-title {
-            font-size: 1.4rem;
-            font-weight: 700;
+            font-size: 1.25rem;
+            font-weight: 600;
             color: var(--dark-color);
-            letter-spacing: -0.5px;
         }
 
         .card-text {
             color: var(--gray-color);
-            margin-bottom: 2rem;
-            line-height: 1.6;
-            font-size: 1.05rem;
-        }
-
-        .btn {
-            display: inline-block;
-            padding: 0.8rem 1.5rem;
-            background-color: var(--primary-color);
-            color: white;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-align: center;
-            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
-        }
-
-        .btn:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(67, 97, 238, 0.4);
-        }
-
-        .btn-outline {
-            background-color: transparent;
-            border: 2px solid var(--primary-color);
-            color: var(--primary-color);
-            box-shadow: none;
-        }
-
-        .btn-outline:hover {
-            background-color: var(--primary-color);
-            color: white;
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(67, 97, 238, 0.4);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
         }
 
         .action-buttons {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        @media (max-width: 992px) {
-            .container {
-                flex-direction: column;
-            }
+        .btn {
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
 
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn:not(.btn-outline) {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        .btn:not(.btn-outline):hover {
+            background: var(--secondary-color);
+        }
+        
+        /* Current page styling */
+        .sidebar-item[href="/admin"] {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
             .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-                padding: 1.5rem;
+                width: 70px;
+                padding: 15px 0;
             }
-
+            
+            .sidebar-header {
+                padding: 0 15px;
+                justify-content: center;
+            }
+            
+            .sidebar-title,
+            .sidebar-item span {
+                display: none;
+            }
+            
+            .sidebar-header i {
+                margin-right: 0;
+            }
+            
+            .sidebar-item {
+                justify-content: center;
+                padding: 12px;
+            }
+            
+            .sidebar-item i {
+                margin-right: 0;
+            }
+            
             .main-content {
-                margin-left: 0;
-                padding: 1.5rem;
+                margin-left: 70px;
             }
-
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-
-            .card-grid {
+            
+            .action-buttons {
                 grid-template-columns: 1fr;
+            }
+            
+            .welcome-message {
+                font-size: 1.5rem;
             }
         }
 
@@ -283,31 +300,29 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="admin-container">
         <aside class="sidebar">
-            <div class="logo">
+            <div class="sidebar-header">
                 <i class="fas fa-graduation-cap"></i>
-                <h1>Test Platform</h1>
+                <div class="sidebar-title">
+                    <h1>Test</h1>
+                    <h1>Platform</h1>
+                </div>
             </div>
-            <nav>
-                <div class="nav-item">
-                    <a href="/admin" class="nav-link active">
-                        <i class="fas fa-home"></i>
-                        Dashboard
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/admin/students" class="nav-link">
-                        <i class="fas fa-users"></i>
-                        Students
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/admin/total-quiz" class="nav-link">
-                        <i class="fas fa-clipboard-list"></i>
-                        Quizzes
-                    </a>
-                </div>
+            <div class="sidebar-divider"></div>
+            <nav class="sidebar-menu">
+                <a href="/admin" class="sidebar-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/admin/students" class="sidebar-item">
+                    <i class="fas fa-users"></i>
+                    <span>Students</span>
+                </a>
+                <a href="/admin/total-quiz" class="sidebar-item">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Quizzes</span>
+                </a>
             </nav>
         </aside>
 
