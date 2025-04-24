@@ -2085,7 +2085,7 @@ router.get('/total-quiz', (req, res) => {
                                                 <td>${quiz.type === 'excel' ? 'Excel' : 'Manual'}</td>
                                                 <td class="actions-cell">
                                                     <a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">Edit</a>
-                                                    <a href="/admin/view-results/${encodeURIComponent(quiz.name)}" class="view-link">Results</a>
+                                                    <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="view-link">Results</a>
                                                 </td>
                                             </tr>
                                         `;

@@ -35,7 +35,7 @@ function loadQuizData(quiz) {
       const workbook = xlsx.readFile(excelFilePath);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    return xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1);
+    return shuffleArray(xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1));
     } catch (err) {
       throw new Error(`Error reading Excel file: ${err.message}`);
     }
@@ -56,18 +56,30 @@ function loadQuizData(quiz) {
     // Convert to the same format as Excel data
     // Format: [question, option1, option2, option3, option4, correctAnswer, questionImage, 
     //          option1Image, option2Image, option3Image, option4Image]
-    return questionsData.map(q => [
+    const formattedQuestions = questionsData.map(q => [
       q.text,
       ...q.options,
       q.options[q.correctAnswer],
       q.image || null,
       ...(q.optionImages || [null, null, null, null]) // Add option images or default to nulls
     ]);
+    
+    return shuffleArray(formattedQuestions);
     } catch (err) {
       throw new Error(`Error reading questions file: ${err.message}`);
     }
   }
   throw new Error('Invalid quiz type');
+}
+
+// Function to shuffle array using Fisher-Yates algorithm
+function shuffleArray(array) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 function calculateDuration(quizConfig) {
