@@ -360,6 +360,49 @@
             height: 150px;
         }
         
+        /* Dropdown styles */
+        .sidebar-dropdown {
+            position: relative;
+        }
+        
+        .dropdown-toggle {
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        
+        .dropdown-icon {
+            margin-left: auto;
+            margin-right: 0;
+            transition: transform 0.3s;
+            font-size: 0.8rem;
+        }
+        
+        .dropdown-toggle.active .dropdown-icon {
+            transform: rotate(180deg);
+        }
+        
+        .dropdown-menu {
+            display: none;
+            background-color: rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .dropdown-menu.show {
+            display: block;
+        }
+        
+        .dropdown-item {
+            display: block;
+            padding: 10px 20px 10px 56px;
+            color: white;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        
+        .dropdown-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
         /* Current page styling */
         .sidebar-item[href="/admin/students"] {
             background-color: rgba(255, 255, 255, 0.2);
@@ -404,6 +447,40 @@
                 margin-left: 70px;
             }
         }
+
+        /* Signout Button */
+        .signout-container {
+            margin-top: auto;
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .signout-btn {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 12px 15px;
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            text-align: left;
+            transition: all 0.3s;
+        }
+        
+        .signout-btn:hover {
+            background-color: #e74a3b;
+        }
+        
+        .signout-btn i {
+            font-size: 1.2rem;
+            margin-right: 10px;
+            width: 24px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -422,15 +499,39 @@
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="/admin/students" class="sidebar-item">
+                
+                <!-- Students Dropdown -->
+                <div class="sidebar-dropdown">
+                    <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
                     <i class="fas fa-users"></i>
                     <span>Students</span>
-                </a>
-                <a href="/admin/total-quiz" class="sidebar-item">
+                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                    </a>
+                    <div class="dropdown-menu">
+                        <a href="/admin/add-student" class="dropdown-item">Add Students</a>
+                        <a href="/admin/students" class="dropdown-item">View Students</a>
+                    </div>
+                </div>
+                
+                <!-- Quizzes Dropdown -->
+                <div class="sidebar-dropdown">
+                    <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
                     <i class="fas fa-clipboard-list"></i>
                     <span>Quizzes</span>
+                        <i class="fas fa-chevron-down dropdown-icon"></i>
                 </a>
+                    <div class="dropdown-menu">
+                        <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
+                        <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
+                    </div>
+                </div>
             </nav>
+            <div class="signout-container">
+                <button class="signout-btn" onclick="window.location.href='/logout'">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Sign Out
+                </button>
+            </div>
         </aside>
 
         <main class="main-content">
@@ -547,14 +648,23 @@
 
     <script>
         // Fetch student statistics from API
+        function fetchStudentStats() {
+            console.log('Fetching student statistics...');
+            
+            // Set initial loading state
+            document.getElementById('totalStudents').textContent = 'Loading...';
+            document.getElementById('activeStudents').textContent = 'Loading...';
+            
         fetch('/admin/stats/students')
             .then(response => {
+                    console.log('Stats response status:', response.status);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(data => {
+                    console.log('Received student stats:', data);
                 // Update total and active student counts
                 document.getElementById('totalStudents').textContent = data.total;
                 document.getElementById('activeStudents').textContent = data.active;
@@ -564,28 +674,97 @@
                 document.getElementById('totalStudents').textContent = 'Error';
                 document.getElementById('activeStudents').textContent = 'Error';
             });
+        }
 
-        // Fetch student counts per class (for demonstration - in a real app, you'd make backend calls)
-        // This would be replaced with actual API calls to get the count for each class
+        // Fetch student counts per class
         function fetchClassCounts() {
-            // For a real implementation, you would fetch this data from your server
-            // For example: fetch('/admin/stats/class/1') for class 1, etc.
-            // Here we're just simulating with random counts
+            console.log('Fetching class counts...');
+            
+            // Initialize all counts to "Loading..." first
             for (let i = 1; i <= 10; i++) {
                 const countElement = document.getElementById(`class${i}-count`);
                 if (countElement) {
-                    // Simulate network delay
-                    setTimeout(() => {
-                        // Random count between 0 and 30
-                        const count = Math.floor(Math.random() * 31);
-                        countElement.textContent = `${count} students`;
-                    }, 500 + Math.random() * 1000); // Random delay between 500ms and 1500ms
+                    countElement.textContent = 'Loading...';
                 }
             }
+            
+            // Make the API call to get all class counts
+            fetch('/admin/stats/class-counts')
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Received class counts data:', data);
+                    
+                    // Update the count for each class
+                    for (let i = 1; i <= 10; i++) {
+                        const countElement = document.getElementById(`class${i}-count`);
+                        if (countElement) {
+                            // Make sure we handle both possible formats: data[i] or data["i"]
+                            const count = data[i] !== undefined ? data[i] : (data[i.toString()] || 0);
+                        countElement.textContent = `${count} students`;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching class counts:', error);
+                    
+                    // Set error message for all class counts
+                    for (let i = 1; i <= 10; i++) {
+                        const countElement = document.getElementById(`class${i}-count`);
+                        if (countElement) {
+                            countElement.textContent = 'Error loading';
+                }
+            }
+                });
         }
 
-        // Call the function when page loads
-        document.addEventListener('DOMContentLoaded', fetchClassCounts);
+        // Call both fetch functions when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchClassCounts();
+            fetchStudentStats();
+        });
+    </script>
+    
+    <script>
+        // Toggle dropdown menus
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+            
+            dropdownToggles.forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    const parent = this.parentElement;
+                    const dropdownMenu = parent.querySelector('.dropdown-menu');
+                    
+                    // Close all other dropdowns
+                    document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+                        if (menu !== dropdownMenu) {
+                            menu.classList.remove('show');
+                        }
+                    });
+                    
+                    // Toggle current dropdown
+                    dropdownMenu.classList.toggle('show');
+                    this.classList.toggle('active');
+                });
+            });
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('.sidebar-dropdown')) {
+                    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                        menu.classList.remove('show');
+                    });
+                    document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+                        toggle.classList.remove('active');
+                    });
+                }
+            });
+        });
     </script>
 </body>
 </html>

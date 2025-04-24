@@ -23,16 +23,74 @@ const ADMIN_SIDEBAR = `
       <i class="fas fa-home"></i>
       <span>Dashboard</span>
     </a>
-    <a href="/admin/students" class="sidebar-item">
+    
+    <!-- Students Dropdown -->
+    <div class="sidebar-dropdown">
+      <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
       <i class="fas fa-users"></i>
       <span>Students</span>
-    </a>
-    <a href="/admin/total-quiz" class="sidebar-item">
+        <i class="fas fa-chevron-down dropdown-icon"></i>
+      </a>
+      <div class="dropdown-menu">
+        <a href="/admin/add-student" class="dropdown-item">Add Students</a>
+        <a href="/admin/students" class="dropdown-item">View Students</a>
+      </div>
+    </div>
+    
+    <!-- Quizzes Dropdown -->
+    <div class="sidebar-dropdown">
+      <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
       <i class="fas fa-clipboard-list"></i>
       <span>Quizzes</span>
+        <i class="fas fa-chevron-down dropdown-icon"></i>
     </a>
+      <div class="dropdown-menu">
+        <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
+        <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
+      </div>
+    </div>
   </div>
 </div>
+`;
+
+// Admin common scripts for all pages
+const ADMIN_SCRIPTS = `
+<script>
+  // Toggle dropdown menus
+  document.addEventListener('DOMContentLoaded', function() {
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    
+    dropdownToggles.forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const parent = this.parentElement;
+        const dropdownMenu = parent.querySelector('.dropdown-menu');
+        
+        // Close all other dropdowns
+        document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+          if (menu !== dropdownMenu) {
+            menu.classList.remove('show');
+          }
+        });
+        
+        // Toggle current dropdown
+        dropdownMenu.classList.toggle('show');
+        this.classList.toggle('active');
+      });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('.sidebar-dropdown')) {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+          menu.classList.remove('show');
+        });
+        document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+          toggle.classList.remove('active');
+        });
+      }
+    });
+  });
+</script>
 `;
 
 // Sidebar CSS for all admin pages
@@ -54,6 +112,7 @@ const SIDEBAR_CSS = `
   left: 0;
   top: 0;
   bottom: 0;
+  z-index: 100;
 }
 
 .sidebar-header {
@@ -114,6 +173,50 @@ const SIDEBAR_CSS = `
   text-align: center;
 }
 
+/* Dropdown styles */
+.sidebar-dropdown {
+  position: relative;
+}
+
+.dropdown-toggle {
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.dropdown-icon {
+  margin-left: auto;
+  margin-right: 0;
+  transition: transform 0.3s;
+  font-size: 0.8rem;
+}
+
+.dropdown-toggle.active .dropdown-icon {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  display: none;
+  background-color: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-item {
+  display: block;
+  padding: 10px 20px 10px 56px;
+  color: white;
+  text-decoration: none;
+  transition: background-color 0.3s;
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .main-content {
   flex: 1;
   margin-left: 260px;
@@ -132,7 +235,8 @@ const SIDEBAR_CSS = `
   }
   
   .sidebar-title,
-  .sidebar-item span {
+  .sidebar-item span,
+  .dropdown-icon {
     display: none;
   }
   
@@ -147,6 +251,11 @@ const SIDEBAR_CSS = `
   
   .sidebar-item i {
     margin-right: 0;
+  }
+  
+  .dropdown-item {
+    padding: 12px;
+    text-align: center;
   }
   
   .main-content {
@@ -899,6 +1008,7 @@ router.get('/students/:class', async (req, res) => {
         <body>
             <div class="admin-container">
                 ${ADMIN_SIDEBAR}
+                ${ADMIN_SCRIPTS}
                 
                 <div class="main-content">
                     <div class="student-container">
@@ -1063,6 +1173,112 @@ router.get('/students/:class', async (req, res) => {
                     <div id="editStatus" style="margin-top: 15px;"></div>
                 </div>
             </div>
+
+            <style>
+                /* Improved Modal Styles */
+                .modal {
+                    display: none;
+                    position: fixed;
+                    z-index: 1000;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: auto;
+                    background-color: rgba(0,0,0,0.5);
+                }
+                .modal-content {
+                    background-color: #fefefe;
+                    margin: 2% auto;
+                    padding: 25px;
+                    border: 1px solid #ddd;
+                    width: 90%;
+                    max-width: 600px;
+                    border-radius: 8px;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                    position: relative;
+                    z-index: 1001;
+                    animation: modalOpen 0.3s ease-out;
+                }
+                @keyframes modalOpen {
+                    from {opacity: 0; transform: translateY(-20px);}
+                    to {opacity: 1; transform: translateY(0);}
+                }
+                .edit-student-container {
+                    padding: 10px 0;
+                }
+                .student-photo-container {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                .student-photo-large {
+                    width: 120px;
+                    height: 120px;
+                    border-radius: 50%;
+                    object-fit: cover;
+                    border: 3px solid #4e73df;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                    display: block;
+                    margin: 0 auto 10px;
+                }
+                .change-photo-btn {
+                    background-color: #4e73df;
+                    color: white;
+                    border: none;
+                    padding: 8px 15px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+                .change-photo-btn:hover {
+                    background-color: #3756a4;
+                }
+                .form-group {
+                    margin-bottom: 20px;
+                }
+                .form-group label {
+                    display: block;
+                    margin-bottom: 8px;
+                    font-weight: 500;
+                    color: #333;
+                }
+                .form-group input:focus,
+                .form-group select:focus {
+                    border-color: #4e73df !important;
+                    box-shadow: 0 0 0 2px rgba(78, 115, 223, 0.25) !important;
+                    outline: none;
+                }
+                .button-group {
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 10px;
+                    margin-top: 25px;
+                }
+                .cancel-btn {
+                    background-color: #6c757d;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+                .cancel-btn:hover {
+                    background-color: #5a6268;
+                }
+                .save-btn {
+                    background-color: #4e73df;
+                    color: white;
+                    border: none;
+                    padding: 10px 25px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+                .save-btn:hover {
+                    background-color: #2e59d9;
+                }
+            </style>
 
             <script>
                 // Real-time filtering function
@@ -1363,25 +1579,34 @@ router.get('/students/:class', async (req, res) => {
                 const changePhotoBtn = document.getElementById('changePhotoBtn');
                 const photoInput = document.getElementById('photoInput');
                 
-                // Close modal when clicking X button
-                editModalClose.addEventListener('click', function() {
+                // Close modal when clicking X button - Using a click event handler with stopPropagation
+                editModalClose.addEventListener('click', function(e) {
+                    e.stopPropagation();
                     editModal.style.display = 'none';
                 });
                 
-                // Close modal when clicking Cancel button
-                cancelEditBtn.addEventListener('click', function() {
+                // Close modal when clicking Cancel button - Using a click event handler with stopPropagation
+                cancelEditBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
                     editModal.style.display = 'none';
                 });
                 
-                // Close modal when clicking outside
+                // Only close modal when clicking directly on the background, not on any children
                 window.addEventListener('click', function(event) {
-                    if (event.target == editModal) {
+                    if (event.target === editModal) {
                         editModal.style.display = 'none';
                     }
                 });
                 
+                // Prevent accidental closings when clicking inside the modal
+                const modalContent = editModal.querySelector('.modal-content');
+                modalContent.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Stop click from reaching the window event listener
+                });
+                
                 // Change photo functionality
-                changePhotoBtn.addEventListener('click', function() {
+                changePhotoBtn.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent event from bubbling up
                     photoInput.click();
                 });
                 
@@ -2011,6 +2236,7 @@ router.get('/total-quiz', (req, res) => {
     <body>
         <div class="admin-container">
             ${ADMIN_SIDEBAR}
+            ${ADMIN_SCRIPTS}
             
             <div class="main-content">
                 <div class="container">
@@ -3095,233 +3321,105 @@ function renderResultsByClass(results) {
     return html;
 }
 
-// API endpoint for student statistics
-router.get('/stats/students', async (req, res) => {
-    try {
-        const db = req.app.locals.db;
-        const collections = await db.listCollections().toArray();
-        const classCollections = collections.filter(c => c.name.startsWith('class_'));
-        
-        let totalStudents = 0;
-        for (const collection of classCollections) {
-            const count = await db.collection(collection.name).countDocuments();
-            totalStudents += count;
-        }
-        
-        // For now, considering all students as active
-        const activeStudents = totalStudents;
-        
-        res.json({
-            total: totalStudents,
-            active: activeStudents
-        });
-    } catch (error) {
-        console.error('Error fetching student stats:', error);
-        res.status(500).json({ error: 'Failed to fetch student statistics' });
-    }
-});
-
-// API endpoint for quiz statistics
-router.get('/stats/quizzes', (req, res) => {
-    try {
-        const quizzes = readQuizzes();
-        const now = new Date();
-        
-        const activeQuizzes = quizzes.filter(quiz => {
-            const startTime = new Date(quiz.startTime);
-            const endTime = new Date(quiz.endTime);
-            return now >= startTime && now <= endTime;
-        });
-        
-        res.json({
-            total: quizzes.length,
-            active: activeQuizzes.length
-        });
-    } catch (error) {
-        console.error('Error fetching quiz stats:', error);
-        res.status(500).json({ error: 'Failed to fetch quiz statistics' });
-    }
-});
-
-// API endpoint for recent activity
-router.get('/recent-activity', async (req, res) => {
-    try {
-        const db = req.app.locals.db;
-        const collections = await db.listCollections().toArray();
-        const classCollections = collections.filter(c => c.name.startsWith('class_'));
-        
-        // Get recent student additions (last 24 hours)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        let recentStudents = [];
-        
-        for (const collection of classCollections) {
-            const students = await db.collection(collection.name)
-                .find({
-                    createdAt: { $gte: oneDayAgo }
-                })
-                .project({
-                    name: 1,
-                    class: 1,
-                    createdAt: 1,
-                    type: 'student_added'
-                })
-                .toArray();
-            
-            recentStudents = recentStudents.concat(students);
-        }
-        
-        // Get recent quiz attempts
-        const quizzes = readQuizzes();
-        const recentQuizAttempts = quizzes
-            .flatMap(quiz => (quiz.attempts || [])
-                .filter(attempt => new Date(attempt.timestamp) >= oneDayAgo)
-                .map(attempt => ({
-                    type: 'quiz_attempt',
-                    quizName: quiz.name,
-                    studentName: attempt.studentName,
-                    score: attempt.score,
-                    timestamp: attempt.timestamp
-                }))
-            );
-        
-        // Combine and sort all activities
-        const allActivities = [...recentStudents, ...recentQuizAttempts]
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-            .slice(0, 10);  // Get only the 10 most recent activities
-        
-        res.json(allActivities);
-    } catch (error) {
-        console.error('Error fetching recent activity:', error);
-        res.status(500).json({ error: 'Failed to fetch recent activity' });
-    }
-});
-
-// Add a test endpoint to verify upload directory permissions
-router.get('/test-upload-dir', (req, res) => {
+// API endpoint to get student counts for all classes
+router.get('/stats/class-counts', async (req, res) => {
   if (!req.session.fname || req.session.role !== 'admin') {
-    return res.status(401).send('Unauthorized');
-  }
+    return res.status(401).json({ error: 'Unauthorized' });
+    }
 
   try {
-    // Check if directory exists
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    // Connect to MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db("School");
+
+    // Get all collections that start with 'class_'
+        const collections = await db.listCollections().toArray();
+        const classCollections = collections.filter(c => c.name.startsWith('class_'));
+        
+    // Initialize counts object
+    const classCounts = {};
+        
+    // Get count for each class
+        for (const collection of classCollections) {
+      const className = collection.name.replace('class_', '');
+      const classNumber = parseInt(className);
+      
+      if (!isNaN(classNumber)) {
+        const count = await db.collection(collection.name).countDocuments();
+        classCounts[classNumber] = count;
+    }
+    }
+    
+    // Add zero counts for classes with no students
+    for (let i = 1; i <= 10; i++) {
+      if (!classCounts[i]) {
+        classCounts[i] = 0;
+      }
     }
 
-    // Try to write a test file
-    const testFilePath = path.join(uploadDir, 'test-file-' + Date.now() + '.txt');
-    fs.writeFileSync(testFilePath, 'This is a test file to verify upload permissions.');
+    // Close MongoDB connection
+    await client.close();
 
-    // Try to read the file
-    const fileContent = fs.readFileSync(testFilePath, 'utf8');
-
-    // Try to delete the file
-    fs.unlinkSync(testFilePath);
-
-    return res.send(`
-      <html>
-        <head>
-          <title>Upload Directory Test</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 2rem; }
-            .success { background-color: #d4edda; border: 1px solid #c3e6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; color: #155724; }
-            pre { background: #f8f9fa; padding: 1rem; border-radius: 0.25rem; overflow: auto; }
-            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
-          </style>
-        </head>
-        <body>
-          <h1>Upload Directory Test</h1>
-          <div class="success">
-            <h3>✅ Success!</h3>
-            <p>The uploads directory is working correctly.</p>
-          </div>
-          <h3>Directory Information:</h3>
-          <pre>
-Upload Directory: ${uploadDir}
-Directory exists: ${fs.existsSync(uploadDir)}
-File write test: Successful
-File read test: Successful (${fileContent.length} bytes)
-File delete test: Successful
-          </pre>
-          <p>You should be able to upload files to this directory without problems.</p>
-          <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
-        </body>
-      </html>
-    `);
+    // Log the response for debugging
+    console.log('Sending class counts:', classCounts);
+    
+    res.json(classCounts);
   } catch (error) {
-    console.error('Upload directory test error:', error);
-    return res.status(500).send(`
-      <html>
-        <head>
-          <title>Upload Directory Test</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 2rem; }
-            .error { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; color: #721c24; }
-            pre { background: #f8f9fa; padding: 1rem; border-radius: 0.25rem; overflow: auto; }
-            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
-          </style>
-        </head>
-        <body>
-          <h1>Upload Directory Test</h1>
-          <div class="error">
-            <h3>❌ Error!</h3>
-            <p>There was a problem with the uploads directory.</p>
-            <p>${error.message}</p>
-          </div>
-          <h3>Directory Information:</h3>
-          <pre>
-Upload Directory: ${uploadDir}
-Directory exists: ${fs.existsSync(uploadDir)}
-Error details: ${error.stack}
-          </pre>
-          <p>Possible solutions:</p>
-          <ul>
-            <li>Ensure that the Node.js process has write permissions to the uploads directory</li>
-            <li>Check that there's sufficient disk space</li>
-            <li>Verify that the path is correct and accessible</li>
-          </ul>
-          <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
-        </body>
-      </html>
-    `);
+    console.error('Error fetching class counts:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// API endpoint to get student details by username
-router.get('/api/student/:username', async (req, res) => {
-    try {
+// API endpoint to get student statistics
+router.get('/stats/students', async (req, res) => {
         if (!req.session.fname || req.session.role !== 'admin') {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const username = req.params.username;
+  try {
+    console.log('Fetching student statistics...');
+    // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
         const db = client.db("School");
         
-        // Find which class the student belongs to
+    // Get all collections that start with 'class_'
         const collections = await db.listCollections().toArray();
         const classCollections = collections.filter(c => c.name.startsWith('class_'));
-        let student = null;
+    
+    console.log(`Found ${classCollections.length} class collections`);
+    
+    // Get total student count across all classes
+    let totalStudents = 0;
+    let activeStudents = 0;
         
         for (const collection of classCollections) {
-            const result = await db.collection(collection.name).findOne({ username: username });
-            if (result) {
-                student = result;
-                break;
+      try {
+        const students = await db.collection(collection.name).find({}).toArray();
+        console.log(`Class ${collection.name}: ${students.length} students`);
+        totalStudents += students.length;
+        
+        // Count active students (those who have logged in at least once)
+        activeStudents += students.filter(student => student.lastLogin).length;
+      } catch (collectionError) {
+        console.error(`Error processing collection ${collection.name}:`, collectionError);
             }
         }
         
-        client.close();
-        
-        if (!student) {
-            return res.status(404).json({ error: 'Student not found' });
-        }
-        
-        res.json(student);
-    } catch (err) {
-        console.error('Error fetching student details:', err);
-        res.status(500).json({ error: 'Failed to fetch student details' });
+    // Close MongoDB connection
+    await client.close();
+    
+    const response = {
+      total: totalStudents,
+      active: activeStudents || totalStudents // If no lastLogin field exists, use total count
+    };
+    
+    console.log('Sending student stats:', response);
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching student stats:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
     }
 });
 
@@ -3459,6 +3557,46 @@ router.post('/api/student/update', uploadStudentPhoto.single('photo'), async (re
         }
         
         res.status(500).json({ error: 'Failed to update student', message: err.message });
+    }
+});
+
+// API endpoint to get student by username
+router.get('/api/student/:username', async (req, res) => {
+    try {
+        if (!req.session.fname || req.session.role !== 'admin') {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const username = req.params.username;
+        
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db("School");
+        
+        // Find which class the student is in
+        const collections = await db.listCollections().toArray();
+        const classCollections = collections.filter(c => c.name.startsWith('class_'));
+        
+        let student = null;
+        
+        for (const collection of classCollections) {
+            student = await db.collection(collection.name).findOne({ username });
+            if (student) {
+                break;
+            }
+        }
+        
+        await client.close();
+        
+        if (!student) {
+            return res.status(404).json({ error: 'Student not found' });
+        }
+        
+        res.json(student);
+    } catch (err) {
+        console.error('Error fetching student:', err);
+        res.status(500).json({ error: 'Failed to fetch student data', message: err.message });
     }
 });
 

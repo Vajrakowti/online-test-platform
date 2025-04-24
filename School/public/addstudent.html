@@ -35,12 +35,174 @@
       color: var(--text-color);
       line-height: 1.6;
       min-height: 100vh;
-      padding: 2rem;
+    }
+
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
     }
 
     .container {
       max-width: 1200px;
       margin: 0 auto;
+      width: 100%;
+    }
+    
+    /* Sidebar Styles */
+    .sidebar {
+      width: 260px;
+      min-height: 100vh;
+      background-color: #4361ee;
+      color: white;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      margin-bottom: 20px;
+    }
+
+    .sidebar-header i {
+      font-size: 2.5rem;
+      margin-right: 12px;
+    }
+
+    .sidebar-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-title h1 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background-color: rgba(255, 255, 255, 0.2);
+      margin: 15px 0;
+    }
+
+    .sidebar-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
+      text-decoration: none;
+      transition: all 0.3s;
+      border-radius: 0;
+    }
+
+    .sidebar-item:hover,
+    .sidebar-item.active {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+    }
+
+    .sidebar-item i {
+      font-size: 1.25rem;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    /* Signout Button */
+    .signout-container {
+      margin-top: auto;
+      padding: 15px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .signout-btn {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 12px 15px;
+      color: white;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: left;
+      transition: all 0.3s;
+    }
+    
+    .signout-btn:hover {
+      background-color: #e74a3b;
+    }
+    
+    .signout-btn i {
+      font-size: 1.2rem;
+      margin-right: 10px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    /* Dropdown styles */
+    .sidebar-dropdown {
+      position: relative;
+    }
+    
+    .dropdown-toggle {
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    
+    .dropdown-icon {
+      margin-left: auto;
+      margin-right: 0;
+      transition: transform 0.3s;
+      font-size: 0.8rem;
+    }
+    
+    .dropdown-toggle.active .dropdown-icon {
+      transform: rotate(180deg);
+    }
+    
+    .dropdown-menu {
+      display: none;
+      background-color: rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    
+    .dropdown-menu.show {
+      display: block;
+    }
+    
+    .dropdown-item {
+      display: block;
+      padding: 10px 20px 10px 56px;
+      color: white;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
+    
+    .dropdown-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      padding: 20px;
     }
     
     /* Header Section */
@@ -198,27 +360,32 @@
     
     label {
       display: block;
-      margin-bottom: 0.5rem;
       font-weight: 500;
+      margin-bottom: 0.5rem;
       color: var(--text-color);
       font-size: 0.875rem;
     }
     
+    label.required:after {
+      content: " *";
+      color: var(--danger-color);
+    }
+    
     input, select {
+      display: block;
       width: 100%;
       padding: 0.75rem 1rem;
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      font-size: 0.875rem;
-      color: var(--text-color);
-      background-color: white;
       transition: var(--transition);
+      background-color: white;
+      font-size: 0.875rem;
     }
     
     input:focus, select:focus {
-      outline: none;
       border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
     }
     
     .button-group {
@@ -226,21 +393,18 @@
       justify-content: flex-end;
       gap: 1rem;
       margin-top: 2rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--border-color);
     }
     
     .btn {
       padding: 0.75rem 1.5rem;
-      border-radius: var(--border-radius);
       font-weight: 500;
-      cursor: pointer;
+      border-radius: var(--border-radius);
       transition: var(--transition);
       border: none;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: 0.875rem;
+      cursor: pointer;
     }
     
     .btn-cancel {
@@ -281,8 +445,43 @@
     
     /* Responsive Design */
     @media (max-width: 768px) {
-      body {
+      .main-content {
+        margin-left: 70px;
         padding: 1rem;
+      }
+
+      .sidebar {
+        width: 70px;
+        padding: 15px 0;
+      }
+      
+      .sidebar-header {
+        padding: 0 15px;
+        justify-content: center;
+      }
+      
+      .sidebar-title,
+      .sidebar-item span,
+      .dropdown-icon {
+        display: none;
+      }
+      
+      .sidebar-header i {
+        margin-right: 0;
+      }
+      
+      .sidebar-item {
+        justify-content: center;
+        padding: 12px;
+      }
+      
+      .sidebar-item i {
+        margin-right: 0;
+      }
+      
+      .dropdown-item {
+        padding: 12px;
+        text-align: center;
       }
 
       .header {
@@ -315,95 +514,148 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1 class="page-title">
-        <i class="fas fa-user-plus"></i>
-        Add New Student
-      </h1>
-      <a href="/admin" class="back-button">
-        <i class="fas fa-arrow-left"></i>
-        Back to Dashboard
-      </a>
-    </div>
-
-    <div class="form-container">
-      <div class="form-header">
-        <h2>Student Information</h2>
-        <p>Fill in the student details below. All fields marked with * are required.</p>
+  <div class="admin-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <i class="fas fa-graduation-cap"></i>
+        <div class="sidebar-title">
+          <h1>Test</h1>
+          <h1>Platform</h1>
+        </div>
       </div>
-
-      <form id="addStudentForm" action="/admin/add-student" method="POST" enctype="multipart/form-data">
-        <div class="photo-upload-container">
-          <div class="photo-preview">
-            <i class="fas fa-user"></i>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-menu">
+        <a href="/admin" class="sidebar-item">
+          <i class="fas fa-home"></i>
+          <span>Dashboard</span>
+        </a>
+        
+        <!-- Students Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-users"></i>
+            <span>Students</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/add-student" class="dropdown-item">Add Students</a>
+            <a href="/admin/students" class="dropdown-item">View Students</a>
           </div>
-          <div class="photo-upload-btn">
-            <input type="file" name="photo" id="photo" accept="image/*" required>
-            <div class="btn-upload">
-              <i class="fas fa-camera"></i>
-              Upload Photo
+        </div>
+        
+        <!-- Quizzes Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Quizzes</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
+            <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
+          </div>
+        </div>
+      </nav>
+      <div class="signout-container">
+        <button class="signout-btn" onclick="window.location.href='/logout'">
+          <i class="fas fa-sign-out-alt"></i>
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="container">
+        <div class="header">
+          <h1 class="page-title">
+            <i class="fas fa-user-plus"></i>
+            Add New Student
+          </h1>
+          <a href="/admin/students" class="back-button">
+            <i class="fas fa-arrow-left"></i>
+            Back to Students
+          </a>
+        </div>
+
+        <div class="form-container">
+          <div class="form-header">
+            <h2>Student Information</h2>
+            <p>Fill in the student details below. All fields marked with * are required.</p>
+          </div>
+
+          <form id="addStudentForm" action="/admin/add-student" method="POST" enctype="multipart/form-data">
+            <div class="photo-upload-container">
+              <div class="photo-preview">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="photo-upload-btn">
+                <input type="file" name="photo" id="photo" accept="image/*" required>
+                <div class="btn-upload">
+                  <i class="fas fa-camera"></i>
+                  Upload Photo
+                </div>
+              </div>
+              <div class="photo-filename"></div>
             </div>
-          </div>
-          <div class="photo-filename"></div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" required placeholder="Enter student's full name">
+                <div class="error-message">Please enter the student's name</div>
+              </div>
+
+              <div class="form-group">
+                <label for="studentClass">Class *</label>
+                <select id="studentClass" name="studentClass" required>
+                  <option value="">Select a class</option>
+                  <option value="1">Class 1</option>
+                  <option value="2">Class 2</option>
+                  <option value="3">Class 3</option>
+                  <option value="4">Class 4</option>
+                  <option value="5">Class 5</option>
+                  <option value="6">Class 6</option>
+                  <option value="7">Class 7</option>
+                  <option value="8">Class 8</option>
+                  <option value="9">Class 9</option>
+                  <option value="10">Class 10</option>
+                </select>
+                <div class="error-message">Please select a class</div>
+              </div>
+
+              <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" required placeholder="Enter email address">
+                <div class="error-message">Please enter a valid email address</div>
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Phone Number *</label>
+                <input type="tel" id="phone" name="phone" required placeholder="Enter phone number">
+                <div class="error-message">Please enter a valid phone number</div>
+              </div>
+
+              <div class="form-group">
+                <label for="dob">Date of Birth *</label>
+                <input type="date" id="dob" name="dob" required>
+                <div class="error-message">Please select the date of birth</div>
+              </div>
+            </div>
+
+            <div class="button-group">
+              <button type="button" class="btn btn-cancel" onclick="window.location.href='/admin/students'">
+                <i class="fas fa-times"></i>
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-submit">
+                <i class="fas fa-check"></i>
+                Add Student
+              </button>
+            </div>
+          </form>
         </div>
-
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="name">Full Name *</label>
-            <input type="text" id="name" name="name" required placeholder="Enter student's full name">
-            <div class="error-message">Please enter the student's name</div>
-          </div>
-
-          <div class="form-group">
-            <label for="studentClass">Class *</label>
-            <select id="studentClass" name="studentClass" required>
-              <option value="">Select a class</option>
-              <option value="1">Class 1</option>
-              <option value="2">Class 2</option>
-              <option value="3">Class 3</option>
-              <option value="4">Class 4</option>
-              <option value="5">Class 5</option>
-              <option value="6">Class 6</option>
-              <option value="7">Class 7</option>
-              <option value="8">Class 8</option>
-              <option value="9">Class 9</option>
-              <option value="10">Class 10</option>
-            </select>
-            <div class="error-message">Please select a class</div>
-          </div>
-
-          <div class="form-group">
-            <label for="email">Email Address *</label>
-            <input type="email" id="email" name="email" required placeholder="Enter email address">
-            <div class="error-message">Please enter a valid email address</div>
-          </div>
-
-          <div class="form-group">
-            <label for="phone">Phone Number *</label>
-            <input type="tel" id="phone" name="phone" required placeholder="Enter phone number">
-            <div class="error-message">Please enter a valid phone number</div>
-          </div>
-
-          <div class="form-group">
-            <label for="dob">Date of Birth *</label>
-            <input type="date" id="dob" name="dob" required>
-            <div class="error-message">Please select the date of birth</div>
-          </div>
-        </div>
-
-        <div class="button-group">
-          <button type="button" class="btn btn-cancel" onclick="window.location.href='/admin'">
-            <i class="fas fa-times"></i>
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-submit">
-            <i class="fas fa-check"></i>
-            Add Student
-          </button>
-        </div>
-      </form>
-    </div>
+      </div>
+    </main>
   </div>
 
   <script>
@@ -443,6 +695,41 @@
       if (!isValid) {
         e.preventDefault();
       }
+    });
+    
+    // Toggle dropdown menus
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+        
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const parent = this.parentElement;
+                const dropdownMenu = parent.querySelector('.dropdown-menu');
+                
+                // Close all other dropdowns
+                document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+                    if (menu !== dropdownMenu) {
+                        menu.classList.remove('show');
+                    }
+                });
+                
+                // Toggle current dropdown
+                dropdownMenu.classList.toggle('show');
+                this.classList.toggle('active');
+            });
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.sidebar-dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.classList.remove('show');
+                });
+                document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
+            }
+        });
     });
   </script>
 </body>

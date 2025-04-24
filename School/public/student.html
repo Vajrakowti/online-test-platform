@@ -99,6 +99,36 @@
       -webkit-text-fill-color: transparent;
     }
 
+    /* Sign Out Button */
+    .signout-btn {
+      position: absolute;
+      top: 1.5rem;
+      right: 2rem;
+      display: flex;
+      align-items: center;
+      padding: 0.6rem 1.2rem;
+      color: white;
+      background-color: var(--primary-color);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.3s;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .signout-btn:hover {
+      background-color: #e74a3b;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    
+    .signout-btn i {
+      font-size: 1rem;
+      margin-right: 8px;
+    }
+
     .tables-container {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -318,8 +348,13 @@
     <div class="student-profile">
       <img id="studentPhoto" src="" alt="Student Photo" class="profile-photo" 
            onerror="this.onerror=null;this.src='/default-profile.jpg';this.style.border='none'">
-      <h2 id="studentName"></h2>
+      <div id="studentName">Loading...</div>
     </div>
+
+    <a href="/logout" class="signout-btn">
+      <i class="fas fa-sign-out-alt"></i>
+      Sign Out
+    </a>
 
     <div class="tables-container">
       <div class="table-section">

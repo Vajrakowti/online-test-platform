@@ -24,8 +24,135 @@
     
     body {
       background-color: var(--secondary-color);
-      padding: 40px 20px;
       min-height: 100vh;
+    }
+    
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    /* Sidebar Styles */
+    .sidebar {
+      width: 260px;
+      min-height: 100vh;
+      background-color: #4361ee;
+      color: white;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      margin-bottom: 20px;
+    }
+
+    .sidebar-header i {
+      font-size: 2.5rem;
+      margin-right: 12px;
+    }
+
+    .sidebar-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-title h1 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background-color: rgba(255, 255, 255, 0.2);
+      margin: 15px 0;
+    }
+
+    .sidebar-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
+      text-decoration: none;
+      transition: all 0.3s;
+      border-radius: 0;
+    }
+
+    .sidebar-item:hover,
+    .sidebar-item.active {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+    }
+
+    .sidebar-item i {
+      font-size: 1.25rem;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    /* Dropdown styles */
+    .sidebar-dropdown {
+      position: relative;
+    }
+    
+    .dropdown-toggle {
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    
+    .dropdown-icon {
+      margin-left: auto;
+      margin-right: 0;
+      transition: transform 0.3s;
+      font-size: 0.8rem;
+    }
+    
+    .dropdown-toggle.active .dropdown-icon {
+      transform: rotate(180deg);
+    }
+    
+    .dropdown-menu {
+      display: none;
+      background-color: rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    
+    .dropdown-menu.show {
+      display: block;
+    }
+    
+    .dropdown-item {
+      display: block;
+      padding: 10px 20px 10px 56px;
+      color: white;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
+    
+    .dropdown-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      padding: 40px 20px;
     }
     
     .form-container {
@@ -273,125 +400,213 @@
       color: var(--danger-color);
       border: 1px solid var(--danger-color);
     }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .main-content {
+        margin-left: 70px;
+      }
+      
+      .sidebar {
+        width: 70px;
+        padding: 15px 0;
+      }
+      
+      .sidebar-header {
+        padding: 0 15px;
+        justify-content: center;
+      }
+      
+      .sidebar-title,
+      .sidebar-item span,
+      .dropdown-icon {
+        display: none;
+      }
+      
+      .sidebar-header i {
+        margin-right: 0;
+      }
+      
+      .sidebar-item {
+        justify-content: center;
+        padding: 12px;
+      }
+      
+      .sidebar-item i {
+        margin-right: 0;
+      }
+      
+      .dropdown-item {
+        padding: 12px;
+        text-align: center;
+      }
+    }
   </style>
 </head>
 <body>
-  <div id="loading-overlay" class="loading-overlay">
-    <div class="spinner"></div>
-  </div>
-
-  <div class="form-container">
-    <h2><i class="fas fa-edit"></i> Edit Quiz</h2>
-    
-    <div id="quiz-alerts"></div>
-
-    <form id="excelQuizForm" class="quiz-section" action="/admin/update-quiz-excel/" method="POST" enctype="multipart/form-data">
-      <input type="hidden" name="quizType" value="excel">
-      <div class="form-group">
-        <label class="required">Quiz Name:</label>
-        <input type="text" name="quizName" id="excelQuizName" placeholder="Enter quiz name" required readonly>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">Class:</label>
-        <select name="quizClass" id="excelQuizClass" required>
-          <option value="">Select Class</option>
-          <option value="1">Class 1</option>
-          <option value="2">Class 2</option>
-          <option value="3">Class 3</option>
-          <option value="4">Class 4</option>
-          <option value="5">Class 5</option>
-          <option value="6">Class 6</option>
-          <option value="7">Class 7</option>
-          <option value="8">Class 8</option>
-          <option value="9">Class 9</option>
-          <option value="10">Class 10</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">Start Time:</label>
-        <input type="time" name="startTime" id="excelStartTime" required>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">End Time:</label>
-        <input type="time" name="endTime" id="excelEndTime" required>
-      </div>
-      
-      <div class="form-group">
-        <label>Current Excel File:</label>
-        <div id="currentExcelFile" style="padding: 10px; background: #f8f9fc; border-radius: 6px; margin-bottom: 15px;"></div>
-        
-        <label>Upload New Excel Sheet (Optional):</label>
-        <div class="file-upload-wrapper">
-          <input type="file" name="quizFile" id="quizFile" accept=".xlsx,.xls">
-          <label for="quizFile" class="file-upload-btn">
-            <i class="fas fa-file-excel"></i> Choose Excel File
-          </label>
-          <div id="fileName" class="file-name">No file chosen</div>
-          <div id="uploadProgress" style="display:none; margin-top: 10px;">
-            <div style="height: 5px; width: 100%; background-color: #f0f0f0; border-radius: 3px;">
-              <div id="progressBar" style="height: 100%; width: 0; background-color: var(--primary-color); border-radius: 3px;"></div>
-            </div>
-            <div id="progressStatus" style="font-size: 12px; margin-top: 5px; text-align: center;">Preparing upload...</div>
-          </div>
+  <div class="admin-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <i class="fas fa-graduation-cap"></i>
+        <div class="sidebar-title">
+          <h1>Test</h1>
+          <h1>Platform</h1>
         </div>
       </div>
-      
-      <button type="submit" class="btn btn-submit">
-        <i class="fas fa-save"></i> Update Quiz
-      </button>
-    </form>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-menu">
+        <a href="/admin" class="sidebar-item">
+          <i class="fas fa-home"></i>
+          <span>Dashboard</span>
+        </a>
+        
+        <!-- Students Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-users"></i>
+            <span>Students</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/add-student" class="dropdown-item">Add Students</a>
+            <a href="/admin/students" class="dropdown-item">View Students</a>
+          </div>
+        </div>
+        
+        <!-- Quizzes Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Quizzes</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
+            <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
+          </div>
+        </div>
+      </nav>
+    </aside>
 
-    <form id="manualQuizForm" class="quiz-section" action="/admin/update-quiz-manual/" method="POST" enctype="multipart/form-data">
-      <input type="hidden" name="quizType" value="manual">
-      <div class="form-group">
-        <label class="required">Quiz Name:</label>
-        <input type="text" name="quizName" id="manualQuizName" placeholder="Enter quiz name" required>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">Class:</label>
-        <select name="quizClass" id="manualQuizClass" required>
-          <option value="">Select Class</option>
-          <option value="1">Class 1</option>
-          <option value="2">Class 2</option>
-          <option value="3">Class 3</option>
-          <option value="4">Class 4</option>
-          <option value="5">Class 5</option>
-          <option value="6">Class 6</option>
-          <option value="7">Class 7</option>
-          <option value="8">Class 8</option>
-          <option value="9">Class 9</option>
-          <option value="10">Class 10</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">Start Time:</label>
-        <input type="time" name="startTime" id="manualStartTime" required>
-      </div>
-      
-      <div class="form-group">
-        <label class="required">End Time:</label>
-        <input type="time" name="endTime" id="manualEndTime" required>
+    <main class="main-content">
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
       </div>
 
-      <button type="button" class="btn add-question-btn" onclick="addQuestion()">
-        <i class="fas fa-plus"></i> Add Question
-      </button>
+      <div class="form-container">
+        <h2><i class="fas fa-edit"></i> Edit Quiz</h2>
+        
+        <div id="quiz-alerts"></div>
 
-      <div id="questionsList"></div>
-      
-      <button type="submit" class="btn btn-submit">
-        <i class="fas fa-save"></i> Update Quiz
-      </button>
-    </form>
-    
-    <button class="btn btn-back" onclick="location.href='/admin/total-quiz'">
-      <i class="fas fa-arrow-left"></i> Back to Quizzes
-    </button>
+        <form id="excelQuizForm" class="quiz-section" action="/admin/update-quiz-excel/" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="quizType" value="excel">
+          <div class="form-group">
+            <label class="required">Quiz Name:</label>
+            <input type="text" name="quizName" id="excelQuizName" placeholder="Enter quiz name" required readonly>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Class:</label>
+            <select name="quizClass" id="excelQuizClass" required>
+              <option value="">Select Class</option>
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Start Time:</label>
+            <input type="time" name="startTime" id="excelStartTime" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">End Time:</label>
+            <input type="time" name="endTime" id="excelEndTime" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Current Excel File:</label>
+            <div id="currentExcelFile" style="padding: 10px; background: #f8f9fc; border-radius: 6px; margin-bottom: 15px;"></div>
+            
+            <label>Upload New Excel Sheet (Optional):</label>
+            <div class="file-upload-wrapper">
+              <input type="file" name="quizFile" id="quizFile" accept=".xlsx,.xls">
+              <label for="quizFile" class="file-upload-btn">
+                <i class="fas fa-file-excel"></i> Choose Excel File
+              </label>
+              <div id="fileName" class="file-name">No file chosen</div>
+              <div id="uploadProgress" style="display:none; margin-top: 10px;">
+                <div style="height: 5px; width: 100%; background-color: #f0f0f0; border-radius: 3px;">
+                  <div id="progressBar" style="height: 100%; width: 0; background-color: var(--primary-color); border-radius: 3px;"></div>
+                </div>
+                <div id="progressStatus" style="font-size: 12px; margin-top: 5px; text-align: center;">Preparing upload...</div>
+              </div>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn btn-submit">
+            <i class="fas fa-save"></i> Update Quiz
+          </button>
+        </form>
+
+        <form id="manualQuizForm" class="quiz-section" action="/admin/update-quiz-manual/" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="quizType" value="manual">
+          <div class="form-group">
+            <label class="required">Quiz Name:</label>
+            <input type="text" name="quizName" id="manualQuizName" placeholder="Enter quiz name" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Class:</label>
+            <select name="quizClass" id="manualQuizClass" required>
+              <option value="">Select Class</option>
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Start Time:</label>
+            <input type="time" name="startTime" id="manualStartTime" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">End Time:</label>
+            <input type="time" name="endTime" id="manualEndTime" required>
+          </div>
+
+          <button type="button" class="btn add-question-btn" onclick="addQuestion()">
+            <i class="fas fa-plus"></i> Add Question
+          </button>
+
+          <div id="questionsList"></div>
+          
+          <button type="submit" class="btn btn-submit">
+            <i class="fas fa-save"></i> Update Quiz
+          </button>
+        </form>
+        
+        <button class="btn btn-back" onclick="location.href='/admin/total-quiz'">
+          <i class="fas fa-arrow-left"></i> Back to Quizzes
+        </button>
+      </div>
+    </main>
   </div>
 
   <script>
@@ -819,6 +1034,41 @@
           }
         }, 300);
       }
+    });
+
+    // Toggle dropdown menus
+    document.addEventListener('DOMContentLoaded', function() {
+      const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+      
+      dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+          const parent = this.parentElement;
+          const dropdownMenu = parent.querySelector('.dropdown-menu');
+          
+          // Close all other dropdowns
+          document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+            if (menu !== dropdownMenu) {
+              menu.classList.remove('show');
+            }
+          });
+          
+          // Toggle current dropdown
+          dropdownMenu.classList.toggle('show');
+          this.classList.toggle('active');
+        });
+      });
+      
+      // Close dropdowns when clicking outside
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.sidebar-dropdown')) {
+          document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+          });
+          document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+            toggle.classList.remove('active');
+          });
+        }
+      });
     });
   </script>
 </body>
