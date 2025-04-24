@@ -1,3 +1,5 @@
+
+
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
@@ -1293,6 +1295,11 @@ router.get('/total-quiz', (req, res) => {
   
     const quizzes = readQuizzes();
     
+    // Get current time to determine quiz status (active, upcoming, ended)
+    const now = new Date();
+    const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+    const currentDate = now.toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+    
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -1433,6 +1440,45 @@ router.get('/total-quiz', (req, res) => {
                 background-color: #e3f2fd;
                 color: #1976d2;
             }
+            .status-badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            .status-active {
+                background-color: #e8f5e9;
+                color: #2e7d32;
+            }
+            .status-upcoming {
+                background-color: #e3f2fd;
+                color: #1565c0;
+            }
+            .status-ended {
+                background-color: #f5f5f5;
+                color: #757575;
+            }
+            .actions-cell {
+                display: flex;
+                gap: 8px;
+            }
+            .edit-link {
+                color: #ff9800;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            .edit-link:hover {
+                text-decoration: underline;
+            }
+            .view-link {
+                color: #4caf50;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            .view-link:hover {
+                text-decoration: underline;
+            }
             @media (max-width: 768px) {
                 .header {
                     flex-direction: column;
@@ -1467,51 +1513,89 @@ router.get('/total-quiz', (req, res) => {
                 '<div class="no-quizzes">No quizzes available. Create your first quiz to get started.</div>' : 
                 `
                 <table class="quiz-table">
-    <thead>
-        <tr>
-            <th>Quiz Name</th>
-            <th>Class</th>
-            <th>Time Period</th>
-            <th>Quiz File</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody id="quizTableBody">
-        ${quizzes.map(quiz => `
-            <tr data-quiz-name="${quiz.name.toLowerCase()}">
-                <td class="quiz-name">${quiz.name}</td>
-                <td>Class ${quiz.class}</td>
-                <td class="time-cell">
-                    <span class="time-badge">Start: ${quiz.startTime}</span>
-                    <span class="time-badge">End: ${quiz.endTime}</span>
-                </td>
-                <td>
-                    <a href="/uploads/${quiz.file}" class="file-link" download>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        ${quiz.file}
-                    </a>
-                </td>
-                <td>
-                    <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="file-link">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
-                        View Results
-                    </a>
-                </td>
-            </tr>
-        `).join('')}
-    </tbody>
-</table>
-
+                    <thead>
+                        <tr>
+                            <th>Quiz Name</th>
+                            <th>Class</th>
+                            <th>Time Period</th>
+                            <th>Status</th>
+                            <th>Quiz File</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quizTableBody">
+                        ${quizzes.map(quiz => {
+                            // Check if quiz is active, upcoming, or ended
+                            let status = '';
+                            let statusClass = '';
+                            
+                            if (quiz.startTime <= currentTime && quiz.endTime >= currentTime) {
+                                status = 'Active';
+                                statusClass = 'status-active';
+                            } else if (quiz.startTime > currentTime) {
+                                status = 'Upcoming';
+                                statusClass = 'status-upcoming';
+                            } else {
+                                status = 'Ended';
+                                statusClass = 'status-ended';
+                            }
+                            
+                            return `
+                            <tr data-quiz-name="${quiz.name.toLowerCase()}">
+                                <td class="quiz-name">${quiz.name}</td>
+                                <td>Class ${quiz.class}</td>
+                                <td class="time-cell">
+                                    <span class="time-badge">Start: ${quiz.startTime}</span>
+                                    <span class="time-badge">End: ${quiz.endTime}</span>
+                                </td>
+                                <td>
+                                    <span class="status-badge ${statusClass}">${status}</span>
+                                </td>
+                                <td>
+                                    ${quiz.file ? 
+                                        `<a href="/uploads/${quiz.file}" class="file-link" download>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="7 10 12 15 17 10"></polyline>
+                                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                            </svg>
+                                            ${quiz.file}
+                                        </a>` : 
+                                        `<span>Manual Quiz</span>`
+                                    }
+                                </td>
+                                <td class="actions-cell">
+                                    <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="file-link">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            <polyline points="10 9 9 9 8 9"></polyline>
+                                        </svg>
+                                        Results
+                                    </a>
+                                    ${status === 'Upcoming' ? 
+                                        `<a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path>
+                                                <polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon>
+                                            </svg>
+                                            Edit
+                                        </a>` : 
+                                        `<a href="/admin/view-quiz/${encodeURIComponent(quiz.name)}" class="view-link">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                <circle cx="12" cy="12" r="3"></circle>
+                                            </svg>
+                                            View
+                                        </a>`
+                                    }
+                                </td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>
                 `
             }
         </div>
@@ -1585,10 +1669,348 @@ router.get('/total-quiz', (req, res) => {
     </body>
     </html>
     `);
-  });
+});
 
+// API endpoint to get quiz data for editing
+router.get('/api/quiz/:quizName', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
 
+    try {
+        const quizName = decodeURIComponent(req.params.quizName);
+        const quizzes = readQuizzes();
+        const quiz = quizzes.find(q => q.name === quizName);
 
+        if (!quiz) {
+            return res.status(404).json({ error: 'Quiz not found' });
+        }
+
+        // Check if quiz has already started
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        // Include if quiz has started in the response
+        const hasStarted = quiz.startTime <= currentTime;
+
+        // For manual quizzes, get the questions
+        let questions = [];
+        if (quiz.type === 'manual' && quiz.questionsFile) {
+            const questionsPath = path.join(MANUAL_QUESTIONS_DIR, quiz.questionsFile);
+            if (fs.existsSync(questionsPath)) {
+                questions = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
+            }
+        }
+
+        res.json({
+            ...quiz,
+            hasStarted,
+            questions: quiz.type === 'manual' ? questions : []
+        });
+    } catch (error) {
+        console.error('Error fetching quiz data:', error);
+        res.status(500).json({ error: 'Failed to fetch quiz data' });
+    }
+});
+
+// Route to render the edit quiz page
+router.get('/edit-quiz/:quizName', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.redirect("/login");
+    }
+
+    try {
+        const quizName = decodeURIComponent(req.params.quizName);
+        const quizzes = readQuizzes();
+        const quiz = quizzes.find(q => q.name === quizName);
+
+        if (!quiz) {
+            return res.status(404).send('Quiz not found');
+        }
+
+        // Check if quiz has already started
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        if (quiz.startTime <= currentTime) {
+            // Quiz has started, redirect to view-only page
+            return res.redirect(`/admin/view-quiz/${encodeURIComponent(quizName)}`);
+        }
+
+        // Serve the edit quiz HTML page
+        res.sendFile(path.join(__dirname, "../public/editquiz.html"));
+    } catch (error) {
+        console.error('Error accessing edit quiz page:', error);
+        res.status(500).send('Error accessing edit quiz page: ' + error.message);
+    }
+});
+
+// Route to render the view-only quiz page
+router.get('/view-quiz/:quizName', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.redirect("/login");
+    }
+
+    try {
+        const quizName = decodeURIComponent(req.params.quizName);
+        const quizzes = readQuizzes();
+        const quiz = quizzes.find(q => q.name === quizName);
+
+        if (!quiz) {
+            return res.status(404).send('Quiz not found');
+        }
+
+        // Serve the view quiz HTML page (you'll need to create this)
+        // For now, redirect to edit page with a view-only flag
+        res.sendFile(path.join(__dirname, "../public/editquiz.html"));
+    } catch (error) {
+        console.error('Error accessing view quiz page:', error);
+        res.status(500).send('Error accessing view quiz page: ' + error.message);
+    }
+});
+
+// Update Excel quiz
+router.post('/update-quiz-excel/:quizName', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).send('Unauthorized');
+    }
+
+    uploadExcel(req, res, function(err) {
+        if (err instanceof multer.MulterError) {
+            console.error('Multer error:', err);
+            return res.status(400).send('Error uploading files: ' + err.message);
+        } else if (err) {
+            console.error('Unknown error:', err);
+            return res.status(500).send('Unknown error occurred');
+        }
+
+        try {
+            const quizName = decodeURIComponent(req.params.quizName);
+            const quizzes = readQuizzes();
+            const quizIndex = quizzes.findIndex(q => q.name === quizName);
+
+            if (quizIndex === -1) {
+                return res.status(404).send('Quiz not found');
+            }
+
+            // Check if quiz has already started
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+            if (quizzes[quizIndex].startTime <= currentTime) {
+                return res.status(400).send('Cannot edit quiz that has already started');
+            }
+
+            const { quizClass, startTime, endTime } = req.body;
+
+            // Update quiz data
+            quizzes[quizIndex].class = quizClass;
+            quizzes[quizIndex].startTime = startTime;
+            quizzes[quizIndex].endTime = endTime;
+
+            // Update file if a new one was uploaded
+            if (req.file) {
+                console.log('New file uploaded:', req.file.filename);
+                
+                // Delete the old file if it exists
+                if (quizzes[quizIndex].file) {
+                    const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
+                    console.log('Attempting to delete old file:', oldFilePath);
+                    
+                    if (fs.existsSync(oldFilePath)) {
+                        fs.unlinkSync(oldFilePath);
+                        console.log('Deleted old file:', oldFilePath);
+                    } else {
+                        console.log('Old file not found:', oldFilePath);
+                    }
+                }
+                
+                // Important: Update the file reference in the quiz object
+                quizzes[quizIndex].file = req.file.filename;
+                console.log('Updated quiz file reference to:', req.file.filename);
+            } else {
+                // If no new file was uploaded, we need to ensure the filename is correct
+                // This fixes the issue where the quiz name might have changed but the file reference wasn't updated
+                if (quizzes[quizIndex].file && !quizzes[quizIndex].file.startsWith(quizName)) {
+                    const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
+                    const fileExt = path.extname(quizzes[quizIndex].file);
+                    const newFileName = quizName + fileExt;
+                    const newFilePath = path.join(uploadDir, newFileName);
+                    
+                    console.log('Renaming file from', quizzes[quizIndex].file, 'to', newFileName);
+                    
+                    // Check if old file exists before trying to rename
+                    if (fs.existsSync(oldFilePath)) {
+                        // Copy the file with the new name (safer than rename)
+                        fs.copyFileSync(oldFilePath, newFilePath);
+                        console.log('Copied file to new name:', newFilePath);
+                        
+                        // Update the file reference
+                        quizzes[quizIndex].file = newFileName;
+                    } else {
+                        console.log('Warning: Could not find the original file to rename:', oldFilePath);
+                    }
+                }
+            }
+
+            saveQuizzes(quizzes);
+            console.log('Quiz updated successfully:', quizzes[quizIndex]);
+            res.redirect('/admin/total-quiz');
+        } catch (error) {
+            console.error('Error updating quiz:', error);
+            res.status(500).send('Error updating quiz: ' + error.message);
+        }
+    });
+});
+
+// Update Manual quiz
+router.post('/update-quiz-manual/:quizName', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).send('Unauthorized');
+    }
+
+    uploadQuizImage(req, res, async function(err) {
+        if (err instanceof multer.MulterError) {
+            console.error('Multer error:', err);
+            return res.status(400).send('Error uploading files: ' + err.message);
+        } else if (err) {
+            console.error('Unknown error:', err);
+            return res.status(500).send('Unknown error occurred');
+        }
+
+        try {
+            const quizName = decodeURIComponent(req.params.quizName);
+            const quizzes = readQuizzes();
+            const quizIndex = quizzes.findIndex(q => q.name === quizName);
+
+            if (quizIndex === -1) {
+                return res.status(404).send('Quiz not found');
+            }
+
+            // Check if quiz has already started
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+            if (quizzes[quizIndex].startTime <= currentTime) {
+                return res.status(400).send('Cannot edit quiz that has already started');
+            }
+
+            // Debug logging
+            console.log('Form Data:', req.body);
+            console.log('Files:', req.files);
+
+            const { quizClass, startTime, endTime } = req.body;
+
+            // Validate required fields
+            if (!quizClass || !startTime || !endTime) {
+                throw new Error('Missing required quiz information');
+            }
+            
+            // Process questions using field format
+            const questions = [];
+            
+            // Get indices of questions
+            const indices = req.body.questionIndex ? 
+                (Array.isArray(req.body.questionIndex) ? req.body.questionIndex : [req.body.questionIndex]) : [];
+            
+            console.log('Question indices:', indices);
+            
+            if (!indices || indices.length === 0) {
+                throw new Error('No questions found in form data');
+            }
+
+            // Create full question objects
+            for (const index of indices) {
+                const text = req.body[`questionText_${index}`];
+                const option1 = req.body[`questionOption1_${index}`];
+                const option2 = req.body[`questionOption2_${index}`];
+                const option3 = req.body[`questionOption3_${index}`];
+                const option4 = req.body[`questionOption4_${index}`];
+                const correct = req.body[`questionCorrect_${index}`];
+                
+                console.log(`Processing question ${index}:`, {
+                    text, option1, option2, option3, option4, correct
+                });
+
+                if (!text || !option1 || !option2 || !option3 || !option4 || !correct) {
+                    throw new Error(`Missing data for question ${parseInt(index) + 1}`);
+                }
+
+                const questionObj = {
+                    text: text,
+                    options: [option1, option2, option3, option4],
+                    correctAnswer: parseInt(correct) - 1
+                };
+
+                // Check for existing question image
+                const existingQuestionImage = req.body[`existingQuestionImage_${index}`];
+                
+                // Check if there's a new image for this question
+                const uploadedFiles = req.files ? (req.files[`questionImage_${index}`] || []) : [];
+                if (uploadedFiles.length > 0) {
+                    questionObj.image = `/quiz-images/${uploadedFiles[0].filename}`;
+                } else if (existingQuestionImage) {
+                    questionObj.image = existingQuestionImage;
+                }
+
+                // Check for option images
+                questionObj.optionImages = [null, null, null, null]; // Initialize with nulls
+
+                // Process each option image (1-4)
+                for (let i = 1; i <= 4; i++) {
+                    // Check for existing option image
+                    const existingOptionImage = req.body[`existingOption${i}Image_${index}`];
+                    
+                    // Check for new option image
+                    const optionImages = req.files ? (req.files[`questionOption${i}Image_${index}`] || []) : [];
+                    
+                    if (optionImages.length > 0) {
+                        questionObj.optionImages[i-1] = `/quiz-images/${optionImages[0].filename}`;
+                    } else if (existingOptionImage) {
+                        questionObj.optionImages[i-1] = existingOptionImage;
+                    }
+                }
+
+                questions.push(questionObj);
+            }
+
+            // Validate we have at least one question
+            if (questions.length === 0) {
+                throw new Error('No questions provided. Please check the form data.');
+            }
+
+            console.log('Final questions array:', questions);
+
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
+                fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
+            }
+
+            // Save questions to the same JSON file or create a new one if it doesn't exist
+            const questionsFileName = quizzes[quizIndex].questionsFile || `${quizName}-manual.json`;
+            const questionsFilePath = path.join(MANUAL_QUESTIONS_DIR, questionsFileName);
+            
+            fs.writeFileSync(
+                questionsFilePath,
+                JSON.stringify(questions, null, 2)
+            );
+
+            console.log('Saved questions to file:', questionsFilePath);
+
+            // Update quiz data
+            quizzes[quizIndex].class = quizClass;
+            quizzes[quizIndex].startTime = startTime;
+            quizzes[quizIndex].endTime = endTime;
+            quizzes[quizIndex].questionsFile = questionsFileName;
+
+            saveQuizzes(quizzes);
+            res.redirect('/admin/total-quiz');
+        } catch (error) {
+            console.error('Error updating manual quiz:', error);
+            res.status(500).send(`Error updating quiz: ${error.message}`);
+        }
+    });
+});
 
 // View Marks.
 

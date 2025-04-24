@@ -238,5 +238,13 @@
     "class": "10",
     "type": "manual",
     "questionsFile": "WW-manual.json"
+  },
+  {
+    "name": "123",
+    "startTime": "11:00",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "excel",
+    "file": "123.xlsx"
   }
 ]
