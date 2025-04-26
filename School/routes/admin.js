@@ -3600,4 +3600,321 @@ router.get('/api/student/:username', async (req, res) => {
     }
 });
 
+// Retake Quiz Page
+router.get('/retake-quiz', (req, res) => {
+  if (req.session.fname && req.session.role === 'admin') {
+    res.sendFile(path.join(__dirname, "../public/retakequiz.html"));
+  } else {
+    res.redirect("/login");
+  }
+});
+
+// API endpoint to get all students from a specific class
+router.get('/api/students-by-class/:classNumber', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const classNumber = req.params.classNumber;
+    
+    // Connect to MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db("School");
+    
+    // Get all students from the specific class
+    const collectionName = `class_${classNumber}`;
+    const students = await db.collection(collectionName).find({}).toArray();
+    
+    await client.close();
+    
+    // Return only necessary student information
+    const sanitizedStudents = students.map(student => ({
+      username: student.username,
+      name: student.name,
+      email: student.email,
+      phone: student.phone
+    }));
+    
+    res.json(sanitizedStudents);
+  } catch (err) {
+    console.error('Error fetching students:', err);
+    res.status(500).json({ error: 'Failed to fetch students', message: err.message });
+  }
+});
+
+// API endpoint to get all available quizzes
+router.get('/api/quizzes', (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const quizzes = readQuizzes();
+    res.json(quizzes);
+  } catch (err) {
+    console.error('Error fetching quizzes:', err);
+    res.status(500).json({ error: 'Failed to fetch quizzes', message: err.message });
+  }
+});
+
+// API endpoint to assign a quiz for retake to specific students
+router.post('/retake-quiz/assign', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { quizName, studentUsernames } = req.body;
+    
+    if (!quizName || !studentUsernames || !Array.isArray(studentUsernames) || studentUsernames.length === 0) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+    
+    // Get the quiz details
+    const quizzes = readQuizzes();
+    const quiz = quizzes.find(q => q.name === quizName);
+    
+    if (!quiz) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+    
+    // Check if the quiz times are valid
+    const now = new Date();
+    const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+    
+    // Convert times to comparable values
+    const startTimeParts = quiz.startTime.split(':').map(Number);
+    const endTimeParts = quiz.endTime.split(':').map(Number);
+    
+    const startTime = new Date();
+    startTime.setHours(startTimeParts[0], startTimeParts[1], 0, 0);
+    
+    const endTime = new Date();
+    endTime.setHours(endTimeParts[0], endTimeParts[1], 0, 0);
+    
+    if (now > endTime) {
+      return res.status(400).json({ 
+        error: 'Quiz has already ended', 
+        message: `This quiz ended at ${quiz.endTime}. Please update the end time before assigning for retake.`
+      });
+    }
+    
+    // Validate student usernames exist in MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db("School");
+    
+    // Get all class collections
+    const collections = await db.listCollections().toArray();
+    const classCollections = collections.filter(c => c.name.startsWith('class_'));
+    
+    // Validate each student username exists
+    const validStudents = [];
+    const invalidStudents = [];
+    
+    for (const username of studentUsernames) {
+      let found = false;
+      
+      for (const collection of classCollections) {
+        const student = await db.collection(collection.name).findOne({ username });
+        if (student) {
+          found = true;
+          validStudents.push(username);
+          break;
+        }
+      }
+      
+      if (!found) {
+        invalidStudents.push(username);
+      }
+    }
+    
+    await client.close();
+    
+    if (invalidStudents.length > 0) {
+      return res.status(400).json({ 
+        error: 'Invalid student usernames', 
+        invalidStudents 
+      });
+    }
+    
+    // Create or update retake entries for the specific quiz
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    if (!fs.existsSync(RETAKE_DIR)) {
+      fs.mkdirSync(RETAKE_DIR, { recursive: true });
+    }
+    
+    const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
+    
+    let retakeData = [];
+    if (fs.existsSync(retakeFilePath)) {
+      retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+    }
+    
+    // Add new students to the retake list
+    const newlyAddedStudents = [];
+    studentUsernames.forEach(username => {
+      if (!retakeData.includes(username)) {
+        retakeData.push(username);
+        newlyAddedStudents.push(username);
+      }
+    });
+    
+    // Save the updated retake data
+    fs.writeFileSync(retakeFilePath, JSON.stringify(retakeData, null, 2));
+    
+    // For each student, clear any previous attempt for this quiz
+    const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
+    
+    for (const username of studentUsernames) {
+      const studentAttemptsPath = path.join(ATTEMPTS_DIR, `${username}.json`);
+      
+      if (fs.existsSync(studentAttemptsPath)) {
+        try {
+          const attempts = JSON.parse(fs.readFileSync(studentAttemptsPath, 'utf8'));
+          
+          // Filter out attempts for the retake quiz
+          const updatedAttempts = attempts.filter(attempt => attempt.quizName !== quizName);
+          
+          // Save the updated attempts
+          fs.writeFileSync(studentAttemptsPath, JSON.stringify(updatedAttempts, null, 2));
+        } catch (err) {
+          console.error(`Error updating attempts for student ${username}:`, err);
+          // Continue with other students even if there's an error with one
+        }
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Quiz assigned for retake successfully',
+      newlyAddedStudents,
+      totalStudents: retakeData.length
+    });
+  } catch (err) {
+    console.error('Error assigning quiz for retake:', err);
+    res.status(500).json({ error: 'Failed to assign quiz for retake', message: err.message });
+  }
+});
+
+// Handle Creating Quiz for Specific Students
+router.post('/create-quiz-for-students', (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  uploadExcel(req, res, async function(err) {
+    if (err instanceof multer.MulterError) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ error: 'Error uploading files: ' + err.message });
+    } else if (err) {
+      console.error('Unknown error:', err);
+      return res.status(500).json({ error: 'Unknown error occurred' });
+    }
+
+    try {
+      const quizzes = readQuizzes();
+      const { quizName, startTime, endTime } = req.body;
+      let studentUsernames;
+      
+      try {
+        studentUsernames = JSON.parse(req.body.studentUsernames);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid student usernames format' });
+      }
+      
+      if (!Array.isArray(studentUsernames) || studentUsernames.length === 0) {
+        return res.status(400).json({ error: 'No students selected' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No Excel file uploaded' });
+      }
+
+      // Validate student usernames exist in MongoDB
+      const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+      await client.connect();
+      const db = client.db("School");
+      
+      // Get all class collections
+      const collections = await db.listCollections().toArray();
+      const classCollections = collections.filter(c => c.name.startsWith('class_'));
+      
+      // Keep track of student's actual classes for the log
+      const studentClasses = {};
+      
+      // Validate each student username exists
+      const validStudents = [];
+      const invalidStudents = [];
+      
+      for (const username of studentUsernames) {
+        let found = false;
+        
+        for (const collection of classCollections) {
+          const student = await db.collection(collection.name).findOne({ username });
+          if (student) {
+            found = true;
+            validStudents.push(username);
+            // Extract class number from collection name (class_1 -> 1)
+            const classNumber = collection.name.replace('class_', '');
+            studentClasses[username] = classNumber;
+            break;
+          }
+        }
+        
+        if (!found) {
+          invalidStudents.push(username);
+        }
+      }
+      
+      await client.close();
+      
+      if (invalidStudents.length > 0) {
+        return res.status(400).json({ 
+          error: 'Invalid student usernames', 
+          invalidStudents 
+        });
+      }
+
+      // Add quiz to quizzes.json - use a dummy class (999) to avoid conflicts with regular classes
+      const quiz = {
+        name: quizName,
+        startTime: startTime,
+        endTime: endTime,
+        class: '999', // Special class number for student-specific quizzes
+        type: 'excel',
+        file: req.file.filename,
+        isStudentSpecific: true // Flag to indicate this is a student-specific quiz
+      };
+
+      quizzes.push(quiz);
+      saveQuizzes(quizzes);
+
+      // Create or update retake entries for the specific quiz (to track which students can access it)
+      const RETAKE_DIR = path.join(__dirname, '../retakes');
+      if (!fs.existsSync(RETAKE_DIR)) {
+        fs.mkdirSync(RETAKE_DIR, { recursive: true });
+      }
+      
+      const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
+      fs.writeFileSync(retakeFilePath, JSON.stringify(validStudents, null, 2));
+
+      // Log information about the quiz creation
+      console.log(`Created student-specific quiz "${quizName}" for ${validStudents.length} students`);
+      console.log('Student classes:', studentClasses);
+
+      res.json({ 
+        success: true, 
+        message: 'Quiz created successfully',
+        studentCount: validStudents.length
+      });
+    } catch (error) {
+      console.error('Error creating quiz for specific students:', error);
+      res.status(500).json({ error: 'Error creating quiz: ' + error.message });
+    }
+  });
+});
+
 module.exports = router;

@@ -362,10 +362,35 @@
   },
   {
     "name": "HH",
-    "startTime": "18:56",
-    "endTime": "19:20",
+    "startTime": "11:40",
+    "endTime": "13:50",
     "class": "10",
     "type": "excel",
     "file": "HH.xlsx"
+  },
+  {
+    "name": "kkk",
+    "startTime": "11:30",
+    "endTime": "13:00",
+    "class": "10",
+    "type": "excel",
+    "file": "kkk.xlsx"
+  },
+  {
+    "name": "4444",
+    "startTime": "11:30",
+    "endTime": "12:30",
+    "class": "10",
+    "type": "excel",
+    "file": "4444.xlsx"
+  },
+  {
+    "name": "mmm",
+    "startTime": "12:00",
+    "endTime": "13:00",
+    "class": "999",
+    "type": "excel",
+    "file": "mmm.xlsx",
+    "isStudentSpecific": true
   }
 ]

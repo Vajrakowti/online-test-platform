@@ -98,7 +98,7 @@ router.get('/info', (req, res) => {
   });
 
 
-// Route to fetch quiz data - UPDATED TO FILTER BY CLASS
+// Route to fetch quiz data - UPDATED TO FILTER BY CLASS AND CHECK RETAKE ELIGIBILITY
 router.get('/quizzes', (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
@@ -129,6 +129,29 @@ router.get('/quizzes', (req, res) => {
     // Combine both sources of completed quizzes
     const completedQuizNames = [...new Set([...attemptedQuizzes, ...sessionCompletedQuizzes])];
     
+    // Check all available retake quizzes for this student
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    const retakeQuizzes = [];
+    
+    if (fs.existsSync(RETAKE_DIR)) {
+        try {
+            const retakeFiles = fs.readdirSync(RETAKE_DIR);
+            for (const retakeFile of retakeFiles) {
+                if (retakeFile.endsWith('.json')) {
+                    const quizName = retakeFile.replace('.json', '').replace(/_/g, ' ');
+                    const retakeFilePath = path.join(RETAKE_DIR, retakeFile);
+                    const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+                    
+                    if (retakeData.includes(studentUsername)) {
+                        retakeQuizzes.push(quizName);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Failed to read retake directory:", err);
+        }
+    }
+    
     fs.readFile(QUIZ_FILE, 'utf-8', (err, data) => {
         if (err) {
             console.error("Failed to read quizzes file:", err);
@@ -139,11 +162,59 @@ router.get('/quizzes', (req, res) => {
             // Filter quizzes by student's class, active time window, and not attempted
             const now = new Date();
             const filteredQuizzes = quizzes.filter(q => {
-                // Skip if already completed
-                if (completedQuizNames.includes(q.name)) return false;
+                // First, check if this is a retake quiz specifically assigned to this student
+                if (retakeQuizzes.includes(q.name)) {
+                    // Only need to check time window for retake quizzes
+                    const [startHour, startMinute] = q.startTime.split(':').map(Number);
+                    const [endHour, endMinute] = q.endTime.split(':').map(Number);
+                    
+                    const quizStart = new Date();
+                    quizStart.setHours(startHour, startMinute, 0, 0);
+                    
+                    const quizEnd = new Date();
+                    quizEnd.setHours(endHour, endMinute, 0, 0);
+                    
+                    return now >= quizStart && now <= quizEnd;
+                }
+                
+                // For student-specific quizzes (class 999), check if specifically assigned to this student
+                if (q.isStudentSpecific || q.class === '999') {
+                    // Check if in retake list for this quiz
+                    const retakeFilePath = path.join(RETAKE_DIR, `${q.name.replace(/\s+/g, '_')}.json`);
+                    if (fs.existsSync(retakeFilePath)) {
+                        try {
+                            const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+                            if (retakeData.includes(studentUsername)) {
+                                // Check time window
+                                const [startHour, startMinute] = q.startTime.split(':').map(Number);
+                                const [endHour, endMinute] = q.endTime.split(':').map(Number);
+                                
+                                const quizStart = new Date();
+                                quizStart.setHours(startHour, startMinute, 0, 0);
+                                
+                                const quizEnd = new Date();
+                                quizEnd.setHours(endHour, endMinute, 0, 0);
+                                
+                                return now >= quizStart && now <= quizEnd;
+                            }
+                        } catch (err) {
+                            console.error("Failed to read retake file:", err);
+                        }
+                    }
+                    return false;
+                }
+                
+                // If not a retake, check normal eligibility
+                
+                // Skip if already completed 
+                if (completedQuizNames.includes(q.name)) {
+                    return false;
+                }
                 
                 // Check if quiz is for student's class
-                if (q.class !== studentClass) return false;
+                if (q.class !== studentClass) {
+                    return false;
+                }
                 
                 // Check if quiz is within active time window
                 const [startHour, startMinute] = q.startTime.split(':').map(Number);
@@ -267,6 +338,35 @@ router.post('/saveattempt', (req, res) => {
     const studentUsername = req.session.username; // Use username instead of name
     const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
     
+    // Check if this is a retake
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
+    
+    let isRetake = false;
+    if (fs.existsSync(retakeFilePath)) {
+        try {
+            const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+            
+            if (retakeData.includes(studentUsername)) {
+                isRetake = true;
+                // Remove this student from retake list
+                const updatedRetakeData = retakeData.filter(username => username !== studentUsername);
+                fs.writeFileSync(retakeFilePath, JSON.stringify(updatedRetakeData, null, 2));
+                
+                // If no more students in retake list, can delete the file
+                if (updatedRetakeData.length === 0) {
+                    try {
+                        fs.unlinkSync(retakeFilePath);
+                    } catch (unlinkErr) {
+                        console.error("Error deleting empty retake file:", unlinkErr);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error checking/updating retake list:", err);
+        }
+    }
+    
     let attempts = [];
     if (fs.existsSync(attemptsFile)) {
         try {
@@ -281,7 +381,8 @@ router.post('/saveattempt', (req, res) => {
         quizName,
         score,
         totalQuestions,
-        attemptedAt: new Date().toISOString()
+        attemptedAt: new Date().toISOString(),
+        isRetake: isRetake
     });
     
     try {
