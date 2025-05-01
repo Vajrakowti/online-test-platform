@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Messages</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #4361ee;
+      --primary-light: #4f6ef2;
+      --primary-gradient: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+      --secondary-color: #f6f8fd;
+      --accent-color: #00b4d8;
+      --error-color: #e74a3b;
+      --success-color: #10b981;
+      --text-color: #2d3748;
+      --text-light: #718096;
+      --border-color: #e2e8f0;
+      --border-radius: 12px;
+      --shadow-sm: 0 2px 8px rgba(67, 97, 238, 0.07);
+      --shadow-md: 0 4px 12px rgba(67, 97, 238, 0.1);
+      --shadow-lg: 0 8px 24px rgba(67, 97, 238, 0.15);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f6f8fd 0%, #ffffff 100%);
+      color: var(--text-color);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .messages-container {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-lg);
+      padding: 2rem;
+      margin-top: 2rem;
+      border: 1px solid rgba(67, 97, 238, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .messages-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--primary-gradient);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    h2 i {
+      color: var(--primary-color);
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background-color: var(--primary-light);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: var(--transition);
+    }
+
+    .back-btn i {
+      margin-right: 0.5rem;
+    }
+
+    .back-btn:hover {
+      background-color: var(--primary-color);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .message-form {
+      margin-top: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    select, textarea, button {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: 0.875rem;
+      transition: var(--transition);
+    }
+
+    select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .submit-btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .submit-btn i {
+      margin-right: 0.5rem;
+    }
+
+    .submit-btn:hover {
+      background-color: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .message-history {
+      margin-top: 2rem;
+    }
+
+    .message-thread {
+      margin-bottom: 2rem;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .message-item {
+      background-color: var(--secondary-color);
+      padding: 1rem;
+      margin-bottom: 0;
+      position: relative;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .message-item:last-child {
+      border-bottom: none;
+    }
+
+    .admin-message {
+      background-color: rgba(67, 97, 238, 0.1);
+      border-left: 4px solid var(--primary-color);
+    }
+
+    .student-message {
+      background-color: rgba(16, 185, 129, 0.1);
+      border-left: 4px solid var(--success-color);
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-light);
+    }
+
+    .message-sender {
+      font-weight: 600;
+      color: var(--text-color);
+    }
+
+    .message-timestamp {
+      color: var(--text-light);
+    }
+
+    .message-content {
+      margin-bottom: 0.5rem;
+    }
+
+    .message-subject {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .error-message, .success-message {
+      padding: 1rem;
+      border-radius: var(--border-radius);
+      margin-bottom: 1rem;
+    }
+
+    .error-message {
+      background-color: rgba(231, 74, 59, 0.1);
+      color: var(--error-color);
+      border-left: 4px solid var(--error-color);
+    }
+
+    .success-message {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: var(--success-color);
+      border-left: 4px solid var(--success-color);
+    }
+
+    .no-messages {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-light);
+      font-style: italic;
+      background-color: rgba(67, 97, 238, 0.05);
+      border-radius: var(--border-radius);
+      margin-top: 1rem;
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+
+    .loader {
+      border: 4px solid rgba(67, 97, 238, 0.1);
+      border-radius: 50%;
+      border-top: 4px solid var(--primary-color);
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .messages-container {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="messages-container">
+      <div class="header">
+        <h2><i class="fas fa-envelope"></i> Quiz Issue Reports</h2>
+        <a href="/student" class="back-btn">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <div class="message-form">
+        <form id="issueForm">
+          <div class="form-group">
+            <label for="issueType">Issue Type:</label>
+            <select id="issueType" name="issueType" required>
+              <option value="">Select Issue Type</option>
+              <option value="Internet Disconnection">Internet Disconnection</option>
+              <option value="Auto-Submitted Quiz">Auto-Submitted Quiz</option>
+              <option value="Questions Not Loading">Questions Not Loading</option>
+              <option value="System Error">System Error</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="quizName">Quiz Name:</label>
+            <select id="quizName" name="quizName" required>
+              <option value="">Select Quiz</option>
+              <!-- Will be populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="messageContent">Describe Your Issue:</label>
+            <textarea id="messageContent" name="messageContent" placeholder="Please describe the issue you encountered while taking the quiz..." required></textarea>
+          </div>
+          <button type="submit" class="submit-btn">
+            <i class="fas fa-paper-plane"></i> Send Report
+          </button>
+        </form>
+      </div>
+
+      <div class="message-history">
+        <h3>Message History</h3>
+        <div id="messagesContainer">
+          <div class="loading">
+            <div class="loader"></div>
+          </div>
+          <!-- Messages will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Variables
+      const issueForm = document.getElementById('issueForm');
+      const alertContainer = document.getElementById('alertContainer');
+      const messagesContainer = document.getElementById('messagesContainer');
+      const quizNameSelect = document.getElementById('quizName');
+      
+      // Load attempted quizzes for the dropdown
+      loadAttemptedQuizzes();
+      
+      // Load previous messages
+      loadMessages();
+      
+      // Form submission
+      issueForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const issueType = document.getElementById('issueType').value;
+        const quizName = document.getElementById('quizName').value;
+        const messageContent = document.getElementById('messageContent').value;
+        
+        if (!issueType || !quizName || !messageContent) {
+          showAlert('error', 'Please fill in all fields');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/student/messages/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              issueType,
+              quizName,
+              messageContent
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            showAlert('success', 'Message sent successfully');
+            issueForm.reset();
+            loadMessages(); // Reload messages
+          } else {
+            showAlert('error', data.error || 'Failed to send message');
+          }
+        } catch (error) {
+          console.error('Error sending message:', error);
+          showAlert('error', 'Failed to send message. Please try again later.');
+        }
+      });
+      
+      // Function to load attempted quizzes for the dropdown
+      async function loadAttemptedQuizzes() {
+        try {
+          const response = await fetch('/student/attempts');
+          const attempts = await response.json();
+          
+          // Clear existing options (except the first one)
+          quizNameSelect.innerHTML = '<option value="">Select Quiz</option>';
+          
+          // Add each quiz as an option
+          attempts.forEach(attempt => {
+            const option = document.createElement('option');
+            option.value = attempt.quizName;
+            option.textContent = attempt.quizName;
+            quizNameSelect.appendChild(option);
+          });
+          
+          // If no attempts found
+          if (attempts.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No quizzes attempted yet";
+            option.disabled = true;
+            quizNameSelect.appendChild(option);
+          }
+        } catch (error) {
+          console.error('Error loading attempted quizzes:', error);
+          quizNameSelect.innerHTML = '<option value="">Error loading quizzes</option>';
+        }
+      }
+      
+      // Function to load messages
+      async function loadMessages() {
+        try {
+          const response = await fetch('/student/api/messages');
+          const messages = await response.json();
+          
+          // Clear the loading indicator
+          messagesContainer.innerHTML = '';
+          
+          if (messages.length === 0) {
+            messagesContainer.innerHTML = `
+              <div class="no-messages">
+                No messages yet. Issues you report will appear here.
+              </div>
+            `;
+            return;
+          }
+          
+          // Display messages
+          messages.forEach(message => {
+            // Create container for each conversation thread
+            const threadContainer = document.createElement('div');
+            threadContainer.className = 'message-thread';
+            
+            // Add the original message from student
+            const originalMessage = document.createElement('div');
+            originalMessage.className = 'message-item student-message';
+            
+            const formattedDate = new Date(message.timestamp).toLocaleString();
+            
+            originalMessage.innerHTML = `
+              <div class="message-header">
+                <span class="message-sender">You</span>
+                <span class="message-timestamp">${formattedDate}</span>
+              </div>
+              <div class="message-content">
+                <div class="message-subject"><strong>${message.issueType}</strong> - ${message.quizName}</div>
+                <p>${message.messageContent}</p>
+              </div>
+            `;
+            
+            threadContainer.appendChild(originalMessage);
+            
+            // Add any replies from admin
+            if (message.replies && message.replies.length > 0) {
+              message.replies.forEach(reply => {
+                const replyElement = document.createElement('div');
+                replyElement.className = `message-item ${reply.sender === 'admin' ? 'admin-message' : 'student-message'}`;
+                
+                const replyDate = new Date(reply.timestamp).toLocaleString();
+                
+                replyElement.innerHTML = `
+                  <div class="message-header">
+                    <span class="message-sender">${reply.sender === 'admin' ? 'Admin' : 'You'}</span>
+                    <span class="message-timestamp">${replyDate}</span>
+                  </div>
+                  <div class="message-content">
+                    <p>${reply.content}</p>
+                  </div>
+                `;
+                
+                threadContainer.appendChild(replyElement);
+              });
+            }
+            
+            messagesContainer.appendChild(threadContainer);
+          });
+        } catch (error) {
+          console.error('Error loading messages:', error);
+          messagesContainer.innerHTML = `
+            <div class="error-message">
+              Failed to load messages. Please refresh the page.
+            </div>
+          `;
+        }
+      }
+      
+      // Function to show alerts
+      function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = type === 'error' ? 'error-message' : 'success-message';
+        alertDiv.textContent = message;
+        
+        alertContainer.innerHTML = '';
+        alertContainer.appendChild(alertDiv);
+        
+        // Remove the alert after 5 seconds
+        setTimeout(() => {
+          alertDiv.remove();
+        }, 5000);
+      }
+    });
+  </script>
+</body>
+</html> 

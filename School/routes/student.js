@@ -402,6 +402,25 @@ router.get('/quiz/:quizName', (req, res) => {
 
     const quizName = decodeURIComponent(req.params.quizName);
     const studentClass = req.session.class || '1';
+    const studentUsername = req.session.username;
+
+    // Check for retake eligibility
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    let isRetakeEligible = false;
+    
+    if (fs.existsSync(RETAKE_DIR)) {
+        const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
+        if (fs.existsSync(retakeFilePath)) {
+            try {
+                const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+                if (retakeData.includes(studentUsername)) {
+                    isRetakeEligible = true;
+                }
+            } catch (err) {
+                console.error("Failed to read retake file:", err);
+            }
+        }
+    }
 
     fs.readFile(QUIZ_FILE, 'utf-8', (err, data) => {
         if (err) {
@@ -411,7 +430,21 @@ router.get('/quiz/:quizName', (req, res) => {
 
         try {
             const quizzes = JSON.parse(data);
-            const quiz = quizzes.find(q => q.name === quizName && q.class === studentClass);
+            
+            // Find the quiz - either regular class quiz or student-specific quiz
+            const quiz = quizzes.find(q => {
+                // If it's a normal class quiz
+                if (q.name === quizName && q.class === studentClass) {
+                    return true;
+                }
+                
+                // If it's a retake quiz (class 999) that student is eligible for
+                if (q.name === quizName && (q.isStudentSpecific || q.class === '999') && isRetakeEligible) {
+                    return true;
+                }
+                
+                return false;
+            });
 
             if (!quiz) {
                 return res.status(404).send(`
@@ -1121,6 +1154,84 @@ router.get('/check-completed-quizzes', (req, res) => {
         .map(quiz => quiz.quizName);
     
     res.json(completedQuizzes);
+});
+
+// Student messages routes
+router.get('/messages', (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+    
+    res.sendFile(path.join(__dirname, '../public/student-messages.html'));
+});
+
+// API endpoint to get messages for a student
+router.get('/api/messages', (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    const studentUsername = req.session.username;
+    const db = req.app.locals.db;
+    
+    // Get messages for this student
+    db.collection('messages')
+        .find({ studentUsername: studentUsername })
+        .sort({ timestamp: -1 }) // Sort by newest first
+        .toArray()
+        .then(messages => {
+            res.json(messages);
+        })
+        .catch(err => {
+            console.error('Error fetching messages:', err);
+            res.status(500).json({ error: 'Failed to load messages' });
+        });
+});
+
+// API endpoint to send a new message
+router.post('/messages/send', (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    const { issueType, quizName, messageContent } = req.body;
+    
+    if (!issueType || !quizName || !messageContent) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const db = req.app.locals.db;
+    const studentUsername = req.session.username;
+    const studentName = req.session.fname;
+    const studentClass = req.session.class || '1';
+    
+    // Create new message
+    const newMessage = {
+        studentUsername,
+        studentName,
+        class: studentClass,
+        issueType,
+        quizName,
+        messageContent,
+        timestamp: new Date(),
+        read: false,
+        replies: []
+    };
+    
+    // Save to database
+    db.collection('messages')
+        .insertOne(newMessage)
+        .then(result => {
+            res.json({ 
+                success: true, 
+                message: 'Message sent successfully',
+                id: result.insertedId
+            });
+        })
+        .catch(err => {
+            console.error('Error sending message:', err);
+            res.status(500).json({ error: 'Failed to send message' });
+        });
 });
 
 module.exports = router;

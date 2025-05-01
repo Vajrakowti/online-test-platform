@@ -22,7 +22,10 @@ const mongoOptions = {
     maxPoolSize: 10,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
-    family: 4
+    family: 4,
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+    tlsAllowInvalidHostnames: false
 };
 
 // Set max listeners to prevent memory leak warnings

@@ -150,12 +150,46 @@ router.get('/:quizName', (req, res) => {
         }
         
     const quizzes = JSON.parse(fs.readFileSync(QUIZ_JSON_PATH));
-    const quizConfig = quizzes.find(q => q.name === quizName);
-
+    
     // Check if user is logged in as a student
     if (!req.session.username || req.session.role !== 'student') {
         return res.redirect('/login');
     }
+    
+    const studentUsername = req.session.username;
+    
+    // Check for retake eligibility
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    let isRetakeEligible = false;
+    
+    if (fs.existsSync(RETAKE_DIR)) {
+        const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
+        if (fs.existsSync(retakeFilePath)) {
+            try {
+                const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+                if (retakeData.includes(studentUsername)) {
+                    isRetakeEligible = true;
+                }
+            } catch (err) {
+                console.error("Failed to read retake file:", err);
+            }
+        }
+    }
+    
+    // Find quiz configuration - either normal class quiz or student-specific quiz
+    const quizConfig = quizzes.find(q => {
+        // If it's a normal class quiz for student's class
+        if (q.name === quizName && q.class === req.session.class) {
+            return true;
+        }
+        
+        // If it's a student-specific quiz (class 999) and student is in retake list
+        if (q.name === quizName && (q.isStudentSpecific || q.class === '999') && isRetakeEligible) {
+            return true;
+        }
+        
+        return false;
+    });
 
     // Check if quiz exists
     if (!quizConfig) {

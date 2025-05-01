@@ -49,6 +49,12 @@ const ADMIN_SIDEBAR = `
         <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
       </div>
     </div>
+    
+    <!-- Messages -->
+    <a href="/admin/messages" class="sidebar-item">
+      <i class="fas fa-envelope"></i>
+      <span>Student Messages</span>
+    </a>
   </div>
 </div>
 `;
@@ -3915,6 +3921,306 @@ router.post('/create-quiz-for-students', (req, res) => {
       res.status(500).json({ error: 'Error creating quiz: ' + error.message });
     }
   });
+});
+
+// Handle Assigning Existing Quiz to Specific Students
+router.post('/assign-existing-quiz', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { 
+      originalQuizName, 
+      quizName, 
+      startTime, 
+      endTime, 
+      studentUsernames,
+      quizType,
+      file,
+      questionsFile
+    } = req.body;
+    
+    if (!originalQuizName || !quizName || !startTime || !endTime || !studentUsernames) {
+      return res.status(400).json({ error: 'Missing required information' });
+    }
+    
+    if (!Array.isArray(studentUsernames) || studentUsernames.length === 0) {
+      return res.status(400).json({ error: 'No students selected' });
+    }
+
+    // Validate student usernames exist in MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db("School");
+    
+    // Get all class collections
+    const collections = await db.listCollections().toArray();
+    const classCollections = collections.filter(c => c.name.startsWith('class_'));
+    
+    // Keep track of student's actual classes for the log
+    const studentClasses = {};
+    
+    // Validate each student username exists
+    const validStudents = [];
+    const invalidStudents = [];
+    
+    for (const username of studentUsernames) {
+      let found = false;
+      
+      for (const collection of classCollections) {
+        const student = await db.collection(collection.name).findOne({ username });
+        if (student) {
+          found = true;
+          validStudents.push(username);
+          // Extract class number from collection name (class_1 -> 1)
+          const classNumber = collection.name.replace('class_', '');
+          studentClasses[username] = classNumber;
+          break;
+        }
+      }
+      
+      if (!found) {
+        invalidStudents.push(username);
+      }
+    }
+    
+    await client.close();
+    
+    if (invalidStudents.length > 0) {
+      return res.status(400).json({ 
+        error: 'Invalid student usernames', 
+        invalidStudents 
+      });
+    }
+
+    // Read existing quizzes
+    const quizzes = readQuizzes();
+    
+    // Check if we're creating a copy or modifying original quiz for specific students
+    let modifiedQuizName = quizName;
+    
+    // If name is the same as original and other fields also match, just create retake file
+    if (quizName === originalQuizName) {
+      // Find the original quiz
+      const originalQuiz = quizzes.find(q => q.name === originalQuizName);
+      
+      if (!originalQuiz) {
+        return res.status(404).json({ error: 'Original quiz not found' });
+      }
+    } else {
+      // Creating a new version of the quiz with a different name
+      // Add quiz to quizzes.json with special class 999 for student-specific
+      const newQuiz = {
+        name: modifiedQuizName,
+        startTime: startTime,
+        endTime: endTime,
+        class: '999', // Special class for student-specific quizzes
+        type: quizType,
+        isStudentSpecific: true // Flag to indicate this is a student-specific quiz
+      };
+      
+      // Add appropriate file reference based on quiz type
+      if (quizType === 'excel' && file) {
+        newQuiz.file = file;
+      } else if (quizType === 'manual' && questionsFile) {
+        newQuiz.questionsFile = questionsFile;
+      } else {
+        return res.status(400).json({ error: 'Missing required file for quiz type' });
+      }
+      
+      quizzes.push(newQuiz);
+      saveQuizzes(quizzes);
+    }
+
+    // Create or update retake entries for the quiz
+    const RETAKE_DIR = path.join(__dirname, '../retakes');
+    if (!fs.existsSync(RETAKE_DIR)) {
+      fs.mkdirSync(RETAKE_DIR, { recursive: true });
+    }
+    
+    const retakeFilePath = path.join(RETAKE_DIR, `${modifiedQuizName.replace(/\s+/g, '_')}.json`);
+    
+    // If retake file exists, read and merge with new students
+    let allStudents = validStudents;
+    if (fs.existsSync(retakeFilePath)) {
+      try {
+        const existingStudents = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
+        allStudents = [...new Set([...existingStudents, ...validStudents])]; // Merge and remove duplicates
+      } catch (err) {
+        console.error('Error reading existing retake file:', err);
+        // Continue with just the new students if there's an error
+      }
+    }
+    
+    fs.writeFileSync(retakeFilePath, JSON.stringify(allStudents, null, 2));
+
+    // Log information about the quiz assignment
+    console.log(`Assigned quiz "${modifiedQuizName}" to ${validStudents.length} students`);
+    console.log('Student classes:', studentClasses);
+
+    res.json({ 
+      success: true, 
+      message: 'Quiz assigned successfully',
+      studentCount: validStudents.length
+    });
+  } catch (error) {
+    console.error('Error assigning existing quiz to students:', error);
+    res.status(500).json({ error: 'Error assigning quiz: ' + error.message });
+  }
+});
+
+// Messages Page
+router.get('/messages', (req, res) => {
+  if (req.session.fname && req.session.role === 'admin') {
+    res.sendFile(path.join(__dirname, "../public/admin-messages.html"));
+  } else {
+    res.redirect("/login");
+  }
+});
+
+// API endpoint to get all messages
+router.get('/api/messages', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const db = req.app.locals.db;
+    
+    // Get all messages sorted by newest first
+    const messages = await db.collection('messages')
+      .find({})
+      .sort({ timestamp: -1 })
+      .toArray();
+    
+    res.json(messages);
+  } catch (err) {
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// API endpoint to get a specific message with student details
+router.get('/api/messages/:messageId', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const messageId = req.params.messageId;
+    const db = req.app.locals.db;
+    
+    // Convert string ID to ObjectId
+    const ObjectId = require('mongodb').ObjectId;
+    const objId = new ObjectId(messageId);
+    
+    // Get the message
+    const message = await db.collection('messages').findOne({ _id: objId });
+    
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    // Find student info from the appropriate class collection
+    const classCollection = `class_${message.class}`;
+    const student = await db.collection(classCollection).findOne({ username: message.studentUsername });
+    
+    if (!student) {
+      // If student not found, return just the message
+      return res.json({ 
+        message, 
+        student: { 
+          name: message.studentName, 
+          class: message.class,
+          username: message.studentUsername
+        } 
+      });
+    }
+    
+    res.json({ message, student });
+  } catch (err) {
+    console.error('Error fetching message details:', err);
+    res.status(500).json({ error: 'Failed to fetch message details' });
+  }
+});
+
+// API endpoint to mark a message as read
+router.put('/api/messages/:messageId/read', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const messageId = req.params.messageId;
+    const db = req.app.locals.db;
+    
+    // Convert string ID to ObjectId
+    const ObjectId = require('mongodb').ObjectId;
+    const objId = new ObjectId(messageId);
+    
+    // Update the message
+    const result = await db.collection('messages').updateOne(
+      { _id: objId },
+      { $set: { read: true } }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ error: 'Message not found or already read' });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking message as read:', err);
+    res.status(500).json({ error: 'Failed to mark message as read' });
+  }
+});
+
+// API endpoint to reply to a message
+router.post('/api/messages/:messageId/reply', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const messageId = req.params.messageId;
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'Reply content is required' });
+    }
+    
+    const db = req.app.locals.db;
+    
+    // Convert string ID to ObjectId
+    const ObjectId = require('mongodb').ObjectId;
+    const objId = new ObjectId(messageId);
+    
+    // Create reply object
+    const reply = {
+      sender: 'admin',
+      content,
+      timestamp: new Date()
+    };
+    
+    // Update the message
+    const result = await db.collection('messages').updateOne(
+      { _id: objId },
+      { 
+        $push: { replies: reply },
+        $set: { read: true }
+      }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error sending reply:', err);
+    res.status(500).json({ error: 'Failed to send reply' });
+  }
 });
 
 module.exports = router;

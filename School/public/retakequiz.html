@@ -383,6 +383,20 @@
             color: var(--dark-color);
         }
 
+        .quiz-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .quiz-table tr:hover td {
+            background-color: #f8f9fa;
+        }
+
+        .edit-quiz-btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            border-radius: var(--border-radius);
+        }
+
         .actions-container {
             display: flex;
             justify-content: space-between;
@@ -598,6 +612,10 @@
                     <i class="fas fa-plus-circle"></i>
                     Create Quiz
                 </button>
+                <button id="showExistingQuizBtn" class="btn btn-secondary" style="margin-top: 1rem; margin-left: 1rem;">
+                    <i class="fas fa-clipboard-list"></i>
+                    Show Existing Quizzes
+                </button>
             </div>
 
             <div id="quizSelection" class="quiz-selection">
@@ -638,6 +656,71 @@
                 </div>
             </div>
 
+            <div id="existingQuizSelection" class="quiz-selection">
+                <h2 class="card-title">
+                    <i class="fas fa-clipboard-list"></i>
+                    Select Existing Quiz for Students
+                </h2>
+
+                <div class="table-container">
+                    <table class="quiz-table">
+                        <thead>
+                            <tr>
+                                <th>Quiz Name</th>
+                                <th>Class</th>
+                                <th>Type</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quizTableBody">
+                            <!-- Quizzes will be added here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="actions-container">
+                    <button id="backToStudentsFromQuizBtn" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Students
+                    </button>
+                </div>
+            </div>
+
+            <div id="editQuizForm" class="quiz-selection">
+                <h2 class="card-title">
+                    <i class="fas fa-edit"></i>
+                    Edit Quiz Details
+                </h2>
+
+                <div class="form-group">
+                    <label for="editQuizName">Quiz Name:</label>
+                    <input type="text" id="editQuizName" class="form-control" placeholder="Enter quiz name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editStartTime">Start Time:</label>
+                    <input type="time" id="editStartTime" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editEndTime">End Time:</label>
+                    <input type="time" id="editEndTime" class="form-control" required>
+                </div>
+
+                <div class="actions-container">
+                    <button id="backToQuizzesBtn" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Quizzes
+                    </button>
+                    <button id="assignQuizBtn" class="btn btn-success">
+                        <i class="fas fa-check-circle"></i>
+                        Assign Quiz to Students
+                    </button>
+                </div>
+            </div>
+
             <div id="loading" class="loading" style="display: none;">
                 <div class="loading-spinner"></div>
             </div>
@@ -647,6 +730,10 @@
     <script>
         // Toggle dropdown menus
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize UI elements
+            document.getElementById('existingQuizSelection').style.display = 'none';
+            document.getElementById('editQuizForm').style.display = 'none';
+            
             const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
             
             dropdownToggles.forEach(toggle => {
@@ -706,16 +793,45 @@
                     return;
                 }
 
-                fetchQuizzes();
+                document.getElementById('studentCard').style.display = 'none';
+                document.getElementById('quizSelection').style.display = 'block';
             });
 
-            // Back to students button
+            // Show existing quizzes button
+            document.getElementById('showExistingQuizBtn').addEventListener('click', function() {
+                const selectedStudents = document.querySelectorAll('.student-checkbox:checked');
+                if (selectedStudents.length === 0) {
+                    showAlert('error', 'Please select at least one student');
+                    return;
+                }
+
+                fetchExistingQuizzes();
+            });
+
+            // Back to students from create quiz button
             document.getElementById('backToStudentsBtn').addEventListener('click', function() {
                 document.getElementById('quizSelection').style.display = 'none';
                 document.getElementById('studentCard').style.display = 'block';
             });
 
-            // Send quiz button
+            // Back to students from existing quizzes button
+            document.getElementById('backToStudentsFromQuizBtn').addEventListener('click', function() {
+                document.getElementById('existingQuizSelection').style.display = 'none';
+                document.getElementById('studentCard').style.display = 'block';
+            });
+
+            // Back to quizzes button
+            document.getElementById('backToQuizzesBtn').addEventListener('click', function() {
+                document.getElementById('editQuizForm').style.display = 'none';
+                document.getElementById('existingQuizSelection').style.display = 'block';
+            });
+
+            // Assign quiz button
+            document.getElementById('assignQuizBtn').addEventListener('click', function() {
+                assignQuizToStudents();
+            });
+
+            // Create quiz button
             document.getElementById('createQuizBtn').addEventListener('click', function() {
                 createQuizForStudents();
             });
@@ -797,19 +913,164 @@
             });
         }
 
-        // Fetch available quizzes
-        function fetchQuizzes() {
-            // Instead of fetching quizzes, we'll just show the quiz creation form
-            document.getElementById('studentCard').style.display = 'none';
-            document.getElementById('quizSelection').style.display = 'block';
+        // Fetch existing quizzes
+        function fetchExistingQuizzes() {
+            showLoading();
+            
+            fetch('/admin/api/quizzes')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch quizzes');
+                    }
+                    return response.json();
+                })
+                .then(quizzes => {
+                    console.log('Fetched quizzes:', quizzes);
+                    renderQuizzes(quizzes);
+                    document.getElementById('studentCard').style.display = 'none';
+                    document.getElementById('existingQuizSelection').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error fetching quizzes:', error);
+                    showAlert('error', error.message);
+                })
+                .finally(() => {
+                    hideLoading();
+                });
         }
 
-        // Replace renderQuizzes function
+        // Render quizzes in the table
         function renderQuizzes(quizzes) {
-            // No longer needed since we're creating a new quiz
+            console.log('Rendering quizzes function called with:', quizzes);
+            const tableBody = document.getElementById('quizTableBody');
+            tableBody.innerHTML = '';
+            
+            if (quizzes.length === 0) {
+                console.log('No quizzes found to render');
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="6" style="text-align: center;">No quizzes found</td>';
+                tableBody.appendChild(row);
+                return;
+            }
+            
+            quizzes.forEach(quiz => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${quiz.name}</td>
+                    <td>${quiz.class}</td>
+                    <td>${quiz.type}</td>
+                    <td>${quiz.startTime}</td>
+                    <td>${quiz.endTime}</td>
+                    <td>
+                        <button class="btn btn-primary edit-quiz-btn" data-quiz="${encodeURIComponent(JSON.stringify(quiz))}">
+                            <i class="fas fa-edit"></i> Select
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // Add event listeners to edit buttons
+            document.querySelectorAll('.edit-quiz-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const quiz = JSON.parse(decodeURIComponent(this.getAttribute('data-quiz')));
+                    showEditQuizForm(quiz);
+                });
+            });
         }
 
-        // Replace sendQuizToStudents with new function for creating quiz
+        // Show edit quiz form
+        function showEditQuizForm(quiz) {
+            document.getElementById('existingQuizSelection').style.display = 'none';
+            document.getElementById('editQuizForm').style.display = 'block';
+            
+            // Populate form with quiz data
+            document.getElementById('editQuizName').value = quiz.name;
+            document.getElementById('editStartTime').value = quiz.startTime;
+            document.getElementById('editEndTime').value = quiz.endTime;
+            
+            // Store original quiz data
+            document.getElementById('editQuizForm').setAttribute('data-original-quiz', JSON.stringify(quiz));
+        }
+
+        // Assign existing quiz to selected students
+        function assignQuizToStudents() {
+            const quizName = document.getElementById('editQuizName').value.trim();
+            const startTime = document.getElementById('editStartTime').value;
+            const endTime = document.getElementById('editEndTime').value;
+            
+            if (!quizName) {
+                showAlert('error', 'Please enter a quiz name');
+                return;
+            }
+            
+            if (!startTime) {
+                showAlert('error', 'Please set a start time');
+                return;
+            }
+            
+            if (!endTime) {
+                showAlert('error', 'Please set an end time');
+                return;
+            }
+            
+            const selectedStudents = Array.from(document.querySelectorAll('.student-checkbox:checked'))
+                .map(checkbox => checkbox.value);
+            
+            if (selectedStudents.length === 0) {
+                showAlert('error', 'Please select at least one student');
+                return;
+            }
+            
+            showLoading();
+            
+            // Get original quiz data
+            const originalQuiz = JSON.parse(document.getElementById('editQuizForm').getAttribute('data-original-quiz'));
+            
+            // Prepare data for sending to server
+            const data = {
+                originalQuizName: originalQuiz.name,
+                quizName: quizName,
+                startTime: startTime,
+                endTime: endTime,
+                studentUsernames: selectedStudents,
+                quizType: originalQuiz.type,
+                file: originalQuiz.file,
+                questionsFile: originalQuiz.questionsFile
+            };
+            
+            fetch('/admin/assign-existing-quiz', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Failed to assign quiz');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                showAlert('success', `Quiz "${quizName}" has been successfully assigned to ${selectedStudents.length} student(s)`);
+                
+                // Reset and go back to the class selection
+                document.getElementById('editQuizForm').style.display = 'none';
+                document.getElementById('studentCard').style.display = 'none';
+                document.getElementById('classSelect').value = '';
+            })
+            .catch(error => {
+                showAlert('error', error.message);
+            })
+            .finally(() => {
+                hideLoading();
+            });
+        }
+
+        // Create quiz function 
         function createQuizForStudents() {
             const quizName = document.getElementById('quizName').value.trim();
             const startTime = document.getElementById('startTime').value;

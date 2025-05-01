@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Messages - Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #4361ee;
+      --secondary-color: #3f37c9;
+      --accent-color: #4895ef;
+      --success-color: #4cc9f0;
+      --warning-color: #ffd166;
+      --danger-color: #e74a3b;
+      --light-color: #f8f9fa;
+      --dark-color: #212529;
+      --gray-color: #6c757d;
+      --border-radius: 12px;
+      --box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+      --card-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      color: var(--dark-color);
+      min-height: 100vh;
+    }
+
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 260px;
+      min-height: 100vh;
+      background-color: #4361ee;
+      color: white;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+    
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      margin-bottom: 20px;
+    }
+    
+    .sidebar-header i {
+      font-size: 2.5rem;
+      margin-right: 12px;
+    }
+    
+    .sidebar-title {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar-title h1 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    
+    .sidebar-divider {
+      height: 1px;
+      background-color: rgba(255, 255, 255, 0.2);
+      margin: 15px 0;
+    }
+    
+    .sidebar-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
+      text-decoration: none;
+      transition: all 0.3s;
+      border-radius: 0;
+    }
+    
+    .sidebar-item:hover,
+    .sidebar-item.active {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+    }
+    
+    .sidebar-item i {
+      font-size: 1.25rem;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    /* Dropdown styles */
+    .sidebar-dropdown {
+      position: relative;
+    }
+    
+    .dropdown-toggle {
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    
+    .dropdown-icon {
+      margin-left: auto;
+      margin-right: 0;
+      transition: transform 0.3s;
+      font-size: 0.8rem;
+    }
+    
+    .dropdown-toggle.active .dropdown-icon {
+      transform: rotate(180deg);
+    }
+    
+    .dropdown-menu {
+      display: none;
+      background-color: rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    
+    .dropdown-menu.show {
+      display: block;
+    }
+    
+    .dropdown-item {
+      display: block;
+      padding: 10px 20px 10px 56px;
+      color: white;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
+    
+    .dropdown-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Signout Button */
+    .signout-container {
+      margin-top: auto;
+      padding: 15px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .signout-btn {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 12px 15px;
+      color: white;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: left;
+      transition: all 0.3s;
+      text-decoration: none;
+    }
+    
+    .signout-btn:hover {
+      background-color: #e74a3b;
+    }
+    
+    .signout-btn i {
+      font-size: 1.2rem;
+      margin-right: 10px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .page-title i {
+      color: var(--primary-color);
+    }
+
+    .alert {
+      padding: 1rem;
+      border-radius: var(--border-radius);
+      margin-bottom: 1rem;
+      color: white;
+    }
+
+    .alert-success {
+      background-color: var(--success-color);
+    }
+
+    .alert-error {
+      background-color: var(--danger-color);
+    }
+
+    /* Messages container */
+    .messages-container {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
+      height: calc(100vh - 120px);
+    }
+
+    .messages-filter {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 15px;
+      padding: 15px;
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group, .search-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 180px;
+    }
+
+    .filter-group label {
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+      color: var(--gray-color);
+      font-weight: 500;
+    }
+
+    .filter-group select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 0.9rem;
+    }
+
+    .search-group {
+      flex-grow: 1;
+      position: relative;
+    }
+
+    .search-group input {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 0.9rem;
+      width: 100%;
+      padding-right: 40px;
+    }
+
+    .search-group button {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--gray-color);
+    }
+
+    .messages-list-container {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      padding: 15px;
+      overflow-y: auto;
+      height: 100%;
+    }
+
+    .messages-list-container h2 {
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+      color: var(--dark-color);
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .messages-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message-item {
+      padding: 10px;
+      border-radius: 6px;
+      border-left: 3px solid #ddd;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .message-item:hover {
+      background-color: #f8f9fa;
+      transform: translateX(3px);
+    }
+
+    .message-item.unread {
+      border-left-color: var(--primary-color);
+      background-color: rgba(67, 97, 238, 0.05);
+    }
+
+    .message-item.active {
+      background-color: rgba(67, 97, 238, 0.1);
+      border-left-color: var(--primary-color);
+    }
+
+    .message-item-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+
+    .message-sender {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      color: var(--gray-color);
+    }
+
+    .message-subject {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+    }
+
+    .message-preview {
+      font-size: 0.8rem;
+      color: var(--gray-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .message-view-container {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      padding: 20px;
+      overflow-y: auto;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--gray-color);
+      text-align: center;
+    }
+
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.3;
+    }
+
+    .message-detail {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .student-info {
+      padding: 15px;
+      border-radius: var(--border-radius);
+      background-color: #f8f9fa;
+      margin-bottom: 20px;
+    }
+
+    .student-header {
+      display: flex;
+      align-items: center;
+    }
+
+    .student-photo {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 15px;
+      border: 3px solid var(--primary-color);
+    }
+
+    .student-name {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+
+    .student-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--gray-color);
+    }
+
+    .student-meta span {
+      display: flex;
+      align-items: center;
+    }
+
+    .student-meta span::before {
+      content: '•';
+      margin-right: 5px;
+    }
+
+    .issue-details {
+      padding: 15px;
+      border-radius: var(--border-radius);
+      background-color: rgba(67, 97, 238, 0.05);
+      margin-bottom: 20px;
+      border-left: 3px solid var(--primary-color);
+    }
+
+    .issue-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .issue-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .issue-timestamp {
+      font-size: 0.85rem;
+      color: var(--gray-color);
+    }
+
+    .issue-content {
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .conversation-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+
+    .conversation-container h3 {
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+      color: var(--dark-color);
+    }
+
+    .conversation {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .conversation-message {
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    .admin-message {
+      align-self: flex-end;
+      background-color: rgba(73, 149, 239, 0.1);
+      border-bottom-right-radius: 0;
+      max-width: 80%;
+    }
+
+    .student-message {
+      align-self: flex-start;
+      background-color: rgba(16, 185, 129, 0.1);
+      border-bottom-left-radius: 0;
+      max-width: 80%;
+    }
+
+    .message-sender-name {
+      font-size: 0.8rem;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .message-text {
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      color: var(--gray-color);
+      align-self: flex-end;
+      margin-top: 5px;
+    }
+
+    .reply-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+
+    .reply-form textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      resize: none;
+      height: 100px;
+      font-size: 0.95rem;
+    }
+
+    .send-reply-btn {
+      align-self: flex-end;
+      padding: 8px 16px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .send-reply-btn:hover {
+      background-color: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+    }
+
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: var(--primary-color);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .no-messages {
+      padding: 30px;
+      text-align: center;
+      color: var(--gray-color);
+      font-style: italic;
+    }
+
+    @media (max-width: 992px) {
+      .messages-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 1fr;
+      }
+
+      .message-view-container {
+        grid-row: 3;
+      }
+
+      .messages-list-container {
+        height: 300px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 70px;
+        padding: 15px 0;
+      }
+      
+      .sidebar-header {
+        padding: 0 15px;
+        justify-content: center;
+      }
+      
+      .sidebar-title,
+      .sidebar-item span {
+        display: none;
+      }
+      
+      .sidebar-header i {
+        margin-right: 0;
+      }
+      
+      .sidebar-item {
+        justify-content: center;
+        padding: 12px;
+      }
+      
+      .sidebar-item i {
+        margin-right: 0;
+      }
+      
+      .main-content {
+        margin-left: 70px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <i class="fas fa-graduation-cap"></i>
+        <div class="sidebar-title">
+          <h1>Test</h1>
+          <h1>Platform</h1>
+        </div>
+      </div>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-menu">
+        <a href="/admin" class="sidebar-item">
+          <i class="fas fa-home"></i>
+          <span>Dashboard</span>
+        </a>
+        
+        <!-- Students Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-users"></i>
+            <span>Students</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/add-student" class="dropdown-item">Add Students</a>
+            <a href="/admin/students" class="dropdown-item">View Students</a>
+          </div>
+        </div>
+        
+        <!-- Quizzes Dropdown -->
+        <div class="sidebar-dropdown">
+          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Quizzes</span>
+            <i class="fas fa-chevron-down dropdown-icon"></i>
+          </a>
+          <div class="dropdown-menu">
+            <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
+            <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
+          </div>
+        </div>
+        
+        <!-- Messages -->
+        <a href="/admin/messages" class="sidebar-item active">
+          <i class="fas fa-envelope"></i>
+          <span>Student Messages</span>
+        </a>
+      </nav>
+      <div class="signout-container">
+        <a href="/admin/logout" class="signout-btn">
+          <i class="fas fa-sign-out-alt"></i>
+          <span>Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="header">
+        <h1 class="page-title">
+          <i class="fas fa-envelope"></i>
+          Student Messages
+        </h1>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <div class="messages-container">
+        <div class="messages-filter">
+          <div class="filter-group">
+            <label for="classFilter">Filter by Class:</label>
+            <select id="classFilter">
+              <option value="all">All Classes</option>
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="statusFilter">Status:</label>
+            <select id="statusFilter">
+              <option value="all">All Messages</option>
+              <option value="unread">Unread</option>
+              <option value="read">Read</option>
+              <option value="replied">Replied</option>
+            </select>
+          </div>
+          <div class="search-group">
+            <input type="text" id="searchInput" placeholder="Search messages...">
+            <button id="searchBtn"><i class="fas fa-search"></i></button>
+          </div>
+        </div>
+
+        <div class="messages-list-container">
+          <h2>Issue Reports</h2>
+          <div class="messages-list" id="messagesList">
+            <div class="loading">
+              <div class="spinner"></div>
+            </div>
+            <!-- Messages will be loaded here -->
+          </div>
+        </div>
+
+        <div class="message-view-container" id="messageViewContainer">
+          <div class="empty-state">
+            <i class="fas fa-envelope-open"></i>
+            <p>Select a message to view details</p>
+          </div>
+          <!-- Selected message details will be displayed here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Message detail template (hidden) -->
+  <template id="messageDetailTemplate">
+    <div class="message-detail">
+      <div class="student-info">
+        <div class="student-header">
+          <img src="" alt="Student Photo" class="student-photo">
+          <div class="student-details">
+            <h3 class="student-name"></h3>
+            <div class="student-meta">
+              <span class="student-email"></span>
+              <span class="student-class"></span>
+              <span class="student-phone"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="issue-details">
+        <div class="issue-header">
+          <div class="issue-title"></div>
+          <div class="issue-timestamp"></div>
+        </div>
+        <div class="issue-content"></div>
+      </div>
+
+      <div class="conversation-container">
+        <h3>Conversation</h3>
+        <div class="conversation" id="conversationContainer">
+          <!-- Messages will be inserted here -->
+        </div>
+      </div>
+
+      <div class="reply-form">
+        <textarea id="replyText" placeholder="Type your reply here..."></textarea>
+        <button id="sendReplyBtn" class="send-reply-btn">
+          <i class="fas fa-paper-plane"></i> Send Reply
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const classFilter = document.getElementById('classFilter');
+      const statusFilter = document.getElementById('statusFilter');
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const messagesList = document.getElementById('messagesList');
+      const messageViewContainer = document.getElementById('messageViewContainer');
+      const alertContainer = document.getElementById('alertContainer');
+
+      // Global variables
+      let allMessages = [];
+      let activeMessageId = null;
+      let currentStudent = null;
+
+      // Toggle dropdown menus
+      const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+      
+      dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+          const parent = this.parentElement;
+          const dropdownMenu = parent.querySelector('.dropdown-menu');
+          
+          // Close all other dropdowns
+          document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+            if (menu !== dropdownMenu) {
+              menu.classList.remove('show');
+            }
+          });
+          
+          // Toggle current dropdown
+          dropdownMenu.classList.toggle('show');
+          this.classList.toggle('active');
+        });
+      });
+      
+      // Close dropdowns when clicking outside
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.sidebar-dropdown')) {
+          document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+          });
+          document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+            toggle.classList.remove('active');
+          });
+        }
+      });
+
+      // Load messages
+      loadMessages();
+
+      // Event listeners
+      classFilter.addEventListener('change', filterMessages);
+      statusFilter.addEventListener('change', filterMessages);
+      searchInput.addEventListener('input', filterMessages);
+      searchBtn.addEventListener('click', filterMessages);
+
+      // Function to load messages from the server
+      function loadMessages() {
+        messagesList.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        
+        fetch('/admin/api/messages')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load messages');
+            }
+            return response.json();
+          })
+          .then(data => {
+            allMessages = data;
+            renderMessages(allMessages);
+          })
+          .catch(error => {
+            console.error('Error loading messages:', error);
+            messagesList.innerHTML = `
+              <div class="no-messages">
+                <p>Error loading messages. Please try again.</p>
+              </div>
+            `;
+            showAlert('error', error.message);
+          });
+      }
+
+      // Function to render messages in the list
+      function renderMessages(messages) {
+        if (messages.length === 0) {
+          messagesList.innerHTML = `
+            <div class="no-messages">
+              <p>No messages found</p>
+            </div>
+          `;
+          return;
+        }
+
+        messagesList.innerHTML = '';
+        
+        messages.forEach(message => {
+          const messageElement = createMessageElement(message);
+          messagesList.appendChild(messageElement);
+        });
+      }
+
+      // Function to create a message element
+      function createMessageElement(message) {
+        const messageItem = document.createElement('div');
+        messageItem.className = `message-item ${message.read ? '' : 'unread'} ${message._id === activeMessageId ? 'active' : ''}`;
+        messageItem.dataset.id = message._id;
+        
+        const date = new Date(message.timestamp);
+        const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        
+        messageItem.innerHTML = `
+          <div class="message-item-header">
+            <span class="message-sender">${message.studentName}</span>
+            <span class="message-time">${formattedDate}</span>
+          </div>
+          <div class="message-subject">${message.issueType} - ${message.quizName}</div>
+          <div class="message-preview">${message.messageContent.substring(0, 60)}${message.messageContent.length > 60 ? '...' : ''}</div>
+        `;
+        
+        messageItem.addEventListener('click', () => {
+          // Remove active class from all messages
+          document.querySelectorAll('.message-item').forEach(item => {
+            item.classList.remove('active');
+          });
+          
+          // Add active class to clicked message
+          messageItem.classList.add('active');
+          
+          // Load message details
+          loadMessageDetails(message._id);
+          
+          // Mark as read if unread
+          if (!message.read) {
+            markMessageAsRead(message._id);
+            messageItem.classList.remove('unread');
+            
+            // Update message in allMessages
+            const index = allMessages.findIndex(m => m._id === message._id);
+            if (index !== -1) {
+              allMessages[index].read = true;
+            }
+          }
+        });
+        
+        return messageItem;
+      }
+
+      // Function to load message details
+      function loadMessageDetails(messageId) {
+        activeMessageId = messageId;
+        
+        messageViewContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+        
+        fetch(`/admin/api/messages/${messageId}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load message details');
+            }
+            return response.json();
+          })
+          .then(data => {
+            renderMessageDetails(data.message, data.student);
+            currentStudent = data.student;
+          })
+          .catch(error => {
+            console.error('Error loading message details:', error);
+            messageViewContainer.innerHTML = `
+              <div class="empty-state">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error loading message details. Please try again.</p>
+              </div>
+            `;
+            showAlert('error', error.message);
+          });
+      }
+
+      // Function to render message details
+      function renderMessageDetails(message, student) {
+        const template = document.getElementById('messageDetailTemplate');
+        const clone = document.importNode(template.content, true);
+        
+        // Student info
+        clone.querySelector('.student-photo').src = student.photo || '/default-profile.jpg';
+        clone.querySelector('.student-photo').onerror = function() {
+          this.src = '/default-profile.jpg';
+        };
+        clone.querySelector('.student-name').textContent = student.name;
+        clone.querySelector('.student-email').textContent = student.email || 'No email';
+        clone.querySelector('.student-class').textContent = `Class ${student.class}`;
+        clone.querySelector('.student-phone').textContent = student.phone || 'No phone';
+        
+        // Issue details
+        const date = new Date(message.timestamp);
+        const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        
+        clone.querySelector('.issue-title').textContent = `${message.issueType} - ${message.quizName}`;
+        clone.querySelector('.issue-timestamp').textContent = formattedDate;
+        clone.querySelector('.issue-content').textContent = message.messageContent;
+        
+        // Conversation
+        const conversationContainer = clone.querySelector('#conversationContainer');
+        
+        // Initial message from student
+        const initialMessage = document.createElement('div');
+        initialMessage.className = 'conversation-message student-message';
+        initialMessage.innerHTML = `
+          <div class="message-sender-name">${student.name}</div>
+          <div class="message-text">${message.messageContent}</div>
+          <div class="message-time">${formattedDate}</div>
+        `;
+        conversationContainer.appendChild(initialMessage);
+        
+        // Reply messages if any
+        if (message.replies && message.replies.length > 0) {
+          message.replies.forEach(reply => {
+            const replyDate = new Date(reply.timestamp);
+            const formattedReplyDate = `${replyDate.toLocaleDateString()} ${replyDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            
+            const replyElement = document.createElement('div');
+            replyElement.className = `conversation-message ${reply.sender === 'admin' ? 'admin-message' : 'student-message'}`;
+            replyElement.innerHTML = `
+              <div class="message-sender-name">${reply.sender === 'admin' ? 'Admin' : student.name}</div>
+              <div class="message-text">${reply.content}</div>
+              <div class="message-time">${formattedReplyDate}</div>
+            `;
+            conversationContainer.appendChild(replyElement);
+          });
+        }
+        
+        // Add send reply event listener
+        const replyForm = clone.querySelector('#sendReplyBtn');
+        replyForm.addEventListener('click', sendReply);
+        
+        // Clear and add the detail view
+        messageViewContainer.innerHTML = '';
+        messageViewContainer.appendChild(clone);
+      }
+
+      // Function to mark message as read
+      function markMessageAsRead(messageId) {
+        fetch(`/admin/api/messages/${messageId}/read`, {
+          method: 'PUT'
+        })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to mark message as read');
+            }
+            return response.json();
+          })
+          .catch(error => {
+            console.error('Error marking message as read:', error);
+          });
+      }
+
+      // Function to send a reply
+      function sendReply() {
+        const replyText = document.getElementById('replyText').value.trim();
+        
+        if (!replyText) {
+          showAlert('error', 'Please enter a reply message');
+          return;
+        }
+        
+        if (!activeMessageId) {
+          showAlert('error', 'No active message to reply to');
+          return;
+        }
+        
+        fetch(`/admin/api/messages/${activeMessageId}/reply`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: replyText
+          })
+        })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to send reply');
+            }
+            return response.json();
+          })
+          .then(() => {
+            // Reload message details to show the new reply
+            loadMessageDetails(activeMessageId);
+            showAlert('success', 'Reply sent successfully');
+          })
+          .catch(error => {
+            console.error('Error sending reply:', error);
+            showAlert('error', error.message);
+          });
+      }
+
+      // Function to filter messages
+      function filterMessages() {
+        const classValue = classFilter.value;
+        const statusValue = statusFilter.value;
+        const searchValue = searchInput.value.toLowerCase();
+        
+        let filtered = allMessages;
+        
+        // Filter by class
+        if (classValue !== 'all') {
+          filtered = filtered.filter(message => message.class === classValue);
+        }
+        
+        // Filter by status
+        if (statusValue === 'unread') {
+          filtered = filtered.filter(message => !message.read);
+        } else if (statusValue === 'read') {
+          filtered = filtered.filter(message => message.read && (!message.replies || message.replies.length === 0));
+        } else if (statusValue === 'replied') {
+          filtered = filtered.filter(message => message.replies && message.replies.length > 0);
+        }
+        
+        // Filter by search term
+        if (searchValue) {
+          filtered = filtered.filter(message => 
+            message.studentName.toLowerCase().includes(searchValue) ||
+            message.quizName.toLowerCase().includes(searchValue) ||
+            message.issueType.toLowerCase().includes(searchValue) ||
+            message.messageContent.toLowerCase().includes(searchValue)
+          );
+        }
+        
+        renderMessages(filtered);
+      }
+
+      // Function to show alerts
+      function showAlert(type, message) {
+        const alertElement = document.createElement('div');
+        alertElement.className = `alert alert-${type}`;
+        alertElement.textContent = message;
+        
+        alertContainer.innerHTML = '';
+        alertContainer.appendChild(alertElement);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+          alertElement.remove();
+        }, 5000);
+      }
+    });
+  </script>
+</body>
+</html>

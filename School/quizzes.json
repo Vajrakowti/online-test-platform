@@ -1,396 +1,54 @@
 [
   {
-    "name": "Quiz",
-    "startTime": "11:00",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "Quiz-manual.json"
-  },
-  {
-    "name": "Quiz",
-    "startTime": "11:50",
-    "endTime": "13:00",
-    "class": "7",
-    "type": "excel",
-    "file": "Quiz.xlsx"
-  },
-  {
-    "name": "final",
-    "startTime": "11:50",
-    "endTime": "13:00",
-    "class": "7",
-    "type": "excel",
-    "file": "final.xlsx"
-  },
-  {
-    "name": "ABC",
-    "startTime": "11:55",
-    "endTime": "13:00",
-    "class": "7",
-    "type": "manual",
-    "questionsFile": "ABC-manual.json"
-  },
-  {
-    "name": "aa",
-    "startTime": "12:00",
-    "endTime": "13:00",
-    "class": "7",
-    "type": "manual",
-    "questionsFile": "aa-manual.json"
-  },
-  {
-    "name": "Safe",
-    "startTime": "12:05",
-    "endTime": "12:30",
-    "class": "7",
-    "type": "excel",
-    "file": "Safe.xlsx"
-  },
-  {
-    "name": "Test1",
-    "startTime": "12:16",
-    "endTime": "12:46",
-    "class": "10",
-    "type": "excel",
-    "file": "Test1.xlsx"
-  },
-  {
-    "name": "Test2",
-    "startTime": "12:15",
-    "endTime": "12:45",
-    "class": "10",
-    "type": "excel",
-    "file": "Test2.xlsx"
-  },
-  {
-    "name": "qq",
-    "startTime": "11:59",
-    "endTime": "13:00",
-    "class": "5",
-    "type": "excel",
-    "file": "qq.xlsx"
-  },
-  {
-    "name": "rr",
-    "startTime": "15:00",
-    "endTime": "17:00",
-    "class": "7",
-    "type": "excel",
-    "file": "rr.xlsx"
-  },
-  {
-    "name": "Rak",
-    "startTime": "17:00",
-    "endTime": "18:00",
-    "class": "10",
-    "type": "excel",
-    "file": "Rak.xlsx"
-  },
-  {
-    "name": "tt",
-    "startTime": "09:50",
-    "endTime": "11:00",
-    "class": "10",
-    "type": "excel",
-    "file": "tt.xlsx"
-  },
-  {
-    "name": "rrr",
-    "startTime": "10:28",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "excel",
-    "file": "rrr.xlsx"
-  },
-  {
-    "name": "RRR",
-    "startTime": "11:00",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "excel",
-    "file": "RRR.xlsx"
-  },
-  {
-    "name": "Aa",
-    "startTime": "11:30",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "excel",
-    "file": "Aa.xlsx"
-  },
-  {
-    "name": "Manual",
-    "startTime": "11:40",
-    "endTime": "12:40",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "Manual-manual.json"
-  },
-  {
-    "name": "egg",
-    "startTime": "12:00",
-    "endTime": "14:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "egg-manual.json"
-  },
-  {
-    "name": "zzz",
-    "startTime": "12:00",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "zzz-manual.json"
-  },
-  {
-    "name": "SSS",
-    "startTime": "12:00",
-    "endTime": "13:09",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "SSS-manual.json"
-  },
-  {
-    "name": "Zz",
-    "startTime": "15:20",
-    "endTime": "17:00",
-    "class": "10",
-    "type": "excel",
-    "file": "Zz.xlsx"
-  },
-  {
-    "name": "Alex",
-    "startTime": "15:00",
-    "endTime": "17:00",
-    "class": "10",
-    "type": "excel",
-    "file": "Alex.xlsx"
-  },
-  {
-    "name": "class 10 final paper",
-    "startTime": "12:11",
-    "endTime": "13:11",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "class 10 final paper-manual.json"
-  },
-  {
-    "name": "WWW",
-    "startTime": "16:00",
-    "endTime": "17:00",
-    "class": "10",
-    "type": "excel",
-    "file": "WWW.xlsx"
-  },
-  {
-    "name": "InceptMode",
-    "startTime": "16:30",
-    "endTime": "18:00",
-    "class": "10",
-    "type": "excel",
-    "file": "InceptMode.xlsx"
-  },
-  {
-    "name": "In",
-    "startTime": "16:55",
-    "endTime": "18:00",
-    "class": "10",
-    "type": "excel",
-    "file": "In.xlsx"
-  },
-  {
-    "name": "Aa",
-    "startTime": "10:00",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "Aa-manual.json"
-  },
-  {
-    "name": "GG",
-    "startTime": "10:00",
-    "endTime": "11:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "GG-manual.json"
-  },
-  {
-    "name": "OI",
-    "startTime": "10:30",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "OI-manual.json"
-  },
-  {
-    "name": "lll",
-    "startTime": "10:30",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "lll-manual.json"
-  },
-  {
-    "name": "WW",
-    "startTime": "10:00",
-    "endTime": "11:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "WW-manual.json"
-  },
-  {
-    "name": "123",
-    "startTime": "11:00",
-    "endTime": "12:00",
-    "class": "10",
-    "type": "excel",
-    "file": "123.xlsx"
-  },
-  {
-    "name": "Final",
-    "startTime": "11:44",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "Final-manual.json"
-  },
-  {
-    "name": "iii",
-    "startTime": "11:57",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "manual",
-    "questionsFile": "iii-manual.json"
-  },
-  {
-    "name": "excel",
-    "startTime": "12:00",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "excel",
-    "file": "excel.xlsx"
-  },
-  {
-    "name": "aa",
-    "startTime": "12:00",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "excel",
-    "file": "aa.xlsx"
-  },
-  {
-    "name": "ttt",
-    "startTime": "12:00",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "excel",
-    "file": "ttt.xlsx"
-  },
-  {
-    "name": "vvvv",
-    "startTime": "12:26",
-    "endTime": "13:50",
-    "class": "10",
-    "type": "excel",
-    "file": "vvvv.xlsx",
-    "fileMissing": true
-  },
-  {
-    "name": "idea",
-    "startTime": "12:30",
-    "endTime": "13:30",
-    "class": "10",
-    "type": "excel",
-    "file": "idea.xlsx"
-  },
-  {
-    "name": "zzz",
-    "startTime": "12:45",
-    "endTime": "13:30",
-    "class": "10",
-    "type": "excel",
-    "file": "zzz.xlsx"
-  },
-  {
-    "name": "ooo",
-    "startTime": "12:45",
-    "endTime": "14:00",
-    "class": "10",
-    "type": "excel",
-    "file": "ooo.xlsx"
-  },
-  {
-    "name": "uuu",
-    "startTime": "12:53",
-    "endTime": "14:00",
-    "class": "10",
-    "type": "excel",
-    "file": "uuu.xlsx"
-  },
-  {
-    "name": "fff",
-    "startTime": "15:56",
-    "endTime": "17:00",
-    "class": "10",
-    "type": "excel",
-    "file": "fff.xlsx"
-  },
-  {
-    "name": "333",
-    "startTime": "15:59",
-    "endTime": "17:00",
-    "class": "10",
-    "type": "excel",
-    "file": "333.xlsx"
-  },
-  {
-    "name": "sss",
-    "startTime": "18:37",
-    "endTime": "20:00",
-    "class": "10",
-    "type": "excel",
-    "file": "sss.xlsx"
-  },
-  {
-    "name": "YAMN",
-    "startTime": "18:44",
-    "endTime": "19:00",
-    "class": "10",
-    "type": "excel",
-    "file": "YAMN.xlsx"
-  },
-  {
-    "name": "HH",
-    "startTime": "11:40",
-    "endTime": "13:50",
-    "class": "10",
-    "type": "excel",
-    "file": "HH.xlsx"
-  },
-  {
-    "name": "kkk",
-    "startTime": "11:30",
-    "endTime": "13:00",
-    "class": "10",
-    "type": "excel",
-    "file": "kkk.xlsx"
-  },
-  {
-    "name": "4444",
-    "startTime": "11:30",
-    "endTime": "12:30",
-    "class": "10",
-    "type": "excel",
-    "file": "4444.xlsx"
-  },
-  {
-    "name": "mmm",
-    "startTime": "12:00",
-    "endTime": "13:00",
+    "name": "qqq retake",
+    "startTime": "17:30",
+    "endTime": "18:20",
     "class": "999",
     "type": "excel",
-    "file": "mmm.xlsx",
+    "file": "qqq retake.xlsx",
     "isStudentSpecific": true
+  },
+  {
+    "name": "manual",
+    "startTime": "10:20",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "excel",
+    "file": "manual.xlsx"
+  },
+  {
+    "name": "manual retake",
+    "startTime": "10:20",
+    "endTime": "12:00",
+    "class": "999",
+    "type": "excel",
+    "isStudentSpecific": true,
+    "file": "manual.xlsx"
+  },
+  {
+    "name": "444",
+    "startTime": "10:30",
+    "endTime": "12:00",
+    "class": "10",
+    "type": "excel",
+    "file": "444.xlsx"
+  },
+  {
+    "name": "444re",
+    "startTime": "10:30",
+    "endTime": "12:00",
+    "class": "999",
+    "type": "excel",
+    "isStudentSpecific": true,
+    "file": "444.xlsx"
+  },
+  {
+    "name": "444 retake quiz",
+    "startTime": "10:30",
+    "endTime": "12:00",
+    "class": "999",
+    "type": "excel",
+    "isStudentSpecific": true,
+    "file": "444.xlsx"
   }
 ]
