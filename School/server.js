@@ -25,9 +25,16 @@ const mongoOptions = {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     family: 4,
+    ssl: true,
+    sslValidate: true,
+    sslCA: undefined, // Let MongoDB driver handle the CA
+    sslCert: undefined,
+    sslKey: undefined,
     tls: true,
     tlsAllowInvalidCertificates: false,
-    tlsAllowInvalidHostnames: false
+    tlsAllowInvalidHostnames: false,
+    retryWrites: true,
+    w: 'majority'
 };
 
 // Set max listeners to prevent memory leak warnings
