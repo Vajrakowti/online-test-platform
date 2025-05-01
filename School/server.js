@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const session = require("express-session");
@@ -13,7 +14,8 @@ const adminRoutes = require('./routes/admin');
 const studentRoutes = require('./routes/student');
 const startQuizRoutes = require('./routes/startquiz');
 
-const url = "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
+// Use environment variables for MongoDB connection
+const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 let dbo;
 let mongoClient = null;
 
@@ -56,15 +58,15 @@ const createMongoStore = (collectionName) => {
 
 // Create separate session configurations for admin and student apps
 const createSessionConfig = (name) => ({
-    secret: `your-secret-key-here-please-change-this-${name}`,
+    secret: process.env.SESSION_SECRET || `your-secret-key-here-please-change-this-${name}`,
     resave: false,
     saveUninitialized: true,
     store: createMongoStore(`sessions_${name}`),
     cookie: {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         httpOnly: true,
-        secure: false,
-        sameSite: 'lax'
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
     },
     name: `session.id.${name}`
 });
@@ -730,8 +732,8 @@ MongoClient.connect(url, mongoOptions)
         }, startQuizRoutes);
 
         // Start both servers
-        adminApp.listen(7000, () => console.log("Admin server running on port 7000"));
-        userApp.listen(7001, () => console.log("User server running on port 7001"));
+        adminApp.listen(3000, () => console.log("Admin server running on port 3000"));
+        userApp.listen(3001, () => console.log("User server running on port 3001"));
     })
     .catch(err => {
         console.log('Mongo connection failed:', err);
