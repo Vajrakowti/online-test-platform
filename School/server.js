@@ -20,16 +20,16 @@ let mongoClient = null;
 
 // MongoDB connection options
 const mongoOptions = {
-    maxPoolSize: 10,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
+    maxPoolSize: parseInt(process.env.MONGODB_POOL_SIZE) || 10,
+    serverSelectionTimeoutMS: parseInt(process.env.MONGODB_TIMEOUT) || 5000,
+    socketTimeoutMS: parseInt(process.env.MONGODB_SOCKET_TIMEOUT) || 45000,
     family: 4,
-    tls: true,
-    tlsAllowInvalidCertificates: false,
-    tlsAllowInvalidHostnames: true,
+    tls: process.env.MONGODB_TLS !== 'false',
+    tlsAllowInvalidCertificates: process.env.MONGODB_ALLOW_INVALID_CERTS === 'true',
+    tlsAllowInvalidHostnames: process.env.MONGODB_ALLOW_INVALID_HOSTS === 'true',
     retryWrites: true,
     w: 'majority',
-    connectTimeoutMS: 10000
+    connectTimeoutMS: parseInt(process.env.MONGODB_CONNECT_TIMEOUT) || 10000
 };
 
 // Set max listeners to prevent memory leak warnings
@@ -73,7 +73,7 @@ app.use(session({
     cookie: {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.COOKIE_SECURE === 'true',
         sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
     },
     rolling: true,
@@ -215,6 +215,7 @@ MongoClient.connect(url, mongoOptions)
             };
             
             console.log('Attempting to login admin:', { username: req.body.username });
+            console.log('Session before login:', req.session);
             
             dbo.collection("LMS").findOne(q)
                 .then(result => {
@@ -240,6 +241,8 @@ MongoClient.connect(url, mongoOptions)
                     req.session.ipAddress = req.ip || req.connection.remoteAddress;
                     req.session.lastAccessed = Date.now();
                     
+                    console.log('Session after login:', req.session);
+                    
                     // Save session before redirecting
                     req.session.save(err => {
                         if (err) {
@@ -259,6 +262,9 @@ MongoClient.connect(url, mongoOptions)
         app.post('/login', async (req, res) => {
             const username = req.body.username;
             const password = req.body.pwd;
+            
+            console.log('Attempting to login student:', { username });
+            console.log('Session before login:', req.session);
             
             try {
                 // First check the database connection
@@ -309,6 +315,8 @@ MongoClient.connect(url, mongoOptions)
                 req.session.userAgent = req.headers['user-agent'];
                 req.session.ipAddress = req.ip || req.connection.remoteAddress;
                 req.session.lastAccessed = Date.now();
+                
+                console.log('Session after login:', req.session);
                 
                 req.session.save(err => {
                     if (err) {

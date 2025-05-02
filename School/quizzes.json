@@ -50,5 +50,13 @@
     "type": "excel",
     "isStudentSpecific": true,
     "file": "444.xlsx"
+  },
+  {
+    "name": "ttt",
+    "startTime": "12:00",
+    "endTime": "15:00",
+    "class": "10",
+    "type": "excel",
+    "file": "ttt.xlsx"
   }
 ]
