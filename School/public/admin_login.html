@@ -81,36 +81,58 @@
       background-color: #2980b9;
     }
     
-    .register-link {
+    .back-link {
       text-align: center;
-      margin-top: 1rem;
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e0e0e0;
     }
     
-    a {
+    .back-link a {
       color: #3498db;
       text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
     }
     
-    a:hover {
-      text-decoration: underline;
+    .back-link a:hover {
+      color: #2980b9;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Admin Login</h2>
-    <form action="/login" method="POST">
+    <form action="/admin-login" method="POST" onsubmit="return validateForm()">
       <label for="username">Username:</label>
-      <input type="text" id="username" name="username" required>
+      <input type="text" id="username" name="username" required minlength="3" maxlength="50">
       
       <label for="pwd">Password:</label>
-      <input type="password" id="pwd" name="pwd" required>
+      <input type="password" id="pwd" name="pwd" required minlength="6">
       
       <button type="submit">Login</button>
     </form>
-    <div class="register-link">
-      <p>Need an account? <a href="/">Register here</a></p>
+    <div class="back-link">
+      <a href="/">Back to Student Login</a>
     </div>
   </div>
+  <script>
+    function validateForm() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('pwd').value;
+      
+      if (username.length < 3) {
+        alert('Username must be at least 3 characters long');
+        return false;
+      }
+      
+      if (password.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return false;
+      }
+      
+      return true;
+    }
+  </script>
 </body>
 </html>

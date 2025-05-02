@@ -99,12 +99,12 @@
 <body>
   <div class="container">
     <h2>Admin Registration</h2>
-    <form action="/register" method="post">
+    <form action="/register" method="post" onsubmit="return validateForm()">
       <label for="first_name">Username:</label>
-      <input type="text" id="first_name" name="first_name" required>
+      <input type="text" id="first_name" name="first_name" required minlength="3" maxlength="50">
       
       <label for="password">Password:</label>
-      <input type="password" id="password" name="password" required>
+      <input type="password" id="password" name="password" required minlength="6">
       
       <input type="submit" value="Register">
     </form>
@@ -112,5 +112,23 @@
       <p>Already have an account? <a href="/login">Login here</a></p>
     </div>
   </div>
+  <script>
+    function validateForm() {
+      const username = document.getElementById('first_name').value;
+      const password = document.getElementById('password').value;
+      
+      if (username.length < 3) {
+        alert('Username must be at least 3 characters long');
+        return false;
+      }
+      
+      if (password.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return false;
+      }
+      
+      return true;
+    }
+  </script>
 </body>
 </html>

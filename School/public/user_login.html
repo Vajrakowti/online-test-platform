@@ -117,6 +117,24 @@
     .logo img {
       height: 50px;
     }
+    
+    .admin-login-link {
+      text-align: center;
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .admin-login-link a {
+      color: #e74c3c;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+    
+    .admin-login-link a:hover {
+      color: #c0392b;
+    }
   </style>
 </head>
 <body>
@@ -141,6 +159,10 @@
       
       <div class="forgot-password">
         <a href="/change-password">Change password</a>
+      </div>
+      
+      <div class="admin-login-link">
+        <a href="/admin-login">Admin Login</a>
       </div>
     </form>
   </div>
