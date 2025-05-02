@@ -15,7 +15,7 @@ const studentRoutes = require('./routes/student');
 const startQuizRoutes = require('./routes/startquiz');
 
 // Use environment variables for MongoDB connection
-const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
+const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/School?retryWrites=true&w=majority&tls=true&tlsAllowInvalidHostnames=true";
 let dbo;
 let mongoClient = null;
 
@@ -27,9 +27,10 @@ const mongoOptions = {
     family: 4,
     tls: true,
     tlsAllowInvalidCertificates: false,
-    tlsAllowInvalidHostnames: false,
+    tlsAllowInvalidHostnames: true,
     retryWrites: true,
-    w: 'majority'
+    w: 'majority',
+    connectTimeoutMS: 10000
 };
 
 // Set max listeners to prevent memory leak warnings
