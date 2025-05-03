@@ -383,6 +383,32 @@
         height: 60px;
       }
     }
+
+    .logout-btn {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .logout-btn:hover {
+        background-color: #c82333;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .logout-btn i {
+        font-size: 18px;
+    }
   </style>
 </head>
 <body>
@@ -399,10 +425,12 @@
           <i class="fas fa-envelope"></i>
           Report Quiz Issue
         </a>
-        <a href="/logout" class="signout-btn">
-          <i class="fas fa-sign-out-alt"></i>
-          Sign Out
-        </a>
+        <div class="signout-container">
+          <button onclick="window.location.href='/logout'" class="logout-btn">
+            <i class="fas fa-sign-out-alt"></i>
+            Logout
+          </button>
+        </div>
       </div>
     </div>
 

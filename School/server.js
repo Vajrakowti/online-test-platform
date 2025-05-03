@@ -263,8 +263,7 @@ MongoClient.connect(url, mongoOptions)
             const username = req.body.username;
             const password = req.body.pwd;
             
-            console.log('Attempting to login student:', { username });
-            console.log('Session before login:', req.session);
+            console.log('Login attempt:', { username });
             
             try {
                 // First check the database connection
@@ -290,12 +289,18 @@ MongoClient.connect(url, mongoOptions)
                 const collections = await dbo.listCollections().toArray();
                 const classCollections = collections.filter(c => c.name.startsWith('class_'));
                 
+                console.log('Searching for student in collections:', classCollections.map(c => c.name));
+                
                 let student = null;
                 for (const collection of classCollections) {
                     student = await dbo.collection(collection.name)
                         .findOne({ username: username });
                     if (student) {
-                        console.log(`Found student in collection ${collection.name}: ${student.name}`);
+                        console.log(`Found student in collection ${collection.name}:`, {
+                            name: student.name,
+                            class: student.class,
+                            username: student.username
+                        });
                         break;
                     }
                 }
@@ -316,7 +321,11 @@ MongoClient.connect(url, mongoOptions)
                 req.session.ipAddress = req.ip || req.connection.remoteAddress;
                 req.session.lastAccessed = Date.now();
                 
-                console.log('Session after login:', req.session);
+                console.log('Session set for student:', {
+                    username: req.session.username,
+                    class: req.session.class,
+                    name: req.session.fname
+                });
                 
                 req.session.save(err => {
                     if (err) {
@@ -370,6 +379,146 @@ MongoClient.connect(url, mongoOptions)
             }
             next();
         }, startQuizRoutes);
+
+        // Add global logout route for students
+        app.get('/logout', (req, res) => {
+            req.session.destroy((err) => {
+                if (err) {
+                    console.error('Error destroying session:', err);
+                }
+                res.redirect('/login');
+            });
+        });
+
+        // Add change password routes
+        app.get('/change-password', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'change-password.html'));
+        });
+
+        app.post('/api/change-password', async (req, res) => {
+            const { username, currentPassword, newPassword } = req.body;
+            
+            try {
+                console.log('Password change attempt for user:', username);
+                
+                // Check if user exists and current password is correct
+                const user = await dbo.collection("user").findOne({ 
+                    Username: username,
+                    Password: currentPassword
+                });
+                
+                if (!user) {
+                    console.log('User not found or incorrect current password');
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Invalid username or current password' 
+                    });
+                }
+                
+                console.log('User found in user collection');
+                
+                // Find student's class by checking all class collections
+                const collections = await dbo.listCollections().toArray();
+                const classCollections = collections.filter(c => c.name.startsWith('class_'));
+                
+                let studentClass = null;
+                let studentRecord = null;
+                
+                for (const collection of classCollections) {
+                    const student = await dbo.collection(collection.name)
+                        .findOne({ username: username.toLowerCase() });
+                    if (student) {
+                        studentClass = student.class;
+                        studentRecord = student;
+                        console.log(`Found student in ${collection.name}, class: ${studentClass}`);
+                        break;
+                    }
+                }
+                
+                if (!studentClass) {
+                    console.log('Student class not found in any class collection');
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Student record not found in class collections' 
+                    });
+                }
+
+                // Start a session for transaction
+                const session = dbo.client.startSession();
+                let transactionError = null;
+                
+                try {
+                    // Start transaction
+                    await session.startTransaction();
+                    
+                    // Update password in user collection
+                    const userResult = await dbo.collection("user").updateOne(
+                        { Username: username },
+                        { $set: { Password: newPassword } },
+                        { session }
+                    );
+                    
+                    console.log('User collection update result:', {
+                        matchedCount: userResult.matchedCount,
+                        modifiedCount: userResult.modifiedCount
+                    });
+                    
+                    // Update password in class collection
+                    const classCollectionName = `class_${studentClass}`;
+                    const classResult = await dbo.collection(classCollectionName).updateOne(
+                        { username: username.toLowerCase() },
+                        { $set: { password: newPassword } },
+                        { session }
+                    );
+                    
+                    console.log('Class collection update result:', {
+                        collection: classCollectionName,
+                        matchedCount: classResult.matchedCount,
+                        modifiedCount: classResult.modifiedCount
+                    });
+                    
+                    if (userResult.modifiedCount === 1 && classResult.modifiedCount === 1) {
+                        // Commit transaction if both updates succeeded
+                        await session.commitTransaction();
+                        console.log('Password change successful in both collections');
+                        res.json({ 
+                            success: true, 
+                            message: 'Password changed successfully in all collections' 
+                        });
+                    } else {
+                        // Abort transaction if either update failed
+                        await session.abortTransaction();
+                        console.log('Password change failed:', {
+                            userUpdate: userResult.modifiedCount,
+                            classUpdate: classResult.modifiedCount
+                        });
+                        res.status(500).json({ 
+                            success: false, 
+                            message: 'Failed to update password in one or more collections' 
+                        });
+                    }
+                } catch (error) {
+                    // Store the error to throw after ending the session
+                    transactionError = error;
+                    console.error('Transaction error:', error);
+                    // Abort transaction on error
+                    await session.abortTransaction();
+                } finally {
+                    // Always end the session
+                    await session.endSession();
+                    // If there was an error, throw it after ending the session
+                    if (transactionError) {
+                        throw transactionError;
+                    }
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                res.status(500).json({ 
+                    success: false, 
+                    message: 'An error occurred while changing password' 
+                });
+            }
+        });
 
         // Start the server
         app.listen(3000, () => console.log("Server running on port 3000"));

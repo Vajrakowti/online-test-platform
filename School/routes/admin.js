@@ -286,6 +286,17 @@ if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
   fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
 }
 
+// Create data directory if it doesn't exist
+const dataDir = path.join(__dirname, '../data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+// Initialize quizzes.json if it doesn't exist
+if (!fs.existsSync(QUIZ_FILE)) {
+  fs.writeFileSync(QUIZ_FILE, '[]');
+}
+
 // Email configuration (replace with your actual SMTP settings)
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com', // Your SMTP host
@@ -4221,6 +4232,16 @@ router.post('/api/messages/:messageId/reply', async (req, res) => {
     console.error('Error sending reply:', err);
     res.status(500).json({ error: 'Failed to send reply' });
   }
+});
+
+// Add logout route
+router.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Error destroying session:', err);
+        }
+        res.redirect('/admin-login');
+    });
 });
 
 module.exports = router;
