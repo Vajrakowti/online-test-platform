@@ -98,143 +98,60 @@ router.get('/info', (req, res) => {
   });
 
 
-// Route to fetch quiz data - UPDATED TO FILTER BY CLASS AND CHECK RETAKE ELIGIBILITY
-router.get('/quizzes', (req, res) => {
+// Route to fetch quiz data - UPDATED TO USE MONGODB
+router.get('/quizzes', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
-    // Get student's class from session
-    const studentClass = req.session.class || '1'; // Default to class 1 if not set
-    const studentUsername = req.session.username;
-    
-    // First get student's attempted quizzes
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-    let attemptedQuizzes = [];
-    
-    if (fs.existsSync(attemptsFile)) {
-        try {
-            attemptedQuizzes = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'))
-                .map(attempt => attempt.quizName);
-        } catch (err) {
-            console.error("Failed to read attempts file:", err);
-            // Continue with empty attempts array
-        }
+    try {
+        // Get student's class from session
+        const studentClass = req.session.class || '1'; // Default to class 1 if not set
+        const studentUsername = req.session.username;
+        
+        // Get student's attempted quizzes from MongoDB
+        const attempts = await req.app.locals.db.collection('attempts')
+            .findOne({ username: studentUsername }) || { attempts: [] };
+        
+        const attemptedQuizzes = attempts.attempts.map(attempt => attempt.quizName);
+        
+        // Also check session-stored completions
+        const sessionCompletedQuizzes = (req.session.completedQuizzes || [])
+            .map(quiz => quiz.quizName);
+        
+        // Combine both sources of completed quizzes
+        const completedQuizNames = [...new Set([...attemptedQuizzes, ...sessionCompletedQuizzes])];
+        
+        // Get retake quizzes for this student
+        const retakes = await req.app.locals.db.collection('retakes')
+            .find({ retakes: studentUsername })
+            .toArray();
+        
+        const retakeQuizzes = retakes.map(retake => retake.quizName);
+        
+        // Get all available quizzes for the student's class
+        const quizzes = await req.app.locals.db.collection('quizzes')
+            .find({
+                $or: [
+                    { class: studentClass },
+                    { isStudentSpecific: true }
+                ]
+            })
+            .toArray();
+        
+        // Filter quizzes based on completion and retake status
+        const availableQuizzes = quizzes.filter(quiz => {
+            const isCompleted = completedQuizNames.includes(quiz.name);
+            const isRetake = retakeQuizzes.includes(quiz.name);
+            // Only show quiz if it's not completed OR if it's a retake
+            return !isCompleted || isRetake;
+        });
+        
+        res.json(availableQuizzes);
+    } catch (err) {
+        console.error('Error fetching quizzes:', err);
+        res.status(500).json({ error: 'Failed to fetch quizzes' });
     }
-    
-    // Also check session-stored completions (in case file hasn't been updated yet)
-    const sessionCompletedQuizzes = (req.session.completedQuizzes || [])
-        .map(quiz => quiz.quizName);
-    
-    // Combine both sources of completed quizzes
-    const completedQuizNames = [...new Set([...attemptedQuizzes, ...sessionCompletedQuizzes])];
-    
-    // Check all available retake quizzes for this student
-    const RETAKE_DIR = path.join(__dirname, '../retakes');
-    const retakeQuizzes = [];
-    
-    if (fs.existsSync(RETAKE_DIR)) {
-        try {
-            const retakeFiles = fs.readdirSync(RETAKE_DIR);
-            for (const retakeFile of retakeFiles) {
-                if (retakeFile.endsWith('.json')) {
-                    const quizName = retakeFile.replace('.json', '').replace(/_/g, ' ');
-                    const retakeFilePath = path.join(RETAKE_DIR, retakeFile);
-                    const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-                    
-                    if (retakeData.includes(studentUsername)) {
-                        retakeQuizzes.push(quizName);
-                    }
-                }
-            }
-        } catch (err) {
-            console.error("Failed to read retake directory:", err);
-        }
-    }
-    
-    fs.readFile(QUIZ_FILE, 'utf-8', (err, data) => {
-        if (err) {
-            console.error("Failed to read quizzes file:", err);
-            return res.status(500).json({ error: "Failed to load quizzes." });
-        }
-        try {
-            const quizzes = JSON.parse(data);
-            // Filter quizzes by student's class, active time window, and not attempted
-            const now = new Date();
-            const filteredQuizzes = quizzes.filter(q => {
-                // First, check if this is a retake quiz specifically assigned to this student
-                if (retakeQuizzes.includes(q.name)) {
-                    // Only need to check time window for retake quizzes
-                    const [startHour, startMinute] = q.startTime.split(':').map(Number);
-                    const [endHour, endMinute] = q.endTime.split(':').map(Number);
-                    
-                    const quizStart = new Date();
-                    quizStart.setHours(startHour, startMinute, 0, 0);
-                    
-                    const quizEnd = new Date();
-                    quizEnd.setHours(endHour, endMinute, 0, 0);
-                    
-                    return now >= quizStart && now <= quizEnd;
-                }
-                
-                // For student-specific quizzes (class 999), check if specifically assigned to this student
-                if (q.isStudentSpecific || q.class === '999') {
-                    // Check if in retake list for this quiz
-                    const retakeFilePath = path.join(RETAKE_DIR, `${q.name.replace(/\s+/g, '_')}.json`);
-                    if (fs.existsSync(retakeFilePath)) {
-                        try {
-                            const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-                            if (retakeData.includes(studentUsername)) {
-                                // Check time window
-                                const [startHour, startMinute] = q.startTime.split(':').map(Number);
-                                const [endHour, endMinute] = q.endTime.split(':').map(Number);
-                                
-                                const quizStart = new Date();
-                                quizStart.setHours(startHour, startMinute, 0, 0);
-                                
-                                const quizEnd = new Date();
-                                quizEnd.setHours(endHour, endMinute, 0, 0);
-                                
-                                return now >= quizStart && now <= quizEnd;
-                            }
-                        } catch (err) {
-                            console.error("Failed to read retake file:", err);
-                        }
-                    }
-                    return false;
-                }
-                
-                // If not a retake, check normal eligibility
-                
-                // Skip if already completed 
-                if (completedQuizNames.includes(q.name)) {
-                    return false;
-                }
-                
-                // Check if quiz is for student's class
-                if (q.class !== studentClass) {
-                    return false;
-                }
-                
-                // Check if quiz is within active time window
-                const [startHour, startMinute] = q.startTime.split(':').map(Number);
-                const [endHour, endMinute] = q.endTime.split(':').map(Number);
-                
-                const quizStart = new Date();
-                quizStart.setHours(startHour, startMinute, 0, 0);
-                
-                const quizEnd = new Date();
-                quizEnd.setHours(endHour, endMinute, 0, 0);
-                
-                return now >= quizStart && now <= quizEnd;
-            });
-            
-            res.json(filteredQuizzes.slice(-10).reverse()); // latest 10
-        } catch (parseErr) {
-            console.error("Failed to parse quizzes JSON:", parseErr);
-            res.status(500).json({ error: "Invalid JSON format." });
-        }
-    });
 });
 
 // New route to update completed quizzes from sessionStorage
@@ -303,97 +220,121 @@ router.post('/update-completed-quizzes', (req, res) => {
 });
 
 // Route to get attempted quizzes for the current student
-router.get('/attempts', (req, res) => {
+router.get('/attempts', async (req, res) => {
     if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
-    const studentUsername = req.session.username; // Use username instead of name
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-    
-    if (!fs.existsSync(attemptsFile)) {
-        return res.json([]);
-    }
+    const studentUsername = req.session.username;
     
     try {
-        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        res.json(attempts);
+        // Get attempts from MongoDB
+        const attempts = await req.app.locals.db.collection('attempts')
+            .findOne({ username: studentUsername }) || { attempts: [] };
+        
+        // Return the attempts array
+        res.json(attempts.attempts);
     } catch (err) {
-        console.error("Failed to read attempts file:", err);
+        console.error("Failed to read attempts:", err);
         res.status(500).json({ error: "Failed to load attempts." });
     }
 });
 
 // Route to save quiz attempt
-router.post('/saveattempt', (req, res) => {
-    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+router.post('/save-attempt', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
-    const { quizName, score, totalQuestions } = req.body;
-    if (!quizName || score === undefined || totalQuestions === undefined) {
-        return res.status(400).json({ error: "Missing required data" });
-    }
-
-    const studentUsername = req.session.username; // Use username instead of name
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-    
-    // Check if this is a retake
-    const RETAKE_DIR = path.join(__dirname, '../retakes');
-    const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
-    
-    let isRetake = false;
-    if (fs.existsSync(retakeFilePath)) {
-        try {
-            const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-            
-            if (retakeData.includes(studentUsername)) {
-                isRetake = true;
-                // Remove this student from retake list
-                const updatedRetakeData = retakeData.filter(username => username !== studentUsername);
-                fs.writeFileSync(retakeFilePath, JSON.stringify(updatedRetakeData, null, 2));
-                
-                // If no more students in retake list, can delete the file
-                if (updatedRetakeData.length === 0) {
-                    try {
-                        fs.unlinkSync(retakeFilePath);
-                    } catch (unlinkErr) {
-                        console.error("Error deleting empty retake file:", unlinkErr);
-                    }
-                }
-            }
-        } catch (err) {
-            console.error("Error checking/updating retake list:", err);
-        }
-    }
-    
-    let attempts = [];
-    if (fs.existsSync(attemptsFile)) {
-        try {
-            attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        } catch (err) {
-            console.error("Failed to read existing attempts:", err);
-        }
-    }
-    
-    // Add the new attempt with timestamp
-    attempts.push({
-        quizName,
-        score,
-        totalQuestions,
-        attemptedAt: new Date().toISOString(),
-        isRetake: isRetake
-    });
-    
     try {
-        fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
+        const { quizName, score, totalQuestions, isRetake } = req.body;
+        const username = req.session.username;
+        
+        const attempt = {
+            quizName,
+            score,
+            totalQuestions,
+            attemptedAt: new Date(),
+            isRetake: isRetake || false
+        };
+        
+        // Save to local attempts file
+        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
+        let attempts = [];
+        
+        if (fs.existsSync(attemptsFile)) {
+            try {
+                attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+            } catch (err) {
+                console.error("Error reading attempts file:", err);
+            }
+        }
+        
+        attempts.push(attempt);
+        
+        try {
+            fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
+        } catch (err) {
+            console.error("Error saving attempt to file:", err);
+        }
+        
+        // Save to MongoDB
+        const db = req.app.locals.db;
+        const attemptsCollection = db.collection('attempts');
+        
+        // First, get the current attempts from MongoDB
+        const existingAttempts = await attemptsCollection.findOne({ username: username }) || { attempts: [] };
+        
+        // Update the attempts array
+        const updatedAttempts = [...(existingAttempts.attempts || []), attempt];
+        
+        // Save the updated attempts array to MongoDB
+        await attemptsCollection.updateOne(
+            { username: username },
+            { $set: { attempts: updatedAttempts } },
+            { upsert: true }
+        );
+        
         res.json({ success: true });
     } catch (err) {
-        console.error("Failed to save attempt:", err);
-        res.status(500).json({ error: "Failed to save attempt" });
+        console.error('Error saving attempt:', err);
+        res.status(500).json({ error: 'Failed to save attempt' });
     }
 });
 
+// Add a new route to sync local attempts with MongoDB
+router.post('/sync-attempts', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+
+    try {
+        const username = req.session.username;
+        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
+        
+        if (!fs.existsSync(attemptsFile)) {
+            return res.json({ success: true, message: "No attempts file found" });
+        }
+        
+        // Read attempts from local file
+        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+        
+        // Save to MongoDB
+        const db = req.app.locals.db;
+        const attemptsCollection = db.collection('attempts');
+        
+        await attemptsCollection.updateOne(
+            { username: username },
+            { $set: { attempts: attempts } },
+            { upsert: true }
+        );
+        
+        res.json({ success: true, message: "Attempts synced successfully" });
+    } catch (err) {
+        console.error('Error syncing attempts:', err);
+        res.status(500).json({ error: 'Failed to sync attempts' });
+    }
+});
 
 router.get('/quiz/:quizName', (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {

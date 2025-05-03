@@ -4,6 +4,7 @@ const path = require('path');
 const session = require("express-session");
 const MongoClient = require('mongodb').MongoClient;
 const MongoStore = require('connect-mongo');
+const fs = require('fs');
 
 // Create a single Express app
 const app = express();
@@ -50,6 +51,143 @@ const store = MongoStore.create({
         secret: false
     }
 });
+
+// Initialize MongoDB collections
+async function initializeCollections() {
+    try {
+        // Create collections if they don't exist
+        await dbo.createCollection('quizzes');
+        await dbo.createCollection('attempts');
+        await dbo.createCollection('manual_questions');
+        await dbo.createCollection('retakes');
+
+        // Create indexes
+        await dbo.collection('quizzes').createIndex({ name: 1 }, { unique: true });
+        await dbo.collection('attempts').createIndex({ username: 1, quizName: 1 });
+        await dbo.collection('manual_questions').createIndex({ quizName: 1 }, { unique: true });
+        await dbo.collection('retakes').createIndex({ quizName: 1 });
+
+        // Migrate existing data from files to MongoDB if collections are empty
+        const quizzesCount = await dbo.collection('quizzes').countDocuments();
+        if (quizzesCount === 0) {
+            const quizzesPath = path.join(__dirname, 'quizzes.json');
+            if (fs.existsSync(quizzesPath)) {
+                try {
+                    const fileContent = fs.readFileSync(quizzesPath, 'utf8');
+                    // Validate JSON format
+                    if (!fileContent.trim()) {
+                        console.log('Quizzes file is empty');
+                        return;
+                    }
+                    const quizzes = JSON.parse(fileContent);
+                    if (Array.isArray(quizzes)) {
+                        await dbo.collection('quizzes').insertMany(quizzes);
+                        console.log('Successfully migrated quizzes to MongoDB');
+                    } else {
+                        console.error('Quizzes data is not in the expected array format');
+                    }
+                } catch (err) {
+                    console.error('Error parsing quizzes.json:', err);
+                }
+            }
+        }
+
+        const attemptsPath = path.join(__dirname, 'attempts');
+        if (fs.existsSync(attemptsPath)) {
+            const attemptFiles = fs.readdirSync(attemptsPath);
+            for (const file of attemptFiles) {
+                if (file.endsWith('.json')) {
+                    const username = file.replace('.json', '');
+                    const filePath = path.join(attemptsPath, file);
+                    try {
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        if (!fileContent.trim()) {
+                            console.log(`Attempts file for ${username} is empty`);
+                            continue;
+                        }
+                        const attempts = JSON.parse(fileContent);
+                        if (Array.isArray(attempts)) {
+                            await dbo.collection('attempts').updateOne(
+                                { username },
+                                { $set: { attempts } },
+                                { upsert: true }
+                            );
+                            console.log(`Successfully migrated attempts for ${username}`);
+                        } else {
+                            console.error(`Attempts data for ${username} is not in the expected array format`);
+                        }
+                    } catch (err) {
+                        console.error(`Error parsing attempts file for ${username}:`, err);
+                    }
+                }
+            }
+        }
+
+        const manualQuestionsPath = path.join(__dirname, 'manual-questions');
+        if (fs.existsSync(manualQuestionsPath)) {
+            const questionFiles = fs.readdirSync(manualQuestionsPath);
+            for (const file of questionFiles) {
+                if (file.endsWith('.json')) {
+                    const quizName = file.replace('.json', '');
+                    const filePath = path.join(manualQuestionsPath, file);
+                    try {
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        if (!fileContent.trim()) {
+                            console.log(`Manual questions file for ${quizName} is empty`);
+                            continue;
+                        }
+                        const questions = JSON.parse(fileContent);
+                        if (Array.isArray(questions)) {
+                            await dbo.collection('manual_questions').updateOne(
+                                { quizName },
+                                { $set: { questions } },
+                                { upsert: true }
+                            );
+                            console.log(`Successfully migrated manual questions for ${quizName}`);
+                        } else {
+                            console.error(`Manual questions data for ${quizName} is not in the expected array format`);
+                        }
+                    } catch (err) {
+                        console.error(`Error parsing manual questions file for ${quizName}:`, err);
+                    }
+                }
+            }
+        }
+
+        const retakesPath = path.join(__dirname, 'retakes');
+        if (fs.existsSync(retakesPath)) {
+            const retakeFiles = fs.readdirSync(retakesPath);
+            for (const file of retakeFiles) {
+                if (file.endsWith('.json')) {
+                    const quizName = file.replace('.json', '');
+                    const filePath = path.join(retakesPath, file);
+                    try {
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        if (!fileContent.trim()) {
+                            console.log(`Retakes file for ${quizName} is empty`);
+                            continue;
+                        }
+                        const retakes = JSON.parse(fileContent);
+                        if (Array.isArray(retakes)) {
+                            await dbo.collection('retakes').updateOne(
+                                { quizName },
+                                { $set: { retakes } },
+                                { upsert: true }
+                            );
+                            console.log(`Successfully migrated retakes for ${quizName}`);
+                        } else {
+                            console.error(`Retakes data for ${quizName} is not in the expected array format`);
+                        }
+                    } catch (err) {
+                        console.error(`Error parsing retakes file for ${quizName}:`, err);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error initializing collections:', err);
+    }
+}
 
 // Generate a unique token for each session 
 function generateSecureToken() {
@@ -149,6 +287,13 @@ MongoClient.connect(url, mongoOptions)
         // Make the database available to all routes
         app.locals.db = dbo;
         
+        // Initialize collections and migrate data
+        initializeCollections().then(() => {
+            console.log("Collections initialized and data migrated successfully");
+        }).catch(err => {
+            console.error("Error during initialization:", err);
+        });
+
         // Clear any corrupted session data
         try {
             // Clear corrupted admin sessions

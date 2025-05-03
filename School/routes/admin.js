@@ -6,6 +6,7 @@ const router = express.Router();
 const { MongoClient } = require('mongodb');
 const nodemailer = require('nodemailer');
 const excel = require('exceljs');
+const xlsx = require('xlsx');
 
 // Sidebar template for all admin pages
 const ADMIN_SIDEBAR = `
@@ -1811,11 +1812,11 @@ router.delete('/students/delete/:username', async (req, res) => {
 
 
 // Handle Excel Quiz Creation
-router.post('/create-quiz', (req, res) => {
+router.post('/create-quiz', async (req, res) => {
   if (!req.session.fname || req.session.role !== 'admin') {
     return res.status(401).send('Unauthorized');
   }
-  uploadExcel(req, res, function(err) {
+  uploadExcel(req, res, async function(err) {
     if (err instanceof multer.MulterError) {
       console.error('Multer error:', err);
       return res.status(400).send('Error uploading files: ' + err.message);
@@ -1825,14 +1826,13 @@ router.post('/create-quiz', (req, res) => {
     }
 
     try {
-      const quizzes = readQuizzes();
       const { quizName, quizClass, startTime, endTime } = req.body;
 
       if (!req.file) {
         throw new Error('No Excel file uploaded');
       }
 
-      // Add quiz to quizzes.json
+      // Create quiz object
       const quiz = {
         name: quizName,
         startTime: startTime,
@@ -1842,8 +1842,27 @@ router.post('/create-quiz', (req, res) => {
         file: req.file.filename
       };
 
+      // Store in MongoDB
+      const db = req.app.locals.db;
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+
+      // Check if quiz already exists in MongoDB
+      const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
+      if (existingQuiz) {
+        throw new Error('Quiz with this name already exists');
+      }
+
+      // Insert into MongoDB
+      await db.collection('quizzes').insertOne(quiz);
+      console.log('Quiz stored in MongoDB:', quiz);
+
+      // Store in quizzes.json
+      const quizzes = readQuizzes();
       quizzes.push(quiz);
       saveQuizzes(quizzes);
+      console.log('Quiz stored in quizzes.json:', quiz);
 
       res.redirect('/admin');
     } catch (error) {
@@ -1854,7 +1873,7 @@ router.post('/create-quiz', (req, res) => {
 });
 
 // Handle Manual Quiz Creation
-router.post('/create-quiz-manual', (req, res) => {
+router.post('/create-quiz-manual', async (req, res) => {
   if (!req.session.fname || req.session.role !== 'admin') {
     return res.status(401).send('Unauthorized');
   }
@@ -1868,11 +1887,6 @@ router.post('/create-quiz-manual', (req, res) => {
     }
 
     try {
-      // Debug logging
-      console.log('Form Data:', req.body);
-      console.log('Files:', req.files);
-
-      const quizzes = readQuizzes();
       const { quizName, quizClass, startTime, endTime } = req.body;
 
       // Validate required fields
@@ -1887,66 +1901,36 @@ router.post('/create-quiz-manual', (req, res) => {
       const indices = req.body.questionIndex ? 
         (Array.isArray(req.body.questionIndex) ? req.body.questionIndex : [req.body.questionIndex]) : [];
       
-      console.log('Question indices:', indices);
-      
       if (!indices || indices.length === 0) {
         throw new Error('No questions found in form data');
       }
 
-      // Create full question objects
+      // Process each question
       for (const index of indices) {
-        const text = req.body[`questionText_${index}`];
-        const option1 = req.body[`questionOption1_${index}`];
-        const option2 = req.body[`questionOption2_${index}`];
-        const option3 = req.body[`questionOption3_${index}`];
-        const option4 = req.body[`questionOption4_${index}`];
-        const correct = req.body[`questionCorrect_${index}`];
-        
-        console.log(`Processing question ${index}:`, {
-          text, option1, option2, option3, option4, correct
-        });
-
-        if (!text || !option1 || !option2 || !option3 || !option4 || !correct) {
-          throw new Error(`Missing data for question ${parseInt(index) + 1}`);
-        }
-
         const questionObj = {
-          text: text,
-          options: [option1, option2, option3, option4],
-          correctAnswer: parseInt(correct) - 1
+          question: req.body[`question_${index}`],
+          options: [
+            req.body[`option1_${index}`],
+            req.body[`option2_${index}`],
+            req.body[`option3_${index}`],
+            req.body[`option4_${index}`]
+          ],
+          correctAnswer: parseInt(req.body[`correctAnswer_${index}`]),
+          optionImages: [null, null, null, null]
         };
 
-        // Check if there's an image for this question
-        const uploadedFiles = req.files ? (req.files[`questionImage_${index}`] || []) : [];
-        if (uploadedFiles.length > 0) {
-          questionObj.image = `/quiz-images/${uploadedFiles[0].filename}`;
+        // Process question image
+        const questionImages = req.files ? (req.files[`questionImage_${index}`] || []) : [];
+        if (questionImages.length > 0) {
+          questionObj.questionImage = `/quiz-images/${questionImages[0].filename}`;
         }
 
-        // Check if there are option images for this question
-        questionObj.optionImages = [null, null, null, null]; // Initialize with nulls
-
-        // Check for option 1 image
-        const option1Images = req.files ? (req.files[`questionOption1Image_${index}`] || []) : [];
-        if (option1Images.length > 0) {
-          questionObj.optionImages[0] = `/quiz-images/${option1Images[0].filename}`;
-        }
-
-        // Check for option 2 image
-        const option2Images = req.files ? (req.files[`questionOption2Image_${index}`] || []) : [];
-        if (option2Images.length > 0) {
-          questionObj.optionImages[1] = `/quiz-images/${option2Images[0].filename}`;
-        }
-
-        // Check for option 3 image
-        const option3Images = req.files ? (req.files[`questionOption3Image_${index}`] || []) : [];
-        if (option3Images.length > 0) {
-          questionObj.optionImages[2] = `/quiz-images/${option3Images[0].filename}`;
-        }
-
-        // Check for option 4 image
-        const option4Images = req.files ? (req.files[`questionOption4Image_${index}`] || []) : [];
-        if (option4Images.length > 0) {
-          questionObj.optionImages[3] = `/quiz-images/${option4Images[0].filename}`;
+        // Process option images
+        for (let i = 1; i <= 4; i++) {
+          const optionImages = req.files ? (req.files[`questionOption${i}Image_${index}`] || []) : [];
+          if (optionImages.length > 0) {
+            questionObj.optionImages[i-1] = `/quiz-images/${optionImages[0].filename}`;
+          }
         }
 
         questions.push(questionObj);
@@ -1956,8 +1940,6 @@ router.post('/create-quiz-manual', (req, res) => {
       if (questions.length === 0) {
         throw new Error('No questions provided. Please check the form data.');
       }
-
-      console.log('Final questions array:', questions);
 
       // Create directory if it doesn't exist
       if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
@@ -1973,9 +1955,7 @@ router.post('/create-quiz-manual', (req, res) => {
         JSON.stringify(questions, null, 2)
       );
 
-      console.log('Saved questions to file:', questionsFilePath);
-
-      // Add quiz to quizzes.json
+      // Create quiz object
       const quiz = {
         name: quizName,
         startTime: startTime,
@@ -1985,26 +1965,32 @@ router.post('/create-quiz-manual', (req, res) => {
         questionsFile: questionsFileName
       };
 
+      // Store in MongoDB
+      const db = req.app.locals.db;
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+
+      // Check if quiz already exists in MongoDB
+      const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
+      if (existingQuiz) {
+        throw new Error('Quiz with this name already exists');
+      }
+
+      // Insert into MongoDB
+      await db.collection('quizzes').insertOne(quiz);
+      console.log('Quiz stored in MongoDB:', quiz);
+
+      // Store in quizzes.json
+      const quizzes = readQuizzes();
       quizzes.push(quiz);
       saveQuizzes(quizzes);
-
-      console.log('Quiz added successfully:', quiz);
+      console.log('Quiz stored in quizzes.json:', quiz);
 
       res.redirect('/admin');
     } catch (error) {
       console.error('Error creating manual quiz:', error);
-      // Delete uploaded files if there was an error
-      if (req.files) {
-        Object.keys(req.files).forEach(key => {
-          req.files[key].forEach(file => {
-            const filePath = path.join(QUIZ_IMAGES_DIR, file.filename);
-            fs.unlink(filePath, (err) => {
-              if (err) console.error('Error deleting uploaded file:', err);
-            });
-          });
-        });
-      }
-      res.status(500).send(`Error creating quiz: ${error.message}`);
+      res.status(500).send('Error creating quiz: ' + error.message);
     }
   });
 });
@@ -4242,6 +4228,236 @@ router.get('/logout', (req, res) => {
         }
         res.redirect('/admin-login');
     });
+});
+
+// Route to create a new quiz - UPDATED TO STORE IN MONGODB
+router.post('/create-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const quiz = req.body;
+        console.log('Received quiz data:', quiz);
+        
+        // Validate required fields
+        if (!quiz.name || !quiz.startTime || !quiz.endTime || !quiz.class || !quiz.type) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        // Get MongoDB database instance
+        const db = req.app.locals.db;
+        if (!db) {
+            console.error('MongoDB database instance not found');
+            return res.status(500).json({ error: 'Database connection not available' });
+        }
+
+        // First store in MongoDB
+        try {
+            console.log('Attempting to store quiz in MongoDB...');
+            
+            // Check if quiz name already exists in MongoDB
+            const existingQuiz = await db.collection('quizzes').findOne({ name: quiz.name });
+            if (existingQuiz) {
+                console.log('Quiz already exists in MongoDB:', existingQuiz);
+                return res.status(400).json({ error: "Quiz with this name already exists" });
+            }
+
+            // Insert new quiz into MongoDB
+            const result = await db.collection('quizzes').insertOne(quiz);
+            console.log('MongoDB insert result:', result);
+            
+            if (!result.insertedId) {
+                throw new Error('Failed to insert quiz into MongoDB');
+            }
+            
+            console.log('Successfully stored quiz in MongoDB:', quiz);
+        } catch (mongoErr) {
+            console.error('Error storing quiz in MongoDB:', mongoErr);
+            return res.status(500).json({ 
+                error: 'Failed to store quiz in database',
+                details: mongoErr.message 
+            });
+        }
+
+        // Then store in local quizzes.json
+        try {
+            const quizzesPath = path.join(__dirname, '../quizzes.json');
+            let quizzes = [];
+            
+            if (fs.existsSync(quizzesPath)) {
+                const fileContent = fs.readFileSync(quizzesPath, 'utf8');
+                if (fileContent.trim()) {
+                    quizzes = JSON.parse(fileContent);
+                }
+            }
+            
+            // Check if quiz name already exists in local storage
+            if (quizzes.some(q => q.name === quiz.name)) {
+                console.log('Quiz already exists in local storage');
+                return res.status(400).json({ error: "Quiz with this name already exists" });
+            }
+            
+            quizzes.push(quiz);
+            fs.writeFileSync(quizzesPath, JSON.stringify(quizzes, null, 2));
+            console.log('Successfully stored quiz in local storage:', quiz);
+        } catch (fileErr) {
+            console.error('Error storing quiz in local file:', fileErr);
+            // Don't return error here, as MongoDB storage was successful
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Quiz created successfully',
+            quiz: quiz
+        });
+    } catch (err) {
+        console.error('Error creating quiz:', err);
+        res.status(500).json({ 
+            error: 'Failed to create quiz',
+            details: err.message 
+        });
+    }
+});
+
+// Route to upload Excel quiz - UPDATED TO STORE IN MONGODB
+router.post('/upload-excel', upload.single('file'), async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        const workbook = xlsx.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Create quiz entry in MongoDB
+        const quiz = {
+            name: req.body.name,
+            startTime: req.body.startTime,
+            endTime: req.body.endTime,
+            class: req.body.class,
+            type: 'excel',
+            file: req.file.originalname,
+            isStudentSpecific: req.body.isStudentSpecific === 'true'
+        };
+
+        // Check if quiz name already exists in MongoDB
+        const existingQuiz = await req.app.locals.db.collection('quizzes')
+            .findOne({ name: quiz.name });
+            
+        if (existingQuiz) {
+            // Delete the uploaded file since quiz already exists
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: "Quiz with this name already exists" });
+        }
+
+        // Insert new quiz into MongoDB
+        await req.app.locals.db.collection('quizzes').insertOne(quiz);
+        
+        // Also update local quizzes.json for backward compatibility
+        const quizzesPath = path.join(__dirname, '../quizzes.json');
+        let quizzes = [];
+        if (fs.existsSync(quizzesPath)) {
+            try {
+                const fileContent = fs.readFileSync(quizzesPath, 'utf8');
+                if (fileContent.trim()) {
+                    quizzes = JSON.parse(fileContent);
+                }
+            } catch (err) {
+                console.error('Error reading quizzes.json:', err);
+            }
+        }
+        
+        quizzes.push(quiz);
+        fs.writeFileSync(quizzesPath, JSON.stringify(quizzes, null, 2));
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error uploading Excel quiz:', err);
+        // Clean up uploaded file if there was an error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: 'Failed to upload Excel quiz' });
+    }
+});
+
+// Route to create manual quiz - UPDATED TO STORE IN MONGODB
+router.post('/create-manual-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const { quizName, questions } = req.body;
+        
+        if (!quizName || !questions || !Array.isArray(questions)) {
+            return res.status(400).json({ error: "Invalid quiz data" });
+        }
+        
+        // Save questions to MongoDB
+        await req.app.locals.db.collection('manual_questions').updateOne(
+            { quizName },
+            { $set: { questions } },
+            { upsert: true }
+        );
+        
+        // Also save to local file for backward compatibility
+        const manualQuestionsPath = path.join(__dirname, '../manual-questions');
+        if (!fs.existsSync(manualQuestionsPath)) {
+            fs.mkdirSync(manualQuestionsPath, { recursive: true });
+        }
+        
+        const filePath = path.join(manualQuestionsPath, `${quizName}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(questions, null, 2));
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating manual quiz:', err);
+        res.status(500).json({ error: 'Failed to create manual quiz' });
+    }
+});
+
+// Route to add retake students - UPDATED TO STORE IN MONGODB
+router.post('/add-retake', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const { quizName, students } = req.body;
+        
+        if (!quizName || !Array.isArray(students)) {
+            return res.status(400).json({ error: "Invalid retake data" });
+        }
+        
+        // Update retake list in MongoDB
+        await req.app.locals.db.collection('retakes').updateOne(
+            { quizName },
+            { $set: { retakes: students } },
+            { upsert: true }
+        );
+        
+        // Also save to local file for backward compatibility
+        const retakesPath = path.join(__dirname, '../retakes');
+        if (!fs.existsSync(retakesPath)) {
+            fs.mkdirSync(retakesPath, { recursive: true });
+        }
+        
+        const filePath = path.join(retakesPath, `${quizName}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(students, null, 2));
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error adding retake:', err);
+        res.status(500).json({ error: 'Failed to add retake' });
+    }
 });
 
 module.exports = router;

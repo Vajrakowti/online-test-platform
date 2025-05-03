@@ -17,88 +17,39 @@
     "file": "manual.xlsx"
   },
   {
-    "name": "manual retake",
-    "startTime": "10:20",
-    "endTime": "12:00",
-    "class": "999",
-    "type": "excel",
-    "isStudentSpecific": true,
-    "file": "manual.xlsx"
-  },
-  {
-    "name": "444",
-    "startTime": "10:30",
-    "endTime": "12:00",
+    "name": "kkt",
+    "startTime": "17:30",
+    "endTime": "18:00",
     "class": "10",
     "type": "excel",
-    "file": "444.xlsx"
+    "file": "kkt.xlsx",
+    "_id": "68160616fca78f153a325c47"
   },
   {
-    "name": "444re",
-    "startTime": "10:30",
-    "endTime": "12:00",
-    "class": "999",
-    "type": "excel",
-    "isStudentSpecific": true,
-    "file": "444.xlsx"
-  },
-  {
-    "name": "444 retake quiz",
-    "startTime": "10:30",
-    "endTime": "12:00",
-    "class": "999",
-    "type": "excel",
-    "isStudentSpecific": true,
-    "file": "444.xlsx"
-  },
-  {
-    "name": "ttt",
-    "startTime": "12:00",
-    "endTime": "15:00",
+    "name": "amma",
+    "startTime": "18:00",
+    "endTime": "19:00",
     "class": "10",
     "type": "excel",
-    "file": "ttt.xlsx"
+    "file": "amma.xlsx",
+    "_id": "68160d28fca78f153a325c48"
   },
   {
-    "name": "zzz",
-    "startTime": "15:00",
-    "endTime": "17:00",
+    "name": "appa",
+    "startTime": "18:20",
+    "endTime": "19:00",
     "class": "10",
     "type": "excel",
-    "file": "zzz.xlsx"
+    "file": "appa.xlsx",
+    "_id": "681611fa57dbac9e60bf1f7b"
   },
   {
-    "name": "888",
-    "startTime": "09:00",
-    "endTime": "10:30",
+    "name": "rrr",
+    "startTime": "18:00",
+    "endTime": "19:00",
     "class": "10",
     "type": "excel",
-    "file": "888.xlsx"
-  },
-  {
-    "name": "mm",
-    "startTime": "09:30",
-    "endTime": "11:00",
-    "class": "10",
-    "type": "excel",
-    "file": "mm.xlsx"
-  },
-  {
-    "name": "baby",
-    "startTime": "09:30",
-    "endTime": "12:00",
-    "class": "999",
-    "type": "excel",
-    "file": "baby.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "mm retake",
-    "startTime": "09:30",
-    "endTime": "12:00",
-    "class": "999",
-    "type": "excel",
-    "isStudentSpecific": true,
-    "file": "mm.xlsx"
+    "file": "rrr.xlsx",
+    "_id": "6816132d13f242c733b04ef4"
   }
 ]
