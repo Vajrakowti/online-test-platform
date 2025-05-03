@@ -67,122 +67,115 @@ async function initializeCollections() {
         await dbo.collection('manual_questions').createIndex({ quizName: 1 }, { unique: true });
         await dbo.collection('retakes').createIndex({ quizName: 1 });
 
-        // Migrate existing data from files to MongoDB if collections are empty
-        const quizzesCount = await dbo.collection('quizzes').countDocuments();
-        if (quizzesCount === 0) {
-            const quizzesPath = path.join(__dirname, 'quizzes.json');
-            if (fs.existsSync(quizzesPath)) {
-                try {
-                    const fileContent = fs.readFileSync(quizzesPath, 'utf8');
-                    // Validate JSON format
-                    if (!fileContent.trim()) {
-                        console.log('Quizzes file is empty');
-                        return;
-                    }
-                    const quizzes = JSON.parse(fileContent);
-                    if (Array.isArray(quizzes)) {
-                        await dbo.collection('quizzes').insertMany(quizzes);
-                        console.log('Successfully migrated quizzes to MongoDB');
-                    } else {
-                        console.error('Quizzes data is not in the expected array format');
-                    }
-                } catch (err) {
-                    console.error('Error parsing quizzes.json:', err);
-                }
-            }
-        }
+        // Check if collections are already populated
+        const attemptsCount = await dbo.collection('attempts').countDocuments();
+        const manualQuestionsCount = await dbo.collection('manual_questions').countDocuments();
+        const retakesCount = await dbo.collection('retakes').countDocuments();
 
-        const attemptsPath = path.join(__dirname, 'attempts');
-        if (fs.existsSync(attemptsPath)) {
-            const attemptFiles = fs.readdirSync(attemptsPath);
-            for (const file of attemptFiles) {
-                if (file.endsWith('.json')) {
-                    const username = file.replace('.json', '');
-                    const filePath = path.join(attemptsPath, file);
+        // Only migrate if collections are empty
+        if (attemptsCount === 0 && manualQuestionsCount === 0 && retakesCount === 0) {
+            // Migrate quizzes if collection is empty
+            const quizzesCount = await dbo.collection('quizzes').countDocuments();
+            if (quizzesCount === 0) {
+                const quizzesPath = path.join(__dirname, 'quizzes.json');
+                if (fs.existsSync(quizzesPath)) {
                     try {
-                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                        if (!fileContent.trim()) {
-                            console.log(`Attempts file for ${username} is empty`);
-                            continue;
-                        }
-                        const attempts = JSON.parse(fileContent);
-                        if (Array.isArray(attempts)) {
-                            await dbo.collection('attempts').updateOne(
-                                { username },
-                                { $set: { attempts } },
-                                { upsert: true }
-                            );
-                            console.log(`Successfully migrated attempts for ${username}`);
-                        } else {
-                            console.error(`Attempts data for ${username} is not in the expected array format`);
+                        const fileContent = fs.readFileSync(quizzesPath, 'utf8');
+                        if (fileContent.trim()) {
+                            const quizzes = JSON.parse(fileContent);
+                            if (Array.isArray(quizzes)) {
+                                await dbo.collection('quizzes').insertMany(quizzes);
+                            }
                         }
                     } catch (err) {
-                        console.error(`Error parsing attempts file for ${username}:`, err);
+                        console.error('Error parsing quizzes.json:', err);
                     }
                 }
             }
-        }
 
-        const manualQuestionsPath = path.join(__dirname, 'manual-questions');
-        if (fs.existsSync(manualQuestionsPath)) {
-            const questionFiles = fs.readdirSync(manualQuestionsPath);
-            for (const file of questionFiles) {
-                if (file.endsWith('.json')) {
-                    const quizName = file.replace('.json', '');
-                    const filePath = path.join(manualQuestionsPath, file);
-                    try {
-                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                        if (!fileContent.trim()) {
-                            console.log(`Manual questions file for ${quizName} is empty`);
-                            continue;
+            // Migrate attempts
+            const attemptsPath = path.join(__dirname, 'attempts');
+            if (fs.existsSync(attemptsPath)) {
+                const attemptFiles = fs.readdirSync(attemptsPath);
+                for (const file of attemptFiles) {
+                    if (file.endsWith('.json')) {
+                        const username = file.replace('.json', '');
+                        const filePath = path.join(attemptsPath, file);
+                        try {
+                            const fileContent = fs.readFileSync(filePath, 'utf8');
+                            if (fileContent.trim()) {
+                                const attempts = JSON.parse(fileContent);
+                                if (Array.isArray(attempts)) {
+                                    await dbo.collection('attempts').updateOne(
+                                        { username },
+                                        { $set: { attempts } },
+                                        { upsert: true }
+                                    );
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error parsing attempts file for ${username}:`, err);
                         }
-                        const questions = JSON.parse(fileContent);
-                        if (Array.isArray(questions)) {
-                            await dbo.collection('manual_questions').updateOne(
-                                { quizName },
-                                { $set: { questions } },
-                                { upsert: true }
-                            );
-                            console.log(`Successfully migrated manual questions for ${quizName}`);
-                        } else {
-                            console.error(`Manual questions data for ${quizName} is not in the expected array format`);
-                        }
-                    } catch (err) {
-                        console.error(`Error parsing manual questions file for ${quizName}:`, err);
                     }
                 }
             }
-        }
 
-        const retakesPath = path.join(__dirname, 'retakes');
-        if (fs.existsSync(retakesPath)) {
-            const retakeFiles = fs.readdirSync(retakesPath);
-            for (const file of retakeFiles) {
-                if (file.endsWith('.json')) {
-                    const quizName = file.replace('.json', '');
-                    const filePath = path.join(retakesPath, file);
-                    try {
-                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                        if (!fileContent.trim()) {
-                            console.log(`Retakes file for ${quizName} is empty`);
-                            continue;
+            // Migrate manual questions
+            const manualQuestionsPath = path.join(__dirname, 'manual-questions');
+            if (fs.existsSync(manualQuestionsPath)) {
+                const questionFiles = fs.readdirSync(manualQuestionsPath);
+                for (const file of questionFiles) {
+                    if (file.endsWith('.json')) {
+                        const quizName = file.replace('.json', '');
+                        const filePath = path.join(manualQuestionsPath, file);
+                        try {
+                            const fileContent = fs.readFileSync(filePath, 'utf8');
+                            if (fileContent.trim()) {
+                                const questions = JSON.parse(fileContent);
+                                if (Array.isArray(questions)) {
+                                    await dbo.collection('manual_questions').updateOne(
+                                        { quizName },
+                                        { $set: { questions } },
+                                        { upsert: true }
+                                    );
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error parsing manual questions file for ${quizName}:`, err);
                         }
-                        const retakes = JSON.parse(fileContent);
-                        if (Array.isArray(retakes)) {
-                            await dbo.collection('retakes').updateOne(
-                                { quizName },
-                                { $set: { retakes } },
-                                { upsert: true }
-                            );
-                            console.log(`Successfully migrated retakes for ${quizName}`);
-                        } else {
-                            console.error(`Retakes data for ${quizName} is not in the expected array format`);
-                        }
-                    } catch (err) {
-                        console.error(`Error parsing retakes file for ${quizName}:`, err);
                     }
                 }
             }
+
+            // Migrate retakes
+            const retakesPath = path.join(__dirname, 'retakes');
+            if (fs.existsSync(retakesPath)) {
+                const retakeFiles = fs.readdirSync(retakesPath);
+                for (const file of retakeFiles) {
+                    if (file.endsWith('.json')) {
+                        const quizName = file.replace('.json', '');
+                        const filePath = path.join(retakesPath, file);
+                        try {
+                            const fileContent = fs.readFileSync(filePath, 'utf8');
+                            if (fileContent.trim()) {
+                                const retakes = JSON.parse(fileContent);
+                                if (Array.isArray(retakes)) {
+                                    await dbo.collection('retakes').updateOne(
+                                        { quizName },
+                                        { $set: { retakes } },
+                                        { upsert: true }
+                                    );
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error parsing retakes file for ${quizName}:`, err);
+                        }
+                    }
+                }
+            }
+            console.log("Initial data migration completed successfully");
+        } else {
+            console.log("Data already migrated, skipping initial migration");
         }
     } catch (err) {
         console.error('Error initializing collections:', err);
@@ -290,6 +283,136 @@ MongoClient.connect(url, mongoOptions)
         // Initialize collections and migrate data
         initializeCollections().then(() => {
             console.log("Collections initialized and data migrated successfully");
+            
+            // Initialize retakes watcher after collections are set up
+            const adminRoutes = require('./routes/admin');
+            const retakesPath = path.join(__dirname, 'retakes');
+            
+            if (!fs.existsSync(retakesPath)) {
+                fs.mkdirSync(retakesPath, { recursive: true });
+            }
+            
+            // Initial sync of all retake files
+            fs.readdirSync(retakesPath)
+                .filter(file => file.endsWith('.json'))
+                .forEach(file => {
+                    const filePath = path.join(retakesPath, file);
+                    const quizName = path.basename(file, '.json').replace('_retake', '');
+                    
+                    try {
+                        const retakeUsernames = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                        
+                        // Get quiz details from quizzes.json
+                        const quizzesPath = path.join(__dirname, 'quizzes.json');
+                        const quizzes = JSON.parse(fs.readFileSync(quizzesPath, 'utf8'));
+                        const quiz = quizzes.find(q => q.name === quizName);
+                        
+                        if (quiz) {
+                            // Update retakes collection
+                            dbo.collection('retakes').updateOne(
+                                { quizName },
+                                { 
+                                    $set: {
+                                        quizName,
+                                        retakes: retakeUsernames,
+                                        quizDetails: {
+                                            ...quiz,
+                                            isStudentSpecific: true,
+                                            allowedStudents: retakeUsernames
+                                        },
+                                        createdAt: new Date(),
+                                        updatedAt: new Date()
+                                    }
+                                },
+                                { upsert: true }
+                            );
+                            
+                            // Update quizzes collection
+                            dbo.collection('quizzes').updateOne(
+                                { name: quizName },
+                                { 
+                                    $set: {
+                                        ...quiz,
+                                        isStudentSpecific: true,
+                                        allowedStudents: retakeUsernames
+                                    }
+                                },
+                                { upsert: true }
+                            );
+                            
+                            console.log(`Synced retake file ${file} to MongoDB`);
+                        }
+                    } catch (err) {
+                        console.error(`Error syncing retake file ${file}:`, err);
+                    }
+                });
+            
+            // Set up file watcher for retakes directory
+            const watcher = fs.watch(retakesPath, async (eventType, filename) => {
+                if (filename && filename.endsWith('.json')) {
+                    const filePath = path.join(retakesPath, filename);
+                    
+                    // Wait a short time to ensure file is fully written
+                    setTimeout(async () => {
+                        try {
+                            if (fs.existsSync(filePath)) {
+                                const quizName = path.basename(filename, '.json').replace('_retake', '');
+                                const retakeUsernames = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                                
+                                // Get quiz details from quizzes.json
+                                const quizzesPath = path.join(__dirname, 'quizzes.json');
+                                const quizzes = JSON.parse(fs.readFileSync(quizzesPath, 'utf8'));
+                                const quiz = quizzes.find(q => q.name === quizName);
+                                
+                                if (quiz) {
+                                    // Update retakes collection
+                                    await dbo.collection('retakes').updateOne(
+                                        { quizName },
+                                        { 
+                                            $set: {
+                                                quizName,
+                                                retakes: retakeUsernames,
+                                                quizDetails: {
+                                                    ...quiz,
+                                                    isStudentSpecific: true,
+                                                    allowedStudents: retakeUsernames
+                                                },
+                                                createdAt: new Date(),
+                                                updatedAt: new Date()
+                                            }
+                                        },
+                                        { upsert: true }
+                                    );
+                                    
+                                    // Update quizzes collection
+                                    await dbo.collection('quizzes').updateOne(
+                                        { name: quizName },
+                                        { 
+                                            $set: {
+                                                ...quiz,
+                                                isStudentSpecific: true,
+                                                allowedStudents: retakeUsernames
+                                            }
+                                        },
+                                        { upsert: true }
+                                    );
+                                    
+                                    console.log(`Synced retake file ${filename} to MongoDB`);
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error syncing retake file ${filename}:`, err);
+                        }
+                    }, 100);
+                }
+            });
+            
+            // Handle watcher errors
+            watcher.on('error', (err) => {
+                console.error('Error watching retakes directory:', err);
+            });
+            
+            console.log('Retakes watcher initialized');
         }).catch(err => {
             console.error("Error during initialization:", err);
         });

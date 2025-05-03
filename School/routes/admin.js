@@ -4401,14 +4401,24 @@ router.post('/create-manual-quiz', async (req, res) => {
             return res.status(400).json({ error: "Invalid quiz data" });
         }
         
-        // Save questions to MongoDB
-        await req.app.locals.db.collection('manual_questions').updateOne(
-            { quizName },
-            { $set: { questions } },
-            { upsert: true }
-        );
+        // First save to MongoDB
+        const db = req.app.locals.db;
+        const manualQuestionsCollection = db.collection('manual_questions');
         
-        // Also save to local file for backward compatibility
+        // Check if quiz already exists
+        const existingQuiz = await manualQuestionsCollection.findOne({ quizName });
+        if (existingQuiz) {
+            return res.status(400).json({ error: "Quiz with this name already exists" });
+        }
+        
+        // Save to MongoDB
+        await manualQuestionsCollection.insertOne({
+            quizName,
+            questions,
+            createdAt: new Date()
+        });
+        
+        // Then save to local file for backward compatibility
         const manualQuestionsPath = path.join(__dirname, '../manual-questions');
         if (!fs.existsSync(manualQuestionsPath)) {
             fs.mkdirSync(manualQuestionsPath, { recursive: true });
@@ -4457,6 +4467,454 @@ router.post('/add-retake', async (req, res) => {
     } catch (err) {
         console.error('Error adding retake:', err);
         res.status(500).json({ error: 'Failed to add retake' });
+    }
+});
+
+// Route to get manual questions
+router.get('/manual-questions/:quizName', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const quizName = req.params.quizName;
+        
+        // First try to get from MongoDB
+        const db = req.app.locals.db;
+        const manualQuestionsCollection = db.collection('manual_questions');
+        
+        const quiz = await manualQuestionsCollection.findOne({ quizName });
+        if (quiz) {
+            return res.json(quiz.questions);
+        }
+        
+        // If not found in MongoDB, try local file
+        const manualQuestionsPath = path.join(__dirname, '../manual-questions', `${quizName}.json`);
+        if (fs.existsSync(manualQuestionsPath)) {
+            const questions = JSON.parse(fs.readFileSync(manualQuestionsPath, 'utf8'));
+            // Save to MongoDB for future use
+            await manualQuestionsCollection.insertOne({
+                quizName,
+                questions,
+                createdAt: new Date()
+            });
+            return res.json(questions);
+        }
+        
+        // If no questions found
+        res.status(404).json({ error: "Questions not found" });
+    } catch (err) {
+        console.error('Error getting manual questions:', err);
+        res.status(500).json({ error: 'Failed to get manual questions' });
+    }
+});
+
+// Add a function to check if data is already migrated
+async function isDataMigrated(db, collectionName) {
+    try {
+        const count = await db.collection(collectionName).countDocuments();
+        return count > 0;
+    } catch (err) {
+        console.error(`Error checking migration status for ${collectionName}:`, err);
+        return false;
+    }
+}
+
+// Update the migration route
+router.post('/migrate-data', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const db = req.app.locals.db;
+        const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
+        const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
+        const RETAKE_DIR = path.join(__dirname, '../retakes');
+
+        // Check if data is already migrated
+        const attemptsMigrated = await isDataMigrated(db, 'attempts');
+        const manualQuestionsMigrated = await isDataMigrated(db, 'manual_questions');
+        const retakesMigrated = await isDataMigrated(db, 'retakes');
+
+        if (attemptsMigrated && manualQuestionsMigrated && retakesMigrated) {
+            return res.json({ 
+                message: "Data is already migrated",
+                status: "already_migrated"
+            });
+        }
+
+        const results = {
+            attempts: [],
+            manualQuestions: [],
+            retakes: []
+        };
+
+        // Migrate attempts if not already migrated
+        if (!attemptsMigrated && fs.existsSync(ATTEMPTS_DIR)) {
+            const attemptFiles = fs.readdirSync(ATTEMPTS_DIR);
+            for (const file of attemptFiles) {
+                if (file.endsWith('.json')) {
+                    const username = file.replace('.json', '');
+                    const filePath = path.join(ATTEMPTS_DIR, file);
+                    const attempts = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    
+                    await db.collection('attempts').updateOne(
+                        { username },
+                        { $set: { attempts } },
+                        { upsert: true }
+                    );
+                    
+                    results.attempts.push(username);
+                }
+            }
+        }
+
+        // Migrate manual questions if not already migrated
+        if (!manualQuestionsMigrated && fs.existsSync(MANUAL_QUESTIONS_DIR)) {
+            const manualFiles = fs.readdirSync(MANUAL_QUESTIONS_DIR);
+            for (const file of manualFiles) {
+                if (file.endsWith('.json')) {
+                    const quizName = file.replace('.json', '');
+                    const filePath = path.join(MANUAL_QUESTIONS_DIR, file);
+                    const questions = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    
+                    await db.collection('manual_questions').updateOne(
+                        { quizName },
+                        { $set: { questions } },
+                        { upsert: true }
+                    );
+                    
+                    results.manualQuestions.push(quizName);
+                }
+            }
+        }
+
+        // Migrate retakes if not already migrated
+        if (!retakesMigrated && fs.existsSync(RETAKE_DIR)) {
+            const retakeFiles = fs.readdirSync(RETAKE_DIR);
+            for (const file of retakeFiles) {
+                if (file.endsWith('.json')) {
+                    const quizName = file.replace('.json', '');
+                    const filePath = path.join(RETAKE_DIR, file);
+                    const retakes = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    
+                    await db.collection('retakes').updateOne(
+                        { quizName },
+                        { $set: { retakes } },
+                        { upsert: true }
+                    );
+                    
+                    results.retakes.push(quizName);
+                }
+            }
+        }
+
+        res.json({ 
+            message: "Migration completed successfully",
+            results,
+            status: "success"
+        });
+    } catch (err) {
+        console.error('Error during migration:', err);
+        res.status(500).json({ error: 'Failed to migrate data' });
+    }
+});
+
+// Route to create retake quiz
+router.post('/create-retake-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const { quizName, studentUsernames } = req.body;
+        
+        if (!quizName || !studentUsernames || !Array.isArray(studentUsernames)) {
+            return res.status(400).json({ error: "Invalid retake data" });
+        }
+        
+        // First save to MongoDB
+        const db = req.app.locals.db;
+        const retakesCollection = db.collection('retakes');
+        
+        // Check if retake already exists
+        const existingRetake = await retakesCollection.findOne({ quizName });
+        if (existingRetake) {
+            // Update existing retake
+            await retakesCollection.updateOne(
+                { quizName },
+                { $set: { retakes: studentUsernames } }
+            );
+        } else {
+            // Create new retake
+            await retakesCollection.insertOne({
+                quizName,
+                retakes: studentUsernames,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+        }
+        
+        // Then save to local file for backward compatibility
+        const retakesPath = path.join(__dirname, '../retakes');
+        if (!fs.existsSync(retakesPath)) {
+            fs.mkdirSync(retakesPath, { recursive: true });
+        }
+        
+        const filePath = path.join(retakesPath, `${quizName}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(studentUsernames, null, 2));
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating retake quiz:', err);
+        res.status(500).json({ error: 'Failed to create retake quiz' });
+    }
+});
+
+// Route to get retake quizzes
+router.get('/retake-quizzes', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const db = req.app.locals.db;
+        const retakesCollection = db.collection('retakes');
+        
+        // Get all retake quizzes from MongoDB
+        const retakes = await retakesCollection.find({}).toArray();
+        
+        res.json(retakes);
+    } catch (err) {
+        console.error('Error getting retake quizzes:', err);
+        res.status(500).json({ error: 'Failed to get retake quizzes' });
+    }
+});
+
+// Route to delete retake quiz
+router.post('/delete-retake-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const { quizName } = req.body;
+        
+        // Delete from MongoDB
+        const db = req.app.locals.db;
+        const retakesCollection = db.collection('retakes');
+        await retakesCollection.deleteOne({ quizName });
+        
+        // Delete from local file
+        const retakesPath = path.join(__dirname, '../retakes', `${quizName}.json`);
+        if (fs.existsSync(retakesPath)) {
+            fs.unlinkSync(retakesPath);
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting retake quiz:', err);
+        res.status(500).json({ error: 'Failed to delete retake quiz' });
+    }
+});
+
+// Function to sync retakes between local storage and MongoDB
+async function syncRetakes(db) {
+    try {
+        const retakesCollection = db.collection('retakes');
+        const quizzesCollection = db.collection('quizzes');
+        const retakesPath = path.join(__dirname, '../retakes');
+        
+        if (!fs.existsSync(retakesPath)) {
+            return;
+        }
+        
+        // Get all retake files from local storage
+        const retakeFiles = fs.readdirSync(retakesPath)
+            .filter(file => file.endsWith('.json'));
+        
+        // Process each retake file
+        for (const file of retakeFiles) {
+            const quizName = file.replace('.json', '').replace('_retake', '');
+            const filePath = path.join(retakesPath, file);
+            
+            try {
+                // Read retake data from local file
+                const retakeUsernames = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                
+                // Get the quiz details from quizzes.json
+                const quizzesPath = path.join(__dirname, '../quizzes.json');
+                const quizzes = JSON.parse(fs.readFileSync(quizzesPath, 'utf8'));
+                const quiz = quizzes.find(q => q.name === quizName);
+                
+                if (!quiz) {
+                    console.error(`Quiz ${quizName} not found in quizzes.json`);
+                    continue;
+                }
+                
+                // Create or update retake document in MongoDB
+                const retakeDoc = {
+                    quizName,
+                    retakes: retakeUsernames,
+                    quizDetails: {
+                        ...quiz,
+                        isStudentSpecific: true,
+                        allowedStudents: retakeUsernames
+                    },
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+                
+                await retakesCollection.updateOne(
+                    { quizName },
+                    { $set: retakeDoc },
+                    { upsert: true }
+                );
+                
+                // Update the quiz in MongoDB to be student-specific
+                await quizzesCollection.updateOne(
+                    { name: quizName },
+                    { 
+                        $set: {
+                            ...quiz,
+                            isStudentSpecific: true,
+                            allowedStudents: retakeUsernames
+                        }
+                    },
+                    { upsert: true }
+                );
+                
+                console.log(`Synced retake for quiz ${quizName}`);
+            } catch (err) {
+                console.error(`Error syncing retake file ${file}:`, err);
+            }
+        }
+        
+        console.log('Retakes sync completed successfully');
+    } catch (err) {
+        console.error('Error syncing retakes:', err);
+    }
+}
+
+// Route to manually trigger retakes sync
+router.post('/sync-retakes', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const db = req.app.locals.db;
+        await syncRetakes(db);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error syncing retakes:', err);
+        res.status(500).json({ error: 'Failed to sync retakes' });
+    }
+});
+
+// Function to watch retakes directory
+function watchRetakesDirectory(db) {
+    const retakesPath = path.join(__dirname, '../retakes');
+    
+    if (!fs.existsSync(retakesPath)) {
+        fs.mkdirSync(retakesPath, { recursive: true });
+    }
+    
+    // Initial sync
+    syncRetakes(db).catch(err => {
+        console.error('Error in initial sync:', err);
+    });
+    
+    // Watch for changes
+    const watcher = fs.watch(retakesPath, async (eventType, filename) => {
+        if (eventType === 'change' && filename.endsWith('.json')) {
+            console.log(`Detected change in retake file: ${filename}`);
+            try {
+                await syncRetakes(db);
+                console.log(`Successfully synced retake file: ${filename}`);
+            } catch (err) {
+                console.error(`Error syncing retake file ${filename}:`, err);
+            }
+        }
+    });
+    
+    // Handle watcher errors
+    watcher.on('error', (err) => {
+        console.error('Error watching retakes directory:', err);
+    });
+    
+    return watcher;
+}
+
+// Initialize retakes sync
+let retakesWatcher = null;
+
+router.use(async (req, res, next) => {
+    try {
+        const db = req.app.locals.db;
+        
+        // Initialize watcher if not already initialized
+        if (!retakesWatcher) {
+            retakesWatcher = watchRetakesDirectory(db);
+            console.log('Retakes directory watcher initialized');
+        }
+        
+        // Perform initial sync
+        await syncRetakes(db);
+        console.log('Initial retakes sync completed');
+    } catch (err) {
+        console.error('Error in retakes initialization:', err);
+    }
+    next();
+});
+
+// Update create-retake-quiz route
+router.post('/create-retake-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const { quizName, studentUsernames } = req.body;
+        
+        if (!quizName || !studentUsernames || !Array.isArray(studentUsernames)) {
+            return res.status(400).json({ error: "Invalid retake data" });
+        }
+        
+        // Save to local file
+        const retakesPath = path.join(__dirname, '../retakes');
+        if (!fs.existsSync(retakesPath)) {
+            fs.mkdirSync(retakesPath, { recursive: true });
+        }
+        
+        const filePath = path.join(retakesPath, `${quizName}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(studentUsernames, null, 2));
+        console.log(`Created retake file: ${filePath}`);
+        
+        // The file watcher will automatically sync to MongoDB
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating retake quiz:', err);
+        res.status(500).json({ error: 'Failed to create retake quiz' });
+    }
+});
+
+// Add route to manually trigger sync
+router.post('/sync-retakes', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const db = req.app.locals.db;
+        await syncRetakes(db);
+        console.log('Manual retakes sync completed');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in manual retakes sync:', err);
+        res.status(500).json({ error: 'Failed to sync retakes' });
     }
 });
 

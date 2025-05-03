@@ -105,52 +105,75 @@ router.get('/quizzes', async (req, res) => {
     }
 
     try {
-        // Get student's class from session
-        const studentClass = req.session.class || '1'; // Default to class 1 if not set
-        const studentUsername = req.session.username;
+        const username = req.session.username;
+        const db = req.app.locals.db;
         
-        // Get student's attempted quizzes from MongoDB
-        const attempts = await req.app.locals.db.collection('attempts')
-            .findOne({ username: studentUsername }) || { attempts: [] };
+        // Get all quizzes
+        const quizzesCollection = db.collection('quizzes');
+        const quizzes = await quizzesCollection.find({}).toArray();
         
-        const attemptedQuizzes = attempts.attempts.map(attempt => attempt.quizName);
+        // Get student's attempts
+        const attemptsCollection = db.collection('attempts');
+        const attempts = await attemptsCollection.find({ studentId: username }).toArray();
         
-        // Also check session-stored completions
-        const sessionCompletedQuizzes = (req.session.completedQuizzes || [])
-            .map(quiz => quiz.quizName);
+        // Get retake quizzes
+        const retakesCollection = db.collection('retakes');
+        const retakes = await retakesCollection.find({}).toArray();
         
-        // Combine both sources of completed quizzes
-        const completedQuizNames = [...new Set([...attemptedQuizzes, ...sessionCompletedQuizzes])];
-        
-        // Get retake quizzes for this student
-        const retakes = await req.app.locals.db.collection('retakes')
-            .find({ retakes: studentUsername })
-            .toArray();
-        
-        const retakeQuizzes = retakes.map(retake => retake.quizName);
-        
-        // Get all available quizzes for the student's class
-        const quizzes = await req.app.locals.db.collection('quizzes')
-            .find({
-                $or: [
-                    { class: studentClass },
-                    { isStudentSpecific: true }
-                ]
-            })
-            .toArray();
-        
-        // Filter quizzes based on completion and retake status
+        // Filter quizzes based on attempts and retakes
         const availableQuizzes = quizzes.filter(quiz => {
-            const isCompleted = completedQuizNames.includes(quiz.name);
-            const isRetake = retakeQuizzes.includes(quiz.name);
-            // Only show quiz if it's not completed OR if it's a retake
-            return !isCompleted || isRetake;
+            // Check if student has attempted this quiz
+            const attempt = attempts.find(a => a.quizName === quiz.name);
+            
+            // Check if student is eligible for retake
+            const retake = retakes.find(r => r.quizName === quiz.name);
+            const isEligibleForRetake = retake && retake.retakes.includes(username);
+            
+            // Show quiz if:
+            // 1. Student hasn't attempted it yet, OR
+            // 2. Student is eligible for retake
+            return !attempt || isEligibleForRetake;
         });
         
         res.json(availableQuizzes);
     } catch (err) {
-        console.error('Error fetching quizzes:', err);
-        res.status(500).json({ error: 'Failed to fetch quizzes' });
+        console.error('Error getting quizzes:', err);
+        res.status(500).json({ error: 'Failed to get quizzes' });
+    }
+});
+
+// Route to check if a student is eligible for retake
+router.get('/check-retake/:quizName', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+
+    try {
+        const { quizName } = req.params;
+        const username = req.session.username;
+        const db = req.app.locals.db;
+        
+        // Check MongoDB first
+        const retakesCollection = db.collection('retakes');
+        const retake = await retakesCollection.findOne({ quizName });
+        
+        if (retake && retake.retakes.includes(username)) {
+            return res.json({ isEligible: true });
+        }
+        
+        // Check local file for backward compatibility
+        const retakesPath = path.join(__dirname, '../retakes', `${quizName}.json`);
+        if (fs.existsSync(retakesPath)) {
+            const retakeUsernames = JSON.parse(fs.readFileSync(retakesPath, 'utf8'));
+            if (retakeUsernames.includes(username)) {
+                return res.json({ isEligible: true });
+            }
+        }
+        
+        res.json({ isEligible: false });
+    } catch (err) {
+        console.error('Error checking retake eligibility:', err);
+        res.status(500).json({ error: 'Failed to check retake eligibility' });
     }
 });
 
@@ -219,24 +242,26 @@ router.post('/update-completed-quizzes', (req, res) => {
     res.json({ success: true });
 });
 
-// Route to get attempted quizzes for the current student
+// Route to get attempts for a student
 router.get('/attempts', async (req, res) => {
-    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+    if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
-    const studentUsername = req.session.username;
-    
     try {
-        // Get attempts from MongoDB
-        const attempts = await req.app.locals.db.collection('attempts')
-            .findOne({ username: studentUsername }) || { attempts: [] };
+        const username = req.session.username;
+        const db = req.app.locals.db;
+        const attemptsCollection = db.collection('attempts');
         
-        // Return the attempts array
-        res.json(attempts.attempts);
+        // Get all attempts for this student
+        const attempts = await attemptsCollection.find({ studentId: username })
+            .sort({ attemptedAt: -1 })
+            .toArray();
+        
+        res.json(attempts);
     } catch (err) {
-        console.error("Failed to read attempts:", err);
-        res.status(500).json({ error: "Failed to load attempts." });
+        console.error('Error getting attempts:', err);
+        res.status(500).json({ error: 'Failed to get attempts' });
     }
 });
 
@@ -247,53 +272,40 @@ router.post('/save-attempt', async (req, res) => {
     }
 
     try {
-        const { quizName, score, totalQuestions, isRetake } = req.body;
+        const { quizName, score, totalQuestions, isRetake, answers } = req.body;
         const username = req.session.username;
         
+        // First save to MongoDB
+        const db = req.app.locals.db;
+        const attemptsCollection = db.collection('attempts');
+        
+        // Create new attempt document
         const attempt = {
+            studentId: username,
             quizName,
             score,
             totalQuestions,
             attemptedAt: new Date(),
-            isRetake: isRetake || false
+            isRetake: isRetake || false,
+            fromSessionStorage: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            answers: answers || null
         };
         
-        // Save to local attempts file
+        // Save to MongoDB
+        await attemptsCollection.insertOne(attempt);
+        
+        // Then save to local file
         const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
         let attempts = [];
         
         if (fs.existsSync(attemptsFile)) {
-            try {
-                attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-            } catch (err) {
-                console.error("Error reading attempts file:", err);
-            }
+            attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
         }
         
         attempts.push(attempt);
-        
-        try {
-            fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
-        } catch (err) {
-            console.error("Error saving attempt to file:", err);
-        }
-        
-        // Save to MongoDB
-        const db = req.app.locals.db;
-        const attemptsCollection = db.collection('attempts');
-        
-        // First, get the current attempts from MongoDB
-        const existingAttempts = await attemptsCollection.findOne({ username: username }) || { attempts: [] };
-        
-        // Update the attempts array
-        const updatedAttempts = [...(existingAttempts.attempts || []), attempt];
-        
-        // Save the updated attempts array to MongoDB
-        await attemptsCollection.updateOne(
-            { username: username },
-            { $set: { attempts: updatedAttempts } },
-            { upsert: true }
-        );
+        fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
         
         res.json({ success: true });
     } catch (err) {
@@ -302,7 +314,7 @@ router.post('/save-attempt', async (req, res) => {
     }
 });
 
-// Add a new route to sync local attempts with MongoDB
+// Route to sync attempts between local storage and MongoDB
 router.post('/sync-attempts', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
@@ -310,29 +322,86 @@ router.post('/sync-attempts', async (req, res) => {
 
     try {
         const username = req.session.username;
-        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
-        
-        if (!fs.existsSync(attemptsFile)) {
-            return res.json({ success: true, message: "No attempts file found" });
-        }
-        
-        // Read attempts from local file
-        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        
-        // Save to MongoDB
         const db = req.app.locals.db;
         const attemptsCollection = db.collection('attempts');
         
-        await attemptsCollection.updateOne(
-            { username: username },
-            { $set: { attempts: attempts } },
-            { upsert: true }
-        );
+        // Get attempts from local file
+        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
+        let localAttempts = [];
         
-        res.json({ success: true, message: "Attempts synced successfully" });
+        if (fs.existsSync(attemptsFile)) {
+            localAttempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+        }
+        
+        // Get attempts from MongoDB
+        const mongoAttempts = await attemptsCollection.find({ studentId: username })
+            .sort({ attemptedAt: -1 })
+            .toArray();
+        
+        // Merge attempts, keeping the most recent version of each quiz attempt
+        const mergedAttempts = [...localAttempts];
+        
+        mongoAttempts.forEach(mongoAttempt => {
+            const existingIndex = mergedAttempts.findIndex(
+                localAttempt => localAttempt.quizName === mongoAttempt.quizName
+            );
+            
+            if (existingIndex === -1) {
+                mergedAttempts.push(mongoAttempt);
+            } else if (new Date(mongoAttempt.attemptedAt) > new Date(mergedAttempts[existingIndex].attemptedAt)) {
+                mergedAttempts[existingIndex] = mongoAttempt;
+            }
+        });
+        
+        // Update MongoDB with merged data
+        for (const attempt of mergedAttempts) {
+            await attemptsCollection.updateOne(
+                { studentId: username, quizName: attempt.quizName },
+                { $set: attempt },
+                { upsert: true }
+            );
+        }
+        
+        // Update local file
+        fs.writeFileSync(attemptsFile, JSON.stringify(mergedAttempts, null, 2));
+        
+        res.json({ success: true });
     } catch (err) {
         console.error('Error syncing attempts:', err);
         res.status(500).json({ error: 'Failed to sync attempts' });
+    }
+});
+
+// Route to delete attempt
+router.post('/delete-attempt', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+
+    try {
+        const { quizName } = req.body;
+        const username = req.session.username;
+        const db = req.app.locals.db;
+        const attemptsCollection = db.collection('attempts');
+        
+        // Delete from MongoDB
+        await attemptsCollection.deleteOne({ 
+            studentId: username, 
+            quizName: quizName 
+        });
+        
+        // Update local file
+        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
+        if (fs.existsSync(attemptsFile)) {
+            let attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+            attempts = attempts.filter(attempt => attempt.quizName !== quizName);
+            fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting attempt:', err);
+        res.status(500).json({ error: 'Failed to delete attempt' });
     }
 });
 
@@ -1183,6 +1252,45 @@ router.get('/logout', (req, res) => {
         }
         res.redirect('/login');
     });
+});
+
+// Route to get manual questions for a quiz
+router.get('/manual-questions/:quizName', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not authorized" });
+    }
+
+    try {
+        const quizName = req.params.quizName;
+        
+        // First try to get from MongoDB
+        const db = req.app.locals.db;
+        const manualQuestionsCollection = db.collection('manual_questions');
+        
+        const quiz = await manualQuestionsCollection.findOne({ quizName });
+        if (quiz) {
+            return res.json(quiz.questions);
+        }
+        
+        // If not found in MongoDB, try local file
+        const manualQuestionsPath = path.join(__dirname, '../manual-questions', `${quizName}.json`);
+        if (fs.existsSync(manualQuestionsPath)) {
+            const questions = JSON.parse(fs.readFileSync(manualQuestionsPath, 'utf8'));
+            // Save to MongoDB for future use
+            await manualQuestionsCollection.insertOne({
+                quizName,
+                questions,
+                createdAt: new Date()
+            });
+            return res.json(questions);
+        }
+        
+        // If no questions found
+        res.status(404).json({ error: "Questions not found" });
+    } catch (err) {
+        console.error('Error getting manual questions:', err);
+        res.status(500).json({ error: 'Failed to get manual questions' });
+    }
 });
 
 module.exports = router;

@@ -1,16 +1,28 @@
 [
   {
-    "quizName": "amma",
-    "score": 5,
-    "totalQuestions": 5,
-    "attemptedAt": "2025-05-03T13:06:06.719Z",
-    "isRetake": false
-  },
-  {
-    "quizName": "appa",
+    "studentId": "blue4181",
+    "quizName": "dhee",
     "score": 1,
     "totalQuestions": 5,
-    "attemptedAt": "2025-05-03T13:10:12.940Z",
-    "isRetake": false
+    "attemptedAt": "2025-05-03T14:02:16.165Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-03T14:02:16.165Z",
+    "updatedAt": "2025-05-03T14:02:16.165Z",
+    "answers": null,
+    "_id": "681621e8ab8e5419f2b845f3"
+  },
+  {
+    "studentId": "blue4181",
+    "quizName": "vajju",
+    "score": 1,
+    "totalQuestions": 20,
+    "attemptedAt": "2025-05-03T14:46:08.282Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-03T14:46:08.282Z",
+    "updatedAt": "2025-05-03T14:46:08.282Z",
+    "answers": null,
+    "_id": "68162c30496482d6ad9d9a0b"
   }
 ]
