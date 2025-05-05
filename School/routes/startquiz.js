@@ -82,12 +82,18 @@ function shuffleArray(array) {
     return shuffled;
 }
 
+function getISTNow() {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+}
+
 function calculateDuration(quizConfig) {
     const [startH, startM] = quizConfig.startTime.split(':').map(Number);
     const [endH, endM] = quizConfig.endTime.split(':').map(Number);
     
-    // Create Date objects for today with the quiz times
-    const now = new Date();
+    // Get current IST time
+    const now = getISTNow();
+    // Create Date objects for today with the quiz times in IST
     const quizStartTime = new Date(
         now.getFullYear(),
         now.getMonth(),

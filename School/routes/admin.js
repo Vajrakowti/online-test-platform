@@ -2004,7 +2004,7 @@ router.get('/total-quiz', (req, res) => {
     const quizzes = readQuizzes();
     
     // Get current time to determine quiz status (active, upcoming, ended)
-    const now = new Date();
+    const now = getISTNow();
     const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     const currentDate = now.toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
     
@@ -2285,7 +2285,7 @@ router.get('/total-quiz', (req, res) => {
                                         const endHour = parseInt(endParts[0]);
                                         const endMinute = parseInt(endParts[1]);
                                         
-                                        const now = new Date();
+                                        const now = getISTNow();
                                         const currentHour = now.getHours();
                                         const currentMinute = now.getMinutes();
                                         
@@ -2378,7 +2378,7 @@ router.get('/api/quiz/:quizName', (req, res) => {
         }
 
         // Check if quiz has already started
-        const now = new Date();
+        const now = getISTNow();
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
         // Include if quiz has started in the response
@@ -2420,7 +2420,7 @@ router.get('/edit-quiz/:quizName', (req, res) => {
         }
 
         // Check if quiz has already started
-        const now = new Date();
+        const now = getISTNow();
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
         if (quiz.startTime <= currentTime) {
@@ -2490,7 +2490,7 @@ router.post('/update-quiz-excel/:quizName', (req, res) => {
             }
 
             // Check if quiz has already started
-            const now = new Date();
+            const now = getISTNow();
             const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
             if (quizzes[quizIndex].startTime <= currentTime) {
@@ -2707,7 +2707,7 @@ router.post('/update-quiz-manual/:quizName', (req, res) => {
             }
 
             // Check if quiz has already started
-            const now = new Date();
+            const now = getISTNow();
             const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
             if (quizzes[quizIndex].startTime <= currentTime) {
@@ -3684,7 +3684,7 @@ router.post('/retake-quiz/assign', async (req, res) => {
     }
     
     // Check if the quiz times are valid
-    const now = new Date();
+    const now = getISTNow();
     const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     
     // Convert times to comparable values
@@ -4917,5 +4917,11 @@ router.post('/sync-retakes', async (req, res) => {
         res.status(500).json({ error: 'Failed to sync retakes' });
     }
 });
+
+// Helper to get current IST time as Date object
+function getISTNow() {
+    const now = new Date();
+    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+}
 
 module.exports = router;
