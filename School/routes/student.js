@@ -355,9 +355,10 @@ router.post('/sync-attempts', async (req, res) => {
         
         // Update MongoDB with merged data
         for (const attempt of mergedAttempts) {
+            const { _id, ...attemptWithoutId } = attempt; // Destructure to remove _id
             await attemptsCollection.updateOne(
                 { studentId: username, quizName: attempt.quizName },
-                { $set: attempt },
+                { $set: attemptWithoutId },
                 { upsert: true }
             );
         }

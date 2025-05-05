@@ -882,8 +882,12 @@ router.get('/:quizName', (req, res) => {
                         userAnswers[index] = userAnswer;
                         answeredQuestions[index] = userAnswer !== "";
                         
-                        if (userAnswer === correctAnswer) {
-                            score += 1;
+                        // Recalculate total score by checking all answers
+                        score = 0;
+                        for (let i = 0; i < quiz.length; i++) {
+                            if (userAnswers[i] === quiz[i][5]) {
+                                score += 1;
+                            }
                         }
                         
                         updateSidebar();

@@ -1,0 +1,54 @@
+[
+  {
+    "studentId": "vajra9714",
+    "quizName": "Working",
+    "score": 4,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T05:05:03.972Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T05:05:03.972Z",
+    "updatedAt": "2025-05-05T05:05:03.972Z",
+    "answers": null,
+    "_id": "681846ff66f26d4875506625"
+  },
+  {
+    "studentId": "vajra9714",
+    "quizName": "All is well",
+    "score": 3,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T05:18:36.390Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T05:18:36.390Z",
+    "updatedAt": "2025-05-05T05:18:36.390Z",
+    "answers": null,
+    "_id": "68184a2c1ce2cf166500a8a9"
+  },
+  {
+    "_id": "68183e9d2bd05a909c0b5261",
+    "studentId": "vajra9714",
+    "quizName": "check3",
+    "score": 0,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T04:29:17.572Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T04:29:17.572Z",
+    "updatedAt": "2025-05-05T04:29:17.572Z",
+    "answers": null
+  },
+  {
+    "_id": "68183ca878deada09de85452",
+    "studentId": "vajra9714",
+    "quizName": "check1 ",
+    "score": 0,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T04:20:56.284Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T04:20:56.284Z",
+    "updatedAt": "2025-05-05T04:20:56.284Z",
+    "answers": null
+  }
+]

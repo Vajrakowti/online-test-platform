@@ -1,109 +1,20 @@
 [
   {
-    "name": "qqq retake",
-    "startTime": "17:30",
-    "endTime": "18:20",
-    "class": "999",
-    "type": "excel",
-    "file": "qqq retake.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "manual",
-    "startTime": "10:20",
-    "endTime": "12:00",
+    "name": "Working",
+    "startTime": "10:34",
+    "endTime": "10:36",
     "class": "10",
     "type": "excel",
-    "file": "manual.xlsx"
+    "file": "Working.xlsx",
+    "_id": "6818466b66f26d4875506624"
   },
   {
-    "name": "dhee",
-    "startTime": "19:00",
-    "endTime": "20:00",
+    "name": "All is well",
+    "startTime": "10:48",
+    "endTime": "10:49",
     "class": "10",
     "type": "excel",
-    "file": "dhee.xlsx",
-    "_id": "681621d9ab8e5419f2b845f2"
-  },
-  {
-    "name": "vajju",
-    "startTime": "19:34",
-    "endTime": "22:34",
-    "class": "999",
-    "type": "excel",
-    "file": "vajju.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "gg",
-    "startTime": "19:45",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "gg.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "baby",
-    "startTime": "19:50",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "baby.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "vajju retake",
-    "startTime": "19:50",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "vajju retake.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "ygy",
-    "startTime": "20:00",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "ygy.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "jk",
-    "startTime": "20:00",
-    "endTime": "21:01",
-    "class": "999",
-    "type": "excel",
-    "file": "jk.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "xxx",
-    "startTime": "20:00",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "xxx.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "narashima mama",
-    "startTime": "20:40",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "narashima mama.xlsx",
-    "isStudentSpecific": true
-  },
-  {
-    "name": "alexgadu",
-    "startTime": "20:40",
-    "endTime": "21:00",
-    "class": "999",
-    "type": "excel",
-    "file": "alexgadu.xlsx",
-    "isStudentSpecific": true
+    "file": "All is well.xlsx",
+    "_id": "681849d91ce2cf166500a8a8"
   }
 ]
