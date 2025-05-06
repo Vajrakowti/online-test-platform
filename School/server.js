@@ -469,6 +469,11 @@ MongoClient.connect(url, mongoOptions)
             res.sendFile(path.join(__dirname, "public", "user_login.html"));
         });
 
+        // Student Login Page Route
+        app.get('/login', (req, res) => {
+            res.sendFile(path.join(__dirname, "public", "user_login.html"));
+        });
+
         // Admin Login Page
         app.get('/admin-login', (req, res) => {
             res.sendFile(path.join(__dirname, "public", "admin_login.html"));

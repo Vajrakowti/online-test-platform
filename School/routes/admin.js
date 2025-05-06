@@ -28,8 +28,8 @@ const ADMIN_SIDEBAR = `
     <!-- Students Dropdown -->
     <div class="sidebar-dropdown">
       <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
-      <i class="fas fa-users"></i>
-      <span>Students</span>
+        <i class="fas fa-users"></i>
+        <span>Students</span>
         <i class="fas fa-chevron-down dropdown-icon"></i>
       </a>
       <div class="dropdown-menu">
@@ -41,21 +41,33 @@ const ADMIN_SIDEBAR = `
     <!-- Quizzes Dropdown -->
     <div class="sidebar-dropdown">
       <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
-      <i class="fas fa-clipboard-list"></i>
-      <span>Quizzes</span>
+        <i class="fas fa-clipboard-list"></i>
+        <span>Quizzes</span>
         <i class="fas fa-chevron-down dropdown-icon"></i>
-    </a>
+      </a>
       <div class="dropdown-menu">
         <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
         <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
       </div>
     </div>
     
+    <!-- Student-Specific Quiz -->
+    <a href="/admin/retake-quiz" class="sidebar-item">
+      <i class="fas fa-user-check"></i>
+      <span>Student-Specific Quiz</span>
+    </a>
+    
     <!-- Messages -->
     <a href="/admin/messages" class="sidebar-item">
       <i class="fas fa-envelope"></i>
       <span>Student Messages</span>
     </a>
+  </div>
+  <div class="signout-container" style="margin-top:auto; padding: 15px 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+    <button onclick="window.location.href='/admin/logout'" class="logout-btn" style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+      <i class="fas fa-sign-out-alt"></i>
+      Logout
+    </button>
   </div>
 </div>
 `;
@@ -141,8 +153,9 @@ const SIDEBAR_CSS = `
 
 .sidebar-title h1 {
   font-size: 1.3rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
+  color: #fff;
 }
 
 .sidebar-divider {
@@ -165,12 +178,14 @@ const SIDEBAR_CSS = `
   text-decoration: none;
   transition: all 0.3s;
   border-radius: 0;
+  font-weight: 500;
+  font-size: 1.05rem;
 }
 
-.sidebar-item:hover,
-.sidebar-item.active {
+.sidebar-item.active,
+.sidebar-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 0;
+  font-weight: 700;
 }
 
 .sidebar-item i {
@@ -218,6 +233,7 @@ const SIDEBAR_CSS = `
   color: white;
   text-decoration: none;
   transition: background-color 0.3s;
+  font-size: 1rem;
 }
 
 .dropdown-item:hover {
@@ -1026,9 +1042,7 @@ router.get('/students/:class', async (req, res) => {
         <body>
             <div class="admin-container">
                 ${ADMIN_SIDEBAR}
-                ${ADMIN_SCRIPTS}
-                
-                <div class="main-content">
+                <main class="main-content">
                     <div class="student-container">
                         <div class="card">
                             <div class="header">
@@ -1095,7 +1109,7 @@ router.get('/students/:class', async (req, res) => {
                             }
                         </div>
                     </div>
-                </div>
+                </main>
             </div>
 
             <!-- Email Modal -->
@@ -2239,9 +2253,7 @@ router.get('/total-quiz', (req, res) => {
     <body>
         <div class="admin-container">
             ${ADMIN_SIDEBAR}
-            ${ADMIN_SCRIPTS}
-            
-            <div class="main-content">
+            <main class="main-content">
                 <div class="container">
                     <div class="header">
                         <h1 class="page-title">Total Quizzes</h1>
@@ -2325,7 +2337,7 @@ router.get('/total-quiz', (req, res) => {
                         `
                     }
                 </div>
-            </div>
+            </main>
         </div>
 
         <script>

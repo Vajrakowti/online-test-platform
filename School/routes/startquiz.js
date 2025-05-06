@@ -205,10 +205,22 @@ router.get('/:quizName', (req, res) => {
                 <a href="/student">Back to Dashboard</a>
             `);
         }
-        
+
         // Check if the quiz has already been attempted
-        if (hasAttemptedQuiz(req.session.username, quizName)) {
-            // Redirect to the result page instead of showing the quiz again
+        const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
+        let hasAttempted = false;
+
+        if (fs.existsSync(attemptsFile)) {
+            try {
+                const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
+                hasAttempted = attempts.some(attempt => attempt.quizName === quizName);
+            } catch (err) {
+                console.error("Error reading attempts file:", err);
+            }
+        }
+
+        // If student has attempted and is not eligible for retake, redirect to results
+        if (hasAttempted && !isRetakeEligible) {
             return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
         }
 
@@ -225,9 +237,9 @@ router.get('/:quizName', (req, res) => {
                 <style>
                     body { font-family: Arial; margin: 0; background: #f0f0f0; display: flex; }
                     .navbar {
-                        background: #007bff;
+                        background: linear-gradient(135deg, #007bff, #0056b3);
                         color: white;
-                        padding: 15px 20px;
+                        padding: 20px 30px;
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
@@ -235,6 +247,7 @@ router.get('/:quizName', (req, res) => {
                         position: fixed;
                         top: 0;
                         z-index: 1000;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                     }
                     .navbar > div {
                         display: flex;
@@ -243,23 +256,30 @@ router.get('/:quizName', (req, res) => {
                     }
                     .card {
                         background: white;
-                        padding: 20px;
-                        max-width: 600px;
+                        padding: 30px;
+                        max-width: 800px;
                         margin: 80px auto 30px 20px;
-                        border-radius: 8px;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                        border-radius: 12px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
                         flex: 1;
+                        transition: all 0.3s ease;
                     }
                     .sidebar {
-                        width: 200px;
-                        padding: 10px;
+                        width: 180px;
+                        padding: 10px 4px;
                         background: #fff;
-                        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+                        box-shadow: -2px 0 5px rgba(0,0,0,0.08);
                         overflow-y: auto;
                         height: calc(100vh - 90px);
                         position: fixed;
                         right: 0;
                         top: 60px;
+                        transition: transform 0.3s ease;
+                        z-index: 100;
+                        transform: translateX(100%); /* Start collapsed */
+                    }
+                    .sidebar.expanded {
+                        transform: translateX(0);
                     }
                     .sidebar h3 {
                         text-align: center;
@@ -271,47 +291,105 @@ router.get('/:quizName', (req, res) => {
                         margin-top: 0;
                         z-index: 1;
                     }
+                    .sidebar-toggle {
+                        position: fixed;
+                        right: 0;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        background: #1976d2;
+                        color: #fff;
+                        border: none;
+                        width: 36px;
+                        height: 36px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 8px 0 0 8px;
+                        z-index: 101;
+                        box-shadow: 0 2px 8px rgba(25,118,210,0.12);
+                        transition: all 0.3s;
+                        font-size: 1.3em;
+                    }
+                    .sidebar-toggle.expanded {
+                        right: 180px;
+                    }
+                    .sidebar-toggle i {
+                        display: inline-block;
+                        font-style: normal;
+                        font-size: 1.5em;
+                        margin-left: 0;
+                        transition: transform 0.3s;
+                    }
+                    .sidebar-toggle.expanded i {
+                        transform: rotate(180deg);
+                    }
+                    .sidebar-toggle:disabled {
+                        display: none !important;
+                    }
                     .sidebar button {
                         width: 100%;
-                        margin-bottom: 8px;
-                        padding: 8px;
+                        min-height: 38px;
+                        max-height: 44px;
+                        margin: 0;
+                        padding: 0;
                         cursor: pointer;
-                        border: none;
-                        border-radius: 4px;
+                        border: 2px solid #1976d2;
+                        border-radius: 10px;
                         text-align: center;
                         transition: all 0.2s;
+                        font-size: 1em;
+                        font-weight: bold;
+                        background: #fff;
+                        color: #1976d2;
+                        box-shadow: 0 1px 3px rgba(25,118,210,0.06);
+                        outline: none;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .sidebar button.viewed {
+                        background: #e53935 !important;
+                        color: #fff !important;
+                        border: 2px solid #e53935 !important;
                     }
                     .sidebar button.answered {
-                        background-color: #4CAF50;
-                        color: white;
-                    }
-                    .sidebar button.skipped {
-                        background-color: #f44336;
-                        color: white;
+                        background: linear-gradient(135deg, #4CAF50, #388E3C) !important;
+                        color: white !important;
+                        border: 2px solid #4CAF50 !important;
                     }
                     .sidebar button.current {
-                        border: 2px solid #007bff;
-                        font-weight: bold;
+                        border: 3px solid #1976d2 !important;
+                        box-shadow: 0 0 0 2px #90caf9;
+                        background: #fff !important;
+                        color: #1976d2 !important;
                     }
                     h2 { margin-bottom: 20px; }
                     ul { list-style: none; padding: 0; }
-                    li { margin-bottom: 10px; }
-                    label { cursor: pointer; }
+                    li { margin-bottom: 15px; padding: 15px; border-radius: 8px; background: #f8f9fa; transition: all 0.3s ease; }
+                    li:hover { background: #e9ecef; transform: translateX(5px); }
+                    label { cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 1.1em; }
+                    input[type="radio"] { width: 20px; height: 20px; cursor: pointer; }
                     button {
-                        padding: 10px 20px;
+                        padding: 12px 25px;
                         margin-top: 15px;
-                        background: rgb(0, 153, 255);
+                        background: linear-gradient(135deg, #007bff, #0056b3);
                         color: white;
                         border: none;
-                        border-radius: 5px;
+                        border-radius: 8px;
                         cursor: pointer;
+                        font-weight: 600;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
                     }
                     button:hover {
-                        background: #0056b3;
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                        background: linear-gradient(135deg, #0056b3, #004494);
                     }
                     .button-container {
                         display: flex;
-                        gap: 10px;
+                        gap: 15px;
+                        margin-top: 25px;
                     }
                     #scoreSection {
                         margin-top: 20px;
@@ -321,14 +399,16 @@ router.get('/:quizName', (req, res) => {
                     #timer {
                         font-weight: bold;
                         transition: color 0.5s ease;
-                        margin-right: 30px;
+                        margin-right: 50px;
                     }
                     .normal { color: white; }
                     .warning { color: orange; }
                     .danger { color: red; }
                     #questionList {
-                        max-height: calc(100vh - 150px);
-                        overflow-y: auto;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                        align-items: stretch;
                     }
                     #answerReview {
                         display: none;
@@ -483,6 +563,14 @@ router.get('/:quizName', (req, res) => {
                     .continue-btn:hover {
                         background: #f8f9fa;
                     }
+                    @media (max-width: 768px) {
+                        .sidebar {
+                            width: 120px;
+                        }
+                        .sidebar-toggle.expanded {
+                            right: 120px;
+                        }
+                    }
                 </style>
             </head>
             <body>
@@ -506,8 +594,12 @@ router.get('/:quizName', (req, res) => {
                 <div id="quizContainer" style="display:none;">
                     <div class="navbar">
                         <div><strong>${quizName}</strong></div>
-                        <div>Time Left: <span id="timer" class="normal"></span></div>
+                        <div>Time Left : <span id="timer" class="normal"></span></div>
                     </div>
+
+                    <button class="sidebar-toggle" onclick="toggleSidebar()">
+                        <i>▶</i>
+                    </button>
 
                     <div class="card">
                         <div id="quiz-content">
@@ -517,6 +609,7 @@ router.get('/:quizName', (req, res) => {
                                 <ul id="options"></ul>
                                 <div class="button-container">
                                     <button type="button" onclick="prevQuestion()" id="prevBtn">Previous</button>
+                                    <button type="button" onclick="clearResponse()" id="clearBtn">Clear Response</button>
                                     <button type="button" onclick="nextQuestion()" id="nextBtn">Next</button>
                                     <button type="button" onclick="submitQuiz()" id="submitBtn" style="display:none;">Submit</button>
                                 </div>
@@ -592,6 +685,14 @@ router.get('/:quizName', (req, res) => {
                         
                         // Set up event listeners
                         setupEventListeners();
+                        
+                        // Ensure sidebar starts collapsed
+                        const sidebar = document.querySelector('.sidebar');
+                        const toggle = document.querySelector('.sidebar-toggle');
+                        const card = document.querySelector('.card');
+                        sidebar.classList.remove('expanded');
+                        toggle.classList.remove('expanded');
+                        card.classList.remove('expanded');
                     }
 
                     function enterFullscreen() {
@@ -701,6 +802,10 @@ router.get('/:quizName', (req, res) => {
                     function hideWarning() {
                         document.getElementById('fullscreenWarning').style.display = 'none';
                         document.getElementById('fullscreenOverlay').style.display = 'none';
+                        // Always resume timer if quiz not submitted
+                        if (!quizSubmitted) {
+                            startTimer();
+                        }
                         enterFullscreen();
                     }
 
@@ -792,52 +897,33 @@ router.get('/:quizName', (req, res) => {
 
                     function submitQuiz(auto = false) {
                         quizSubmitted = true;
-                        
-                        // Check the answer for the current question (which might be the last one)
                         checkAnswer();
-                        
                         exitFullscreen();
                         removeEventListeners();
-                        
-                        // First, replace the showQuestion function entirely
-                        window.showQuestion = function() {
-                            return; // Do absolutely nothing
-                        };
-                        
-                        // Add quiz-completed class to body to hide the image using CSS
+                        window.showQuestion = function() { return; };
                         document.body.classList.add('quiz-completed');
-                        
-                        // Completely remove the sidebar instead of just hiding it
+                        // Remove sidebar and toggle button
                         const sidebar = document.querySelector('.sidebar');
-                        if (sidebar) {
-                            sidebar.parentNode.removeChild(sidebar);
-                        }
-                        
+                        if (sidebar) sidebar.parentNode.removeChild(sidebar);
+                        const sidebarToggle = document.querySelector('.sidebar-toggle');
+                        if (sidebarToggle) sidebarToggle.parentNode.removeChild(sidebarToggle);
                         clearInterval(timerInterval);
-                        
                         // Disable all navigation buttons and remove their event handlers
                         const allButtons = document.querySelectorAll('button');
                         allButtons.forEach(btn => {
                             if (btn.id !== 'backBtn') {
                                 btn.disabled = true;
                                 btn.onclick = null;
-                                // Remove all event listeners by cloning and replacing
                                 const newBtn = btn.cloneNode(true);
                                 if (btn.parentNode) {
                                     btn.parentNode.replaceChild(newBtn, btn);
                                 }
                             }
                         });
-                        
-                        // Switch to results view by hiding quiz content and showing results
                         document.getElementById('quiz-content').style.display = "none";
                         document.getElementById('quiz-results').style.display = "block";
-                        
                         document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + quiz.length;
-                        
-                        // Mark this quiz as completed in sessionStorage
                         sessionStorage.setItem(attemptKey, 'completed');
-                        
                         saveAttempt(score, quiz.length);
                         generateAnswerReview();
                     }
@@ -901,7 +987,7 @@ router.get('/:quizName', (req, res) => {
 
                     function generateSidebar() {
                         const list = quiz.map((_, i) => 
-                            \`<button onclick="showQuestion(\${i})" id="qBtn\${i}">Q\${i + 1}</button>\`
+                            '<button onclick="showQuestion(' + i + ')" id="qBtn' + i + '">Q' + (i + 1) + '</button>'
                         ).join("");
                         document.getElementById('questionList').innerHTML = list;
                         updateSidebar();
@@ -909,13 +995,13 @@ router.get('/:quizName', (req, res) => {
 
                     function updateSidebar() {
                         for (let i = 0; i < quiz.length; i++) {
-                            const btn = document.getElementById(\`qBtn\${i}\`);
+                            const btn = document.getElementById('qBtn' + i);
                             if (btn) {
                                 btn.className = '';
                                 if (answeredQuestions[i]) {
                                     btn.classList.add('answered');
                                 } else if (viewedQuestions[i]) {
-                                    btn.classList.add('skipped');
+                                    btn.classList.add('viewed');
                                 }
                                 if (i === index) {
                                     btn.classList.add('current');
@@ -1045,6 +1131,16 @@ router.get('/:quizName', (req, res) => {
                         }
                     }
 
+                    function toggleSidebar() {
+                        const sidebar = document.querySelector('.sidebar');
+                        const toggle = document.querySelector('.sidebar-toggle');
+                        const card = document.querySelector('.card');
+                        
+                        sidebar.classList.toggle('expanded');
+                        toggle.classList.toggle('expanded');
+                        card.classList.toggle('expanded');
+                    }
+
                     // Add event listener for page load to detect if this is a page refresh during an active quiz
                     window.addEventListener('load', function() {
                         // If the page is being refreshed during an active quiz (not already submitted)
@@ -1079,7 +1175,34 @@ router.get('/:quizName', (req, res) => {
                                 }
                             }
                         });
+
+                        // Add event listener for page load to ensure sidebar starts collapsed
+                        const sidebar = document.querySelector('.sidebar');
+                        const toggle = document.querySelector('.sidebar-toggle');
+                        const card = document.querySelector('.card');
+                        if (sidebar && toggle && card) {
+                            sidebar.classList.remove('expanded');
+                            toggle.classList.remove('expanded');
+                            card.classList.remove('expanded');
+                        }
                     });
+
+                    // Add markedQuestions array to track marked questions
+                    const markedQuestions = new Array(quiz.length).fill(false);
+
+                    function markForReview() {
+                        markedQuestions[index] = !markedQuestions[index];
+                        updateSidebar();
+                    }
+
+                    function clearResponse() {
+                        userAnswers[index] = null;
+                        answeredQuestions[index] = false;
+                        // Uncheck all radio buttons
+                        const radios = document.querySelectorAll('input[name="option"]');
+                        radios.forEach(r => r.checked = false);
+                        updateSidebar();
+                    }
 
                 </script>
             </body>

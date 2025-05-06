@@ -1,0 +1,80 @@
+[
+  {
+    "studentId": "pavankumar3148",
+    "quizName": "jj",
+    "score": 0,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-06T06:54:27.650Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-06T06:54:27.650Z",
+    "updatedAt": "2025-05-06T06:54:27.650Z",
+    "answers": null,
+    "_id": "6819b2234a8501ba39f3fad6"
+  },
+  {
+    "_id": "681993e1016e06bb37af1dff",
+    "studentId": "pavankumar3148",
+    "quizName": "Hello",
+    "score": 0,
+    "totalQuestions": 1,
+    "attemptedAt": "2025-05-06T04:45:21.570Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-06T04:45:21.570Z",
+    "updatedAt": "2025-05-06T04:45:21.570Z",
+    "answers": null
+  },
+  {
+    "_id": "681991b9016e06bb37af1dfc",
+    "studentId": "pavankumar3148",
+    "quizName": "Diff",
+    "score": 0,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-06T04:36:09.782Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-06T04:36:09.782Z",
+    "updatedAt": "2025-05-06T04:36:09.782Z",
+    "answers": null
+  },
+  {
+    "_id": "68188b65421eb099e625cf36",
+    "studentId": "pavankumar3148",
+    "quizName": "Last Exam",
+    "score": 1,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T09:56:53.971Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T09:56:53.971Z",
+    "updatedAt": "2025-05-05T09:56:53.971Z",
+    "answers": null
+  },
+  {
+    "_id": "681870b2ea00edecea03689f",
+    "studentId": "pavankumar3148",
+    "quizName": "General",
+    "score": 1,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T08:02:58.206Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T08:02:58.206Z",
+    "updatedAt": "2025-05-05T08:02:58.206Z",
+    "answers": null
+  },
+  {
+    "_id": "68186d8eea00edecea03689d",
+    "studentId": "pavankumar3148",
+    "quizName": "GK",
+    "score": 4,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-05T07:49:34.893Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-05T07:49:34.893Z",
+    "updatedAt": "2025-05-05T07:49:34.893Z",
+    "answers": null
+  }
+]

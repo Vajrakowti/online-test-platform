@@ -1,0 +1,28 @@
+[
+  {
+    "studentId": "mnm7094",
+    "quizName": "quizzz",
+    "score": 0,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-06T11:00:28.864Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-06T11:00:28.864Z",
+    "updatedAt": "2025-05-06T11:00:28.864Z",
+    "answers": null,
+    "_id": "6819ebcc97cfc354b3a244bc"
+  },
+  {
+    "studentId": "mnm7094",
+    "quizName": "lllal",
+    "score": 0,
+    "totalQuestions": 20,
+    "attemptedAt": "2025-05-06T11:16:33.257Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-06T11:16:33.257Z",
+    "updatedAt": "2025-05-06T11:16:33.257Z",
+    "answers": null,
+    "_id": "6819ef9197cfc354b3a244be"
+  }
+]
