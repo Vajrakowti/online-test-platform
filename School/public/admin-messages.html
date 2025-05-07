@@ -818,28 +818,22 @@
           <i class="fas fa-home"></i>
           <span>Dashboard</span>
         </a>
-        <div class="sidebar-dropdown">
-          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
-            <i class="fas fa-users"></i>
-            <span>Students</span>
-            <i class="fas fa-chevron-down dropdown-icon"></i>
-          </a>
-          <div class="dropdown-menu">
-            <a href="/admin/add-student" class="dropdown-item">Add Students</a>
-            <a href="/admin/students" class="dropdown-item">View Students</a>
-          </div>
-        </div>
-        <div class="sidebar-dropdown">
-          <a href="javascript:void(0)" class="sidebar-item dropdown-toggle">
-            <i class="fas fa-clipboard-list"></i>
-            <span>Quizzes</span>
-            <i class="fas fa-chevron-down dropdown-icon"></i>
-          </a>
-          <div class="dropdown-menu">
-            <a href="/admin/create-quiz" class="dropdown-item">Create Quiz</a>
-            <a href="/admin/total-quiz" class="dropdown-item">View Quizzes</a>
-          </div>
-        </div>
+        <a href="/admin/add-student" class="sidebar-item">
+          <i class="fas fa-user-plus"></i>
+          <span>Add Student</span>
+        </a>
+        <a href="/admin/students" class="sidebar-item">
+          <i class="fas fa-users"></i>
+          <span>View Students</span>
+        </a>
+        <a href="/admin/create-quiz" class="sidebar-item">
+          <i class="fas fa-clipboard-list"></i>
+          <span>Create Quiz</span>
+        </a>
+        <a href="/admin/total-quiz" class="sidebar-item">
+          <i class="fas fa-list"></i>
+          <span>View Quizzes</span>
+        </a>
         <a href="/admin/retake-quiz" class="sidebar-item">
           <i class="fas fa-user-check"></i>
           <span>Student-Specific Quiz</span>

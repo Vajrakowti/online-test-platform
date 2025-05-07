@@ -76,5 +76,18 @@
     "createdAt": "2025-05-05T07:49:34.893Z",
     "updatedAt": "2025-05-05T07:49:34.893Z",
     "answers": null
+  },
+  {
+    "studentId": "pavankumar3148",
+    "quizName": "java",
+    "score": 0,
+    "totalQuestions": 20,
+    "attemptedAt": "2025-05-07T07:33:16.671Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-07T07:33:16.671Z",
+    "updatedAt": "2025-05-07T07:33:16.671Z",
+    "answers": null,
+    "_id": "681b0cbc4b31f773ee948dd1"
   }
 ]
