@@ -246,7 +246,7 @@ router.get('/:quizName', (req, res) => {
                         width: 100%;
                         position: fixed;
                         top: 0;
-                        z-index: 1000;
+                        z-index: 2000;
                     }
                     .navbar > div {
                         display: flex;
@@ -834,29 +834,207 @@ router.get('/:quizName', (req, res) => {
                     }
                     .question-panel-overlay {
                         position: fixed;
-                        top: 60px;
+                        top: 60px; /* Changed from 0 to 60px to account for navbar height */
                         right: 0;
                         width: auto;
-                        height: calc(100vh - 60px);
+                        height: calc(100vh - 60px); /* Adjusted height to account for navbar */
                         background: none;
-                        z-index: 2000;
+                        z-index: 1500;
                         display: none;
                         align-items: flex-start;
                         justify-content: flex-end;
                         pointer-events: none;
                     }
+                    .question-panel-overlay.open {
+                        display: flex;
+                    }
                     .question-panel-card {
                         background: #fff;
                         border-radius: 18px 0 0 18px;
-                        box-shadow: -4px 0 24px rgba(0,0,0,0.1);
-                        width: 320px;
-                        height: 100%;
+                        box-shadow: -4px 0 24px rgba(0,0,0,0.13);
+                        width: 410px;
+                        max-width: 98vw;
+                        min-height: 90vh;
+                        margin: 0 0 0 auto;
+                        display: flex;
+                        flex-direction: column;
+                        padding: 24px 18px 18px 18px;
+                        gap: 18px;
                         position: relative;
                         pointer-events: auto;
                     }
-                    .panel-arrow-btn {
+                    .panel-summary-card {
+                        background: #f8f9fa;
+                        border-radius: 12px;
+                        padding: 18px 12px 10px 12px;
+                        margin-bottom: 10px;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                    }
+                    .summary-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 8px;
+                    }
+                    .summary-shape {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.1rem;
+                        font-weight: 700;
+                        width: 38px;
+                        height: 38px;
+                        margin-right: 6px;
+                    }
+                    .summary-shape.answered {
+                        background: #4CAF50;
+                        color: #fff;
+                        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+                    }
+                    .summary-shape.not-answered {
+                        background: #f44336;
+                        color: #fff;
+                        clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+                    }
+                    .summary-shape.marked {
+                        background: #673ab7;
+                        color: #fff;
+                        border-radius: 50%;
+                    }
+                    .summary-shape.not-visited {
+                        background: #fff;
+                        color: #222;
+                        border: 2px solid #bbb;
+                        border-radius: 7px;
+                    }
+                    .summary-shape.answered-marked {
+                        background: #2196f3;
+                        color: #fff;
+                        border-radius: 50%;
+                        border: 2px solid #2196f3;
+                        position: relative;
+                    }
+                    .summary-label {
+                        font-size: 1rem;
+                        color: #333;
+                        margin-right: 18px;
+                        min-width: 120px;
+                    }
+                    .panel-section-card {
+                        background: #fff;
+                        border-radius: 12px;
+                        padding: 18px 10px 18px 10px;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                    }
+                    .panel-title {
+                        text-align: center;
+                        font-size: 1.18rem;
+                        font-weight: 600;
+                        margin-bottom: 18px;
+                        color: #222;
+                    }
+                    .question-grid {
+                        display: grid;
+                        grid-template-columns: repeat(5, 1fr);
+                        gap: 14px;
+                        padding: 0 8px;
+                    }
+                    .question-btn {
+                        width: 38px;
+                        height: 38px;
+                        font-size: 1.1rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: none;
+                        outline: none;
+                        background: #fff;
+                        color: #222;
+                        border-radius: 7px;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+                        transition: box-shadow 0.2s, background 0.2s;
+                        position: relative;
+                    }
+                    .question-btn.answered {
+                        background: #4CAF50;
+                        color: #fff;
+                        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+                    }
+                    .question-btn.not-answered {
+                        background: #f44336;
+                        color: #fff;
+                        clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+                    }
+                    .question-btn.marked {
+                        background: #673ab7;
+                        color: #fff;
+                        border-radius: 50%;
+                        clip-path: none;
+                    }
+                    .question-btn.not-visited {
+                        background: #fff;
+                        color: #222;
+                        border: 2px solid #bbb;
+                        border-radius: 7px;
+                        clip-path: none;
+                    }
+                    .question-btn.answered-marked {
+                        background: #2196f3;
+                        color: #fff;
+                        border-radius: 50%;
+                        border: 2px solid #2196f3;
+                        clip-path: none;
+                    }
+                    .question-btn.current {
+                        box-shadow: 0 0 0 3px #007bff44;
+                        border: 2px solid #007bff;
+                    }
+                    .close-panel-btn {
                         position: absolute;
-                        right: -44px;
+                        top: 18px;
+                        right: 24px;
+                        background: #fff;
+                        color: #333;
+                        border: none;
+                        font-size: 2rem;
+                        border-radius: 50%;
+                        width: 38px;
+                        height: 38px;
+                        cursor: pointer;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+                        z-index: 10;
+                        transition: background 0.2s;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .close-panel-btn:hover {
+                        background: #f44336;
+                        color: #fff;
+                    }
+                    .open-panel-btn {
+                        position: fixed;
+                        right: 0;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        background: #fff;
+                        color: #007bff;
+                        border: 2px solid #bbb;
+                        border-radius: 8px 0 0 8px;
+                        padding: 0;
+                        z-index: 1001;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+                        width: 44px;
+                        height: 44px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .panel-arrow-btn {
+                        position: fixed;
+                        right: 0;
                         top: 50%;
                         transform: translateY(-50%);
                         background: #fff;
@@ -864,31 +1042,38 @@ router.get('/:quizName', (req, res) => {
                         border-radius: 8px 0 0 8px;
                         width: 44px;
                         height: 44px;
-                        display: flex !important;
-                        align-items: center;
-                        justify-content: center;
-                        cursor: pointer;
-                        z-index: 3000;
-                        pointer-events: auto;
-                    }
-                    .question-navigation {
                         display: flex;
-                        justify-content: center;
                         align-items: center;
-                        gap: 10px;
-                        margin-top: 20px;
-                    }
-                    .clear-response-btn {
-                        background: #f8f9fa;
-                        color: #dc3545;
-                        border: 1px solid #dc3545;
-                        padding: 8px 16px;
-                        border-radius: 4px;
+                        justify-content: center;
                         cursor: pointer;
+                        margin-right: 0;
+                        transition: background 0.2s, border 0.2s;
+                        z-index: 2001;
                     }
-                    .clear-response-btn:hover {
-                        background: #dc3545;
-                        color: white;
+                    .panel-arrow-btn:hover {
+                        background: #f0f0f0;
+                        border-color: #007bff;
+                    }
+                    .panel-arrow-btn.open {
+                        right: 320px;
+                    }
+                    @media (max-width: 768px) {
+                        .panel-arrow-btn {
+                            position: fixed;
+                            right: 0;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            width: 38px;
+                            height: 38px;
+                            z-index: 2001;
+                        }
+                        .panel-arrow-btn.open {
+                            right: 95vw;
+                        }
+                        .question-panel-card {
+                            width: 95vw;
+                            max-width: 95vw;
+                        }
                     }
                 </style>
             </head>
@@ -916,7 +1101,7 @@ router.get('/:quizName', (req, res) => {
                         <div>Time Left: <span id="timer" class="normal"></span></div>
                     </div>
 
-                    <button class="open-panel-btn" id="sidebarToggleBtn">
+                    <button class="sidebar-toggle" id="sidebarToggleBtn">
                         <span style="display: flex; align-items: center; justify-content: center;">
                             <svg id="arrowSvgClosed" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <rect x="2" y="2" width="24" height="24" rx="6" fill="#fff" stroke="#bbb" stroke-width="2"/>
@@ -928,10 +1113,15 @@ router.get('/:quizName', (req, res) => {
                     <div class="question-panel-overlay" id="questionPanelOverlay">
                         <div class="question-panel-card">
                             <div class="panel-header">
-                                <h3>Question Panel</h3>
                                 <button class="panel-arrow-btn" id="panelArrowBtn" aria-label="Close Panel">
-                                    <i class="fas fa-chevron-right"></i>
+                                    <span style="display: flex; align-items: center; justify-content: center;">
+                                        <svg id="arrowSvg" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect x="2" y="2" width="24" height="24" rx="6" fill="#fff" stroke="#bbb" stroke-width="2"/>
+                                            <path d="M16.5 8L11.5 14L16.5 20" stroke="#888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </span>
                                 </button>
+                                <button class="close-panel-btn" id="closePanelBtn" aria-label="Close Panel">&times;</button>
                             </div>
                             <div class="panel-summary-card">
                                 <div class="summary-row">
@@ -946,6 +1136,10 @@ router.get('/:quizName', (req, res) => {
                                     <div class="summary-shape not-visited"><span id="countNotVisited">0</span></div>
                                     <div class="summary-label">Not Visited</div>
                                 </div>
+                                <div class="summary-row">
+                                    <div class="summary-shape answered-marked"><span id="countAnsweredMarked">0</span></div>
+                                    <div class="summary-label">Answered and Marked for Review</div>
+                                </div>
                             </div>
                             <div class="panel-section-card">
                                 <div class="panel-title">Computer Awareness</div>
@@ -958,7 +1152,7 @@ router.get('/:quizName', (req, res) => {
                         <div id="quiz-content">
                             <div class="question-header">
                                 <span class="question-number" id="questionNumber"></span>
-                                <span class="marking-scheme">Marking Scheme : <span class="plus">+3</span> <span class="minus">-1</span></span>
+                                <span class="marking-scheme">Marking Scheme : <span class="plus">+1</span> <span class="minus">0</span></span>
                                 <span class="timer"><span id="timer" class="normal"></span></span>
                                 <button type="button" class="mark-btn" id="markBtn" onclick="toggleMarkForReview()"><span id="markBtnText">Mark</span></button>
                             </div>
@@ -970,7 +1164,7 @@ router.get('/:quizName', (req, res) => {
                             </div>
                             <div class="button-container">
                                 <button type="button" onclick="prevQuestion()" id="prevBtn" class="nav-btn">&lt; Previous</button>
-                                <button type="button" onclick="clearResponse()" id="clearBtn" class="nav-btn clear-btn">Clear Response</button>
+                                <button type="button" onclick="clearResponse()" id="clearBtn" class="nav-btn">Clear Response</button>
                                 <button type="button" onclick="nextQuestion()" id="nextBtn" class="nav-btn">Save & Next &gt;</button>
                                 <button type="button" onclick="submitQuiz()" id="submitBtn" class="nav-btn submit-btn">Submit Test</button>
                             </div>
@@ -1266,10 +1460,19 @@ router.get('/:quizName', (req, res) => {
                         // Add quiz-completed class to body to hide the image using CSS
                         document.body.classList.add('quiz-completed');
                         
-                        // Completely remove the sidebar instead of just hiding it
-                        const sidebar = document.querySelector('.sidebar');
-                        if (sidebar) {
-                            sidebar.parentNode.removeChild(sidebar);
+                        // Hide the question panel and arrow button
+                        const panelOverlay = document.getElementById('questionPanelOverlay');
+                        const panelArrowBtn = document.getElementById('panelArrowBtn');
+                        const sidebarBtn = document.getElementById('sidebarToggleBtn');
+                        
+                        if (panelOverlay) {
+                            panelOverlay.style.display = 'none';
+                        }
+                        if (panelArrowBtn) {
+                            panelArrowBtn.style.display = 'none';
+                        }
+                        if (sidebarBtn) {
+                            sidebarBtn.style.display = 'none';
                         }
                         
                         clearInterval(timerInterval);
@@ -1492,16 +1695,14 @@ router.get('/:quizName', (req, res) => {
                     const panelOverlay = document.getElementById('questionPanelOverlay');
                     const closePanelBtn = document.getElementById('closePanelBtn');
                     const panelArrowBtn = document.getElementById('panelArrowBtn');
-                    const arrowSvg = document.getElementById('arrowSvg');
-                    const arrowSvgClosed = document.getElementById('arrowSvgClosed');
 
                     function openPanel() {
                         panelOverlay.classList.add('open');
-                        sidebarBtn.classList.add('hide');
+                        sidebarBtn.style.display = 'none';
                     }
                     function closePanel() {
                         panelOverlay.classList.remove('open');
-                        sidebarBtn.classList.remove('hide');
+                        sidebarBtn.style.display = 'block';
                     }
                     sidebarBtn.onclick = openPanel;
                     panelArrowBtn.onclick = closePanel;
@@ -1555,13 +1756,18 @@ router.get('/:quizName', (req, res) => {
 
                     // Replace sidebar logic with new panel logic
                     function updatePanelCountsAndGrid() {
-                        let notAnswered = 0, answered = 0, marked = 0, notVisited = 0;
+                        let notAnswered = 0, answered = 0, marked = 0, notVisited = 0, answeredMarked = 0;
                         const grid = [];
                         for (let i = 0; i < quiz.length; i++) {
                             let status = 'not-visited';
                             if (userAnswers[i] && userAnswers[i] !== '') {
-                                status = 'answered';
-                                answered++;
+                                if (viewedQuestions[i] && viewedQuestions[i] === 'marked') {
+                                    status = 'answered-marked';
+                                    answeredMarked++;
+                                } else {
+                                    status = 'answered';
+                                    answered++;
+                                }
                             } else if (viewedQuestions[i] && viewedQuestions[i] === 'marked') {
                                 status = 'marked';
                                 marked++;
@@ -1578,7 +1784,8 @@ router.get('/:quizName', (req, res) => {
                         document.getElementById('countAnswered').textContent = answered;
                         document.getElementById('countMarked').textContent = marked;
                         document.getElementById('countNotVisited').textContent = notVisited;
-                        // Render grid with shapes (no answered-marked)
+                        document.getElementById('countAnsweredMarked').textContent = answeredMarked;
+                        // Render grid with shapes
                         const gridDiv = document.getElementById('questionGrid');
                         gridDiv.innerHTML = grid.map(function(q) {
                             let shapeClass = q.status;
@@ -1587,34 +1794,19 @@ router.get('/:quizName', (req, res) => {
                     }
 
                     function clearResponse() {
+                        // Clear the selected radio button
+                        const selectedOption = document.querySelector('input[name="option"]:checked');
+                        if (selectedOption) {
+                            selectedOption.checked = false;
+                        }
+                        
+                        // Clear the user's answer for this question
                         userAnswers[index] = null;
-                        // Uncheck all radio buttons
-                        const radios = document.querySelectorAll('input[name="option"]');
-                        radios.forEach(r => r.checked = false);
+                        answeredQuestions[index] = false;
+                        
+                        // Update the sidebar to reflect the change
                         updateSidebar();
                     }
-
-                    // Update panel toggle logic to ensure close button is visible
-                    function togglePanel() {
-                        const panelOverlay = document.getElementById('questionPanelOverlay');
-                        const panelArrowBtn = document.getElementById('panelArrowBtn');
-                        
-                        if (panelOverlay.classList.contains('open')) {
-                            panelOverlay.classList.remove('open');
-                            panelArrowBtn.style.display = 'none';
-                        } else {
-                            panelOverlay.classList.add('open');
-                            panelArrowBtn.style.display = 'flex';
-                        }
-                    }
-
-                    // Initialize panel arrow button
-                    document.addEventListener('DOMContentLoaded', function() {
-                        const panelArrowBtn = document.getElementById('panelArrowBtn');
-                        if (panelArrowBtn) {
-                            panelArrowBtn.addEventListener('click', togglePanel);
-                        }
-                    });
 
                 </script>
             </body>

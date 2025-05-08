@@ -1,41 +1,15 @@
 [
   {
     "studentId": "vajra9714",
-    "quizName": "updated",
-    "score": 0,
-    "totalQuestions": 5,
-    "attemptedAt": "2025-05-07T06:19:13.908Z",
-    "isRetake": false,
-    "fromSessionStorage": false,
-    "createdAt": "2025-05-07T06:19:13.908Z",
-    "updatedAt": "2025-05-07T06:19:13.908Z",
-    "answers": null,
-    "_id": "681afb61debbb746cff0e570"
-  },
-  {
-    "studentId": "vajra9714",
-    "quizName": "java2",
-    "score": 0,
+    "quizName": "nenu",
+    "score": 1,
     "totalQuestions": 20,
-    "attemptedAt": "2025-05-07T07:34:54.712Z",
+    "attemptedAt": "2025-05-08T05:51:36.989Z",
     "isRetake": false,
     "fromSessionStorage": false,
-    "createdAt": "2025-05-07T07:34:54.712Z",
-    "updatedAt": "2025-05-07T07:34:54.712Z",
+    "createdAt": "2025-05-08T05:51:36.989Z",
+    "updatedAt": "2025-05-08T05:51:36.989Z",
     "answers": null,
-    "_id": "681b0d1e4b31f773ee948dd3"
-  },
-  {
-    "studentId": "vajra9714",
-    "quizName": "vvv",
-    "score": 0,
-    "totalQuestions": 5,
-    "attemptedAt": "2025-05-07T09:24:37.147Z",
-    "isRetake": false,
-    "fromSessionStorage": false,
-    "createdAt": "2025-05-07T09:24:37.147Z",
-    "updatedAt": "2025-05-07T09:24:37.147Z",
-    "answers": null,
-    "_id": "681b26d56ef0cd9a19a686a4"
+    "_id": "681c466807377900f5928251"
   }
 ]
