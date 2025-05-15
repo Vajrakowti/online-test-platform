@@ -295,7 +295,7 @@ MongoClient.connect(url, mongoOptions)
             // Initial sync of all retake files
             fs.readdirSync(retakesPath)
                 .filter(file => file.endsWith('.json'))
-                .forEach(file => {
+                .forEach(async file => {
                     const filePath = path.join(retakesPath, file);
                     const quizName = path.basename(file, '.json').replace('_retake', '');
                     
@@ -309,14 +309,20 @@ MongoClient.connect(url, mongoOptions)
                         
                         if (quiz) {
                             // Update retakes collection
-                            dbo.collection('retakes').updateOne(
+                            await dbo.collection('retakes').updateOne(
                                 { quizName },
                                 { 
                                     $set: {
                                         quizName,
                                         retakes: retakeUsernames,
                                         quizDetails: {
-                                            ...quiz,
+                                            name: quiz.name,
+                                            startTime: quiz.startTime,
+                                            endTime: quiz.endTime,
+                                            class: quiz.class,
+                                            type: quiz.type,
+                                            file: quiz.file,
+                                            questionsFile: quiz.questionsFile,
                                             isStudentSpecific: true,
                                             allowedStudents: retakeUsernames
                                         },
@@ -328,11 +334,17 @@ MongoClient.connect(url, mongoOptions)
                             );
                             
                             // Update quizzes collection
-                            dbo.collection('quizzes').updateOne(
+                            await dbo.collection('quizzes').updateOne(
                                 { name: quizName },
                                 { 
                                     $set: {
-                                        ...quiz,
+                                        name: quiz.name,
+                                        startTime: quiz.startTime,
+                                        endTime: quiz.endTime,
+                                        class: quiz.class,
+                                        type: quiz.type,
+                                        file: quiz.file,
+                                        questionsFile: quiz.questionsFile,
                                         isStudentSpecific: true,
                                         allowedStudents: retakeUsernames
                                     }
@@ -373,7 +385,13 @@ MongoClient.connect(url, mongoOptions)
                                                 quizName,
                                                 retakes: retakeUsernames,
                                                 quizDetails: {
-                                                    ...quiz,
+                                                    name: quiz.name,
+                                                    startTime: quiz.startTime,
+                                                    endTime: quiz.endTime,
+                                                    class: quiz.class,
+                                                    type: quiz.type,
+                                                    file: quiz.file,
+                                                    questionsFile: quiz.questionsFile,
                                                     isStudentSpecific: true,
                                                     allowedStudents: retakeUsernames
                                                 },
@@ -389,7 +407,13 @@ MongoClient.connect(url, mongoOptions)
                                         { name: quizName },
                                         { 
                                             $set: {
-                                                ...quiz,
+                                                name: quiz.name,
+                                                startTime: quiz.startTime,
+                                                endTime: quiz.endTime,
+                                                class: quiz.class,
+                                                type: quiz.type,
+                                                file: quiz.file,
+                                                questionsFile: quiz.questionsFile,
                                                 isStudentSpecific: true,
                                                 allowedStudents: retakeUsernames
                                             }

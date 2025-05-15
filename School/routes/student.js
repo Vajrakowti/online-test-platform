@@ -106,6 +106,7 @@ router.get('/quizzes', async (req, res) => {
 
     try {
         const username = req.session.username;
+        const studentClass = req.session.class;
         const db = req.app.locals.db;
         
         // Get all quizzes
@@ -120,8 +121,12 @@ router.get('/quizzes', async (req, res) => {
         const retakesCollection = db.collection('retakes');
         const retakes = await retakesCollection.find({}).toArray();
         
-        // Filter quizzes based on attempts and retakes
+        // Filter quizzes based on class, attempts and retakes
         const availableQuizzes = quizzes.filter(quiz => {
+            // Check if quiz is for student's class or is a retake quiz
+            const isForStudentClass = quiz.class === studentClass;
+            const isRetakeQuiz = quiz.isStudentSpecific || quiz.class === '999';
+            
             // Check if student has attempted this quiz
             const attempt = attempts.find(a => a.quizName === quiz.name);
             
@@ -130,9 +135,9 @@ router.get('/quizzes', async (req, res) => {
             const isEligibleForRetake = retake && retake.retakes.includes(username);
             
             // Show quiz if:
-            // 1. Student hasn't attempted it yet, OR
-            // 2. Student is eligible for retake
-            return !attempt || isEligibleForRetake;
+            // 1. Quiz is for student's class OR is a retake quiz that student is eligible for
+            // 2. Student hasn't attempted it yet OR is eligible for retake
+            return (isForStudentClass || (isRetakeQuiz && isEligibleForRetake)) && (!attempt || isEligibleForRetake);
         });
         
         res.json(availableQuizzes);

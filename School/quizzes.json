@@ -160,5 +160,41 @@
     "type": "excel",
     "file": "nenu.xlsx",
     "_id": "681c430d8e0895e7fe54b38b"
+  },
+  {
+    "name": "rrr",
+    "startTime": "19:40",
+    "endTime": "21:00",
+    "class": "8",
+    "type": "excel",
+    "file": "rrr.xlsx",
+    "_id": "6824a5f29885fe26603ef0e2"
+  },
+  {
+    "name": "king ra",
+    "startTime": "19:50",
+    "endTime": "21:00",
+    "class": "8",
+    "type": "excel",
+    "file": "king ra.xlsx",
+    "_id": "6824a8cf5ad2e6264112ea37"
+  },
+  {
+    "name": "king ra retake",
+    "startTime": "19:50",
+    "endTime": "21:00",
+    "class": "999",
+    "type": "excel",
+    "isStudentSpecific": true,
+    "file": "king ra.xlsx"
+  },
+  {
+    "name": "sorry",
+    "startTime": "20:00",
+    "endTime": "21:00",
+    "class": "999",
+    "type": "excel",
+    "file": "sorry.xlsx",
+    "isStudentSpecific": true
   }
 ]
