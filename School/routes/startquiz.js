@@ -35,7 +35,50 @@ function loadQuizData(quiz) {
             const workbook = xlsx.readFile(excelFilePath);
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            return shuffleArray(xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1));
+            const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+            // Remove header row
+            const dataRows = rows.slice(1);
+            // Map each row to [question, option1, option2, option3, option4, correctAnswers]
+            const mappedRows = dataRows.map(row => {
+                // Defensive: ensure at least 6 columns
+                if (!row || row.length < 6) return null;
+                const [question, option1, option2, option3, option4, answerCol, secondAnswerCol] = row;
+                let correctAnswers = [];
+                // Map A/B/C/D to the correct option value for the first answer
+                switch ((answerCol || '').toString().trim().toUpperCase()) {
+                    case 'A':
+                        correctAnswers.push(option1);
+                        break;
+                    case 'B':
+                        correctAnswers.push(option2);
+                        break;
+                    case 'C':
+                        correctAnswers.push(option3);
+                        break;
+                    case 'D':
+                        correctAnswers.push(option4);
+                        break;
+                }
+                // Map A/B/C/D to the correct option value for the second answer, if present and not empty
+                if (secondAnswerCol && secondAnswerCol.toString().trim() !== '') {
+                    switch ((secondAnswerCol || '').toString().trim().toUpperCase()) {
+                        case 'A':
+                            if (!correctAnswers.includes(option1)) correctAnswers.push(option1);
+                            break;
+                        case 'B':
+                            if (!correctAnswers.includes(option2)) correctAnswers.push(option2);
+                            break;
+                        case 'C':
+                            if (!correctAnswers.includes(option3)) correctAnswers.push(option3);
+                            break;
+                        case 'D':
+                            if (!correctAnswers.includes(option4)) correctAnswers.push(option4);
+                            break;
+                    }
+                }
+                return [question, option1, option2, option3, option4, correctAnswers];
+            }).filter(Boolean);
+            return shuffleArray(mappedRows);
         } catch (err) {
             throw new Error(`Error reading Excel file: ${err.message}`);
         }
@@ -1397,9 +1440,20 @@ router.get('/:quizName', (req, res) => {
                         document.getElementById('question').innerText = row[0];
                         // Handle options
                         const options = row.slice(1, 5);
-                        const list = options.map((opt, optIndex) => {
-                            return '<li><label><input type="radio" name="option" value="' + opt + '" ' + (userAnswers[index] === opt ? 'checked' : '') + '> ' + opt + '</label></li>';
-                        }).join("");
+                        const correctAnswers = row[5];
+                        let list = '';
+                        if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                            // Multi-answer: use checkboxes
+                            const selected = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
+                            list = options.map((opt, optIndex) => {
+                                return '<li><label><input type="checkbox" name="option" value="' + opt + '" ' + (selected.includes(opt) ? 'checked' : '') + '> ' + opt + '</label></li>';
+                            }).join("");
+                        } else {
+                            // Single-answer: use radio
+                            list = options.map((opt, optIndex) => {
+                                return '<li><label><input type="radio" name="option" value="' + opt + '" ' + (userAnswers[index] === opt ? 'checked' : '') + '> ' + opt + '</label></li>';
+                            }).join("");
+                        }
                         document.getElementById('options').innerHTML = list;
                         // Mark button state
                         const markBtn = document.getElementById('markBtn');
@@ -1543,21 +1597,41 @@ router.get('/:quizName', (req, res) => {
                     }
 
                     function checkAnswer() {
-                        const chosen = document.querySelector('input[name="option"]:checked');
-                        const userAnswer = chosen?.value || "";
-                        const correctAnswer = quiz[index][5];
-                        
-                        userAnswers[index] = userAnswer;
-                        answeredQuestions[index] = userAnswer !== "";
-                        
+                        const row = quiz[index];
+                        const correctAnswers = row[5];
+                        let userAnswer;
+                        if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                            // Multi-answer: collect all checked checkboxes
+                            userAnswer = Array.from(document.querySelectorAll('input[name="option"]:checked')).map(cb => cb.value);
+                            // Sort for comparison
+                            const sortedUser = [...userAnswer].sort();
+                            const sortedCorrect = [...correctAnswers].sort();
+                            userAnswers[index] = userAnswer;
+                            answeredQuestions[index] = (sortedUser.length === sortedCorrect.length && sortedUser.every((val, i) => val === sortedCorrect[i]));
+                        } else {
+                            // Single-answer: radio
+                            const chosen = document.querySelector('input[name="option"]:checked');
+                            userAnswer = chosen?.value || "";
+                            userAnswers[index] = userAnswer;
+                            answeredQuestions[index] = correctAnswers.includes(userAnswer);
+                        }
                         // Recalculate total score by checking all answers
                         score = 0;
                         for (let i = 0; i < quiz.length; i++) {
-                            if (userAnswers[i] === quiz[i][5]) {
-                                score += 1;
+                            const row = quiz[i];
+                            const correct = row[5];
+                            if (Array.isArray(correct) && correct.length > 1) {
+                                const ua = Array.isArray(userAnswers[i]) ? [...userAnswers[i]].sort() : [];
+                                const ca = [...correct].sort();
+                                if (ua.length === ca.length && ua.every((val, idx) => val === ca[idx])) {
+                                    score += 1;
+                                }
+                            } else {
+                                if (userAnswers[i] && correct.includes(userAnswers[i])) {
+                                    score += 1;
+                                }
                             }
                         }
-                        
                         updateSidebar();
                     }
 
@@ -1578,22 +1652,31 @@ router.get('/:quizName', (req, res) => {
                         
                         for (let i = 0; i < quiz.length; i++) {
                             const question = quiz[i][0];
-                            const userAnswer = userAnswers[i] || "Not answered";
-                            const correctAnswer = quiz[i][5];
-                            const isCorrect = userAnswer === correctAnswer;
-                            
+                            const correctAnswers = quiz[i][5];
+                            let userAnswer = userAnswers[i];
+                            let isCorrect = false;
+                            let userDisplay = '';
+                            if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                                // Multi-answer
+                                const ua = Array.isArray(userAnswer) ? [...userAnswer].sort() : [];
+                                const ca = [...correctAnswers].sort();
+                                isCorrect = (ua.length === ca.length && ua.every((val, idx) => val === ca[idx]));
+                                userDisplay = ua.length > 0 ? ua.join(', ') : 'Not answered';
+                            } else {
+                                // Single-answer
+                                isCorrect = userAnswer && correctAnswers.includes(userAnswer);
+                                userDisplay = userAnswer ? userAnswer : 'Not answered';
+                            }
                             reviewHTML += '<div class="review-question">' +
                                 '<h3>Q' + (i+1) + ': ' + question + '</h3>' +
                                 '<div class="review-option ' + (isCorrect ? 'correct-answer' : 'wrong-answer') + '">' +
-                                'Your answer: ' + userAnswer +
+                                'Your answer: ' + userDisplay +
                                 '</div>';
-                                
                             if (!isCorrect) {
                                 reviewHTML += '<div class="review-option correct-answer">' +
-                                    'Correct answer: ' + correctAnswer +
+                                    'Correct answers: ' + (Array.isArray(correctAnswers) ? correctAnswers.join(', ') : correctAnswers) +
                                     '</div>';
                             }
-                            
                             reviewHTML += '</div>';
                         }
                         
