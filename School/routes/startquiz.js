@@ -1195,7 +1195,7 @@ router.get('/:quizName', (req, res) => {
                         <div id="quiz-content">
                             <div class="question-header">
                                 <span class="question-number" id="questionNumber"></span>
-                                <span class="marking-scheme">Marking Scheme : <span class="plus">+1</span> <span class="minus">0</span></span>
+                                <span class="marking-scheme">Marking Scheme : <span class="plus">+4</span> <span class="minus">0</span></span>
                                 <span class="timer"><span id="timer" class="normal"></span></span>
                                 <button type="button" class="mark-btn" id="markBtn" onclick="toggleMarkForReview()"><span id="markBtnText">Mark</span></button>
                             </div>
@@ -1451,8 +1451,8 @@ router.get('/:quizName', (req, res) => {
                         } else {
                             // Single-answer: use radio
                             list = options.map((opt, optIndex) => {
-                                return '<li><label><input type="radio" name="option" value="' + opt + '" ' + (userAnswers[index] === opt ? 'checked' : '') + '> ' + opt + '</label></li>';
-                            }).join("");
+                            return '<li><label><input type="radio" name="option" value="' + opt + '" ' + (userAnswers[index] === opt ? 'checked' : '') + '> ' + opt + '</label></li>';
+                        }).join("");
                         }
                         document.getElementById('options').innerHTML = list;
                         // Mark button state
@@ -1549,7 +1549,7 @@ router.get('/:quizName', (req, res) => {
                         document.getElementById('quiz-content').style.display = "none";
                         document.getElementById('quiz-results').style.display = "block";
                         
-                        document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + quiz.length;
+                        document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + (quiz.length * 4);
                         
                         // Mark this quiz as completed in sessionStorage
                         sessionStorage.setItem(attemptKey, 'completed');
@@ -1567,7 +1567,7 @@ router.get('/:quizName', (req, res) => {
                             body: JSON.stringify({
                                 quizName: quizName,
                                 score: score,
-                                totalQuestions: totalQuestions
+                                totalQuestions: totalQuestions * 4
                             })
                         })
                         .then(response => {
@@ -1610,9 +1610,9 @@ router.get('/:quizName', (req, res) => {
                             answeredQuestions[index] = (sortedUser.length === sortedCorrect.length && sortedUser.every((val, i) => val === sortedCorrect[i]));
                         } else {
                             // Single-answer: radio
-                            const chosen = document.querySelector('input[name="option"]:checked');
+                        const chosen = document.querySelector('input[name="option"]:checked');
                             userAnswer = chosen?.value || "";
-                            userAnswers[index] = userAnswer;
+                        userAnswers[index] = userAnswer;
                             answeredQuestions[index] = correctAnswers.includes(userAnswer);
                         }
                         // Recalculate total score by checking all answers
@@ -1624,11 +1624,11 @@ router.get('/:quizName', (req, res) => {
                                 const ua = Array.isArray(userAnswers[i]) ? [...userAnswers[i]].sort() : [];
                                 const ca = [...correct].sort();
                                 if (ua.length === ca.length && ua.every((val, idx) => val === ca[idx])) {
-                                    score += 1;
+                                    score += 4;
                                 }
                             } else {
                                 if (userAnswers[i] && correct.includes(userAnswers[i])) {
-                                    score += 1;
+                                    score += 4;
                                 }
                             }
                         }

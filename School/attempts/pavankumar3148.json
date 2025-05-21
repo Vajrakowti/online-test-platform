@@ -24,5 +24,18 @@
     "updatedAt": "2025-05-20T12:37:12.910Z",
     "answers": null,
     "_id": "682c77789be657fcc1f57f94"
+  },
+  {
+    "studentId": "pavankumar3148",
+    "quizName": "four",
+    "score": 8,
+    "totalQuestions": 20,
+    "attemptedAt": "2025-05-21T12:09:04.587Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-21T12:09:04.587Z",
+    "updatedAt": "2025-05-21T12:09:04.587Z",
+    "answers": null,
+    "_id": "682dc260e3e83abf522cc405"
   }
 ]

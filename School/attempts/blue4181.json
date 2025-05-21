@@ -258,5 +258,18 @@
     "updatedAt": "2025-05-20T14:44:22.028Z",
     "answers": null,
     "_id": "682c95462c8899d4bd62bffb"
+  },
+  {
+    "studentId": "blue4181",
+    "quizName": "four",
+    "score": 12,
+    "totalQuestions": 5,
+    "attemptedAt": "2025-05-21T12:03:06.451Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-21T12:03:06.451Z",
+    "updatedAt": "2025-05-21T12:03:06.451Z",
+    "answers": null,
+    "_id": "682dc0fa55f43842493b82fc"
   }
 ]
