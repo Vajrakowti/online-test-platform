@@ -817,6 +817,14 @@ MongoClient.connect(url, mongoOptions)
             }
         });
 
+        // Subscription Plan Page
+        app.get('/admin/subscription', (req, res) => {
+            if (!req.session.fname || req.session.role !== 'admin') {
+                return res.redirect('/admin-login');
+            }
+            res.sendFile(path.join(__dirname, 'public', 'subscription.html'));
+        });
+
         // Start the server
         app.listen(3000, () => console.log("Server running on port 3000"));
     })

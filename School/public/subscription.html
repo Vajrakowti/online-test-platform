@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Plans</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            color: #212529;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(67, 97, 238, 0.10);
+            padding: 2.5rem 2rem 2rem 2rem;
+        }
+        h1 {
+            text-align: center;
+            color: #4361ee;
+            margin-bottom: 2rem;
+        }
+        .plans {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .plan {
+            background: linear-gradient(135deg, #f6f8fd 0%, #e0e7ff 100%);
+            border: 2px solid #4361ee22;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(67, 97, 238, 0.07);
+            padding: 2rem 1.5rem;
+            width: 260px;
+            text-align: center;
+            transition: box-shadow 0.3s, border 0.3s;
+        }
+        .plan:hover {
+            box-shadow: 0 8px 24px rgba(67, 97, 238, 0.15);
+            border: 2px solid #4361ee;
+        }
+        .plan .plan-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #3a0ca3;
+            margin-bottom: 0.5rem;
+        }
+        .plan .plan-price {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #4361ee;
+            margin-bottom: 0.5rem;
+        }
+        .plan .plan-duration {
+            color: #6366f1;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        .plan ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1.5rem;
+        }
+        .plan ul li {
+            margin: 0.5rem 0;
+            color: #212529;
+            font-size: 1rem;
+        }
+        .plan .subscribe-btn {
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .plan .subscribe-btn:hover {
+            background: #3a0ca3;
+        }
+        .razorpay-placeholder {
+            margin-top: 2.5rem;
+            background: #f6f8fd;
+            border: 2px dashed #4361ee;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            color: #4361ee;
+            font-size: 1.1rem;
+        }
+        @media (max-width: 900px) {
+            .plans { flex-direction: column; align-items: center; }
+            .plan { width: 90%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-credit-card"></i> Subscription Plans</h1>
+        <div class="plans">
+            <div class="plan">
+                <div class="plan-title">Basic</div>
+                <div class="plan-price">₹199</div>
+                <div class="plan-duration">per month</div>
+                <ul>
+                    <li>Up to 50 students</li>
+                    <li>10 quizzes/month</li>
+                    <li>Email support</li>
+                </ul>
+                <button class="subscribe-btn">Subscribe</button>
+            </div>
+            <div class="plan" style="border:2px solid #10b981;">
+                <div class="plan-title" style="color:#047857;">Pro</div>
+                <div class="plan-price" style="color:#10b981;">₹499</div>
+                <div class="plan-duration" style="color:#10b981;">per month</div>
+                <ul>
+                    <li>Up to 500 students</li>
+                    <li>Unlimited quizzes</li>
+                    <li>Priority email support</li>
+                    <li>Custom branding</li>
+                </ul>
+                <button class="subscribe-btn" style="background:#10b981;">Subscribe</button>
+            </div>
+            <div class="plan" style="border:2px solid #eab308;">
+                <div class="plan-title" style="color:#b45309;">Enterprise</div>
+                <div class="plan-price" style="color:#eab308;">₹1499</div>
+                <div class="plan-duration" style="color:#eab308;">per month</div>
+                <ul>
+                    <li>Unlimited students</li>
+                    <li>Unlimited quizzes</li>
+                    <li>Dedicated support</li>
+                    <li>API access</li>
+                </ul>
+                <button class="subscribe-btn" style="background:#eab308;">Subscribe</button>
+            </div>
+        </div>
+        <div class="razorpay-placeholder">
+            <i class="fas fa-info-circle"></i> <br>
+            <strong>Payment gateway integration coming soon!</strong><br>
+            This is a placeholder for Razorpay integration. In the future, you will be able to subscribe and pay securely here.
+        </div>
+    </div>
+</body>
+</html> 
