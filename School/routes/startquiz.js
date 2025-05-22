@@ -905,6 +905,7 @@ router.get('/:quizName', (req, res) => {
                         gap: 18px;
                         position: relative;
                         pointer-events: auto;
+                        overflow: hidden; /* Prevent double scrollbars */
                     }
                     .panel-summary-card {
                         background: #f8f9fa;
@@ -912,6 +913,7 @@ router.get('/:quizName', (req, res) => {
                         padding: 18px 12px 10px 12px;
                         margin-bottom: 10px;
                         box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                        flex-shrink: 0; /* Prevent summary from shrinking */
                     }
                     .summary-row {
                         display: flex;
@@ -968,6 +970,8 @@ router.get('/:quizName', (req, res) => {
                         border-radius: 12px;
                         padding: 18px 10px 18px 10px;
                         box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                        max-height: calc(100vh - 400px); /* Limit height and enable scrolling */
+                        overflow-y: auto; /* Enable vertical scrolling */
                     }
                     .panel-title {
                         text-align: center;
@@ -975,12 +979,15 @@ router.get('/:quizName', (req, res) => {
                         font-weight: 600;
                         margin-bottom: 18px;
                         color: #222;
+                        background: #fff;
+                        padding: 10px 0;
                     }
                     .question-grid {
                         display: grid;
                         grid-template-columns: repeat(5, 1fr);
                         gap: 14px;
                         padding: 0 8px;
+                        margin-bottom: 10px; /* Add some bottom margin */
                     }
                     .question-btn {
                         width: 38px;
@@ -1185,7 +1192,7 @@ router.get('/:quizName', (req, res) => {
                                 </div>
                             </div>
                             <div class="panel-section-card">
-                                <div class="panel-title">Computer Awareness</div>
+                                <div class="panel-title">Question Panel</div>
                                 <div class="question-grid" id="questionGrid"></div>
                             </div>
                         </div>
