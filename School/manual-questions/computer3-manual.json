@@ -1,0 +1,18 @@
+[
+  {
+    "question": "∫x",
+    "options": [
+      "2x",
+      "x",
+      "1",
+      "0"
+    ],
+    "correctAnswer": 0,
+    "optionImages": [
+      null,
+      null,
+      null,
+      "/quiz-images/1748602512253-538048611.png"
+    ]
+  }
+]

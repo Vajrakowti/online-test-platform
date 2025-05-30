@@ -1921,6 +1921,8 @@ router.post('/create-quiz-manual', async (req, res) => {
 
       // Process each question
       for (const index of indices) {
+        console.log(`Processing question index: ${index}`);
+        console.log(`Correct answer raw value for index ${index}:`, req.body[`correctAnswer_${index}`]);
         const questionObj = {
           question: req.body[`question_${index}`],
           options: [

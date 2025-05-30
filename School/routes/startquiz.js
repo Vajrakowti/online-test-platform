@@ -96,13 +96,45 @@ function loadQuizData(quiz) {
                 fs.readFileSync(questionsFilePath, 'utf8')
             );
             
+            // Validate manual questions data structure and content
+            if (!Array.isArray(questionsData)) {
+                throw new Error('Invalid questions file format: must be an array.');
+            }
+
+            questionsData.forEach((q, index) => {
+                if (!q || typeof q !== 'object') {
+                    throw new Error(`Invalid question object at index ${index}.`);
+                }
+                if (!q.text && !q.question) {
+                    throw new Error(`Question text is missing at index ${index}.`);
+                }
+                if (!q.options || !Array.isArray(q.options) || q.options.length !== 4) {
+                    throw new Error(`Question at index ${index} must have exactly 4 options.`);
+                }
+                // Validate each option
+                for (let i = 0; i < q.options.length; i++) {
+                    if (q.options[i] === null || q.options[i] === undefined || typeof q.options[i] !== 'string' || q.options[i].trim() === '') {
+                        // Provide more context in the error message
+                        throw new Error(`Invalid or empty option at question ${index}, option index ${i}. Option value: ${q.options[i]}.`);
+                    }
+                    // Trim options immediately after validation
+                    q.options[i] = q.options[i].trim();
+                }
+                if (typeof q.correctAnswer !== 'number' || q.correctAnswer < 0 || q.correctAnswer > 3) {
+                    throw new Error(`Invalid correct answer index at question ${index}. Expected 0-3, got ${q.correctAnswer}.`);
+                }
+            });
+
             // Convert to the same format as Excel data
             // Format: [question, option1, option2, option3, option4, correctAnswer, questionImage, 
             //          option1Image, option2Image, option3Image, option4Image]
             const formattedQuestions = questionsData.map(q => [
-                q.text,
-                ...q.options,
-                q.options[q.correctAnswer],
+                String(q.text || q.question).trim(), // Ensure text and trim
+                q.options[0], // Use validated and trimmed options
+                q.options[1],
+                q.options[2],
+                q.options[3],
+                q.options[q.correctAnswer], // Correct answer value (already validated and trimmed)
                 q.image || null,
                 ...(q.optionImages || [null, null, null, null]) // Add option images or default to nulls
             ]);

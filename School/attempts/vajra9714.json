@@ -76,5 +76,70 @@
     "updatedAt": "2025-05-22T05:18:32.479Z",
     "answers": null,
     "_id": "682eb3a8f3c501af27e04d28"
+  },
+  {
+    "studentId": "vajra9714",
+    "quizName": "aditya",
+    "score": 4,
+    "totalQuestions": 4,
+    "attemptedAt": "2025-05-30T10:46:23.782Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-30T10:46:23.782Z",
+    "updatedAt": "2025-05-30T10:46:23.782Z",
+    "answers": null,
+    "_id": "68398c7fa6eb93c6fc5ed751"
+  },
+  {
+    "_id": "68394bdd201c1ff3017a4abb",
+    "studentId": "vajra9714",
+    "quizName": "test",
+    "score": 0,
+    "totalQuestions": 20,
+    "attemptedAt": "2025-05-30T06:10:37.752Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-30T06:10:37.753Z",
+    "updatedAt": "2025-05-30T06:10:37.753Z",
+    "answers": null
+  },
+  {
+    "studentId": "vajra9714",
+    "quizName": "computer3",
+    "score": 4,
+    "totalQuestions": 4,
+    "attemptedAt": "2025-05-30T10:55:56.430Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-30T10:55:56.430Z",
+    "updatedAt": "2025-05-30T10:55:56.430Z",
+    "answers": null,
+    "_id": "68398ebc438d78e1e9f626fd"
+  },
+  {
+    "studentId": "vajra9714",
+    "quizName": "Calculus",
+    "score": 4,
+    "totalQuestions": 4,
+    "attemptedAt": "2025-05-30T10:59:22.890Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-30T10:59:22.890Z",
+    "updatedAt": "2025-05-30T10:59:22.890Z",
+    "answers": null,
+    "_id": "68398f8a438d78e1e9f626ff"
+  },
+  {
+    "studentId": "vajra9714",
+    "quizName": "lastQuiz",
+    "score": 0,
+    "totalQuestions": 4,
+    "attemptedAt": "2025-05-30T11:15:49.301Z",
+    "isRetake": false,
+    "fromSessionStorage": false,
+    "createdAt": "2025-05-30T11:15:49.301Z",
+    "updatedAt": "2025-05-30T11:15:49.301Z",
+    "answers": null,
+    "_id": "683993654015eb6cd6f3ef18"
   }
 ]
