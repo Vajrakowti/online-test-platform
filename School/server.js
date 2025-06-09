@@ -504,55 +504,47 @@ MongoClient.connect(url, mongoOptions)
         });
 
         // Admin Login Handler
-        app.post('/admin-login', (req, res) => {
+        app.post('/admin-login', async (req, res) => {
             const q = { 
                 Username: req.body.username, 
                 Password: req.body.pwd,
                 role: 'admin'
             };
-            
-            console.log('Attempting to login admin:', { username: req.body.username });
-            console.log('Session before login:', req.session);
-            
-            dbo.collection("LMS").findOne(q)
-                .then(result => {
-                    if (!result) {
-                        console.log('Admin login failed: Invalid credentials');
-                        return res.redirect("/admin-login?error=invalid_credentials");
+
+            try {
+                const result = await dbo.collection("LMS").findOne(q);
+                if (!result) {
+                    console.log('Admin login failed: Invalid credentials');
+                    return res.redirect("/admin-login?error=invalid_credentials");
+                }
+
+                // Set session info
+                req.session.fname = result.Username;
+                req.session.role = 'admin';
+                req.session.adminDb = `School_${result.Username}`;
+                req.session.securityToken = generateSecureToken();
+                req.session.userAgent = req.headers['user-agent'];
+                req.session.ipAddress = req.ip || req.connection.remoteAddress;
+                req.session.lastAccessed = Date.now();
+
+                // Ensure admin DB exists
+                const client = new MongoClient(url);
+                await client.connect();
+                const db = client.db(req.session.adminDb);
+                await db.collection('init').updateOne({init: true}, {$set: {init: true}}, {upsert: true});
+                await client.close();
+
+                req.session.save(err => {
+                    if (err) {
+                        console.error('Session save error:', err);
+                        return res.status(500).send('Login failed');
                     }
-                    
-                    console.log('Admin login successful:', { username: result.Username });
-                    
-                    // Initialize session if it doesn't exist
-                    if (!req.session) {
-                        req.session = {};
-                    }
-                    
-                    // Set user info
-                    req.session.fname = result.Username;
-                    req.session.role = 'admin';
-                    
-                    // Generate and set security token
-                    req.session.securityToken = generateSecureToken();
-                    req.session.userAgent = req.headers['user-agent'];
-                    req.session.ipAddress = req.ip || req.connection.remoteAddress;
-                    req.session.lastAccessed = Date.now();
-                    
-                    console.log('Session after login:', req.session);
-                    
-                    // Save session before redirecting
-                    req.session.save(err => {
-                        if (err) {
-                            console.error('Session save error:', err);
-                            return res.status(500).send('Login failed');
-                        }
-                        res.redirect("/admin");
-                    });
-                })
-                .catch(err => {
-                    console.error('Admin login error:', err);
-                    res.status(500).send('Login failed: ' + err.message);
+                    res.redirect("/admin");
                 });
+            } catch (err) {
+                console.error('Admin login error:', err);
+                res.status(500).send('Login failed: ' + err.message);
+            }
         });
 
         // Student Login Handler
@@ -566,45 +558,65 @@ MongoClient.connect(url, mongoOptions)
                 // First check the database connection
                 await dbo.command({ ping: 1 });
                 
-                // Check credentials in the user collection
-                const userRecord = await dbo.collection("user").findOne({ 
-                    Username: username 
-                });
+                // Get all databases
+                const admin = dbo.admin();
+                const { databases } = await admin.listDatabases();
                 
-                if (!userRecord) {
-                    console.log(`User not found in database: ${username}`);
-                    return res.redirect("/login?error=invalid_credentials");
-                }
+                // Filter for admin-specific databases (School_*)
+                const adminDbs = databases
+                    .map(db => db.name)
+                    .filter(name => name.startsWith('School_'));
                 
-                // Verify password
-                if (userRecord.Password !== password) {
-                    console.log(`Password mismatch for ${username}`);
-                    return res.redirect("/login?error=invalid_credentials");
-                }
-                
-                // Find student record in class collections
-                const collections = await dbo.listCollections().toArray();
-                const classCollections = collections.filter(c => c.name.startsWith('class_'));
-                
-                console.log('Searching for student in collections:', classCollections.map(c => c.name));
+                console.log('Found admin databases:', adminDbs);
                 
                 let student = null;
+                let adminDb = null;
+                
+                // Check each admin database for the student
+                for (const dbName of adminDbs) {
+                    const adminDbClient = new MongoClient(url);
+                    await adminDbClient.connect();
+                    const currentDb = adminDbClient.db(dbName);
+                    
+                    // Check user collection for credentials
+                    const userRecord = await currentDb.collection("user").findOne({ 
+                        Username: username,
+                        Password: password
+                    });
+                    
+                    if (userRecord) {
+                // Find student record in class collections
+                        const collections = await currentDb.listCollections().toArray();
+                const classCollections = collections.filter(c => c.name.startsWith('class_'));
+                
+                        console.log(`Searching for student in ${dbName} collections:`, classCollections.map(c => c.name));
+                
                 for (const collection of classCollections) {
-                    student = await dbo.collection(collection.name)
+                            student = await currentDb.collection(collection.name)
                         .findOne({ username: username });
                     if (student) {
-                        console.log(`Found student in collection ${collection.name}:`, {
+                                console.log(`Found student in ${dbName} collection ${collection.name}:`, {
                             name: student.name,
                             class: student.class,
                             username: student.username
                         });
                         break;
                     }
+                        }
+                        
+                        if (student) {
+                            adminDb = dbName;
+                            await adminDbClient.close();
+                            break;
+                        }
+                    }
+                    
+                    await adminDbClient.close();
                 }
                 
                 if (!student) {
                     console.log(`No student record found for username: ${username}`);
-                    return res.status(401).send("Student record not found");
+                    return res.redirect("/login?error=invalid_credentials");
                 }
 
                 // Set user info
@@ -613,6 +625,7 @@ MongoClient.connect(url, mongoOptions)
                 req.session.class = student.class;
                 req.session.role = 'student';
                 req.session.photo = student.photo;
+                req.session.adminDb = adminDb; // Store the admin database name
                 req.session.securityToken = generateSecureToken();
                 req.session.userAgent = req.headers['user-agent'];
                 req.session.ipAddress = req.ip || req.connection.remoteAddress;
@@ -621,7 +634,8 @@ MongoClient.connect(url, mongoOptions)
                 console.log('Session set for student:', {
                     username: req.session.username,
                     class: req.session.class,
-                    name: req.session.fname
+                    name: req.session.fname,
+                    adminDb: req.session.adminDb
                 });
                 
                 req.session.save(err => {

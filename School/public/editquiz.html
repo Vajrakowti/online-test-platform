@@ -1162,12 +1162,29 @@
         return false;
       }
 
-      // If everything is valid, submit the form
-      this.submit();
+      // If everything is valid, submit the form using fetch
+      const formData = new FormData(this);
+      fetch(this.action, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('success', data.message);
+        } else {
+          showAlert('error', data.error || 'Failed to update quiz');
+        }
+      })
+      .catch(error => {
+        showAlert('error', 'Error updating quiz: ' + error.message);
+      });
     });
 
-    // Add form submission handler
+    // Add form submission handler for Excel quiz
     document.getElementById('excelQuizForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
       if (document.getElementById('quizFile').files.length > 0) {
         // Show upload progress when a file is selected
         document.getElementById('uploadProgress').style.display = 'block';
@@ -1186,6 +1203,30 @@
           }
         }, 300);
       }
+
+      // Submit the form using fetch
+      const formData = new FormData(this);
+      fetch(this.action, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('success', data.message);
+          // Reset progress bar
+          document.getElementById('uploadProgress').style.display = 'none';
+          document.getElementById('progressBar').style.width = '0';
+        } else {
+          showAlert('error', data.error || 'Failed to update quiz');
+        }
+      })
+      .catch(error => {
+        showAlert('error', 'Error updating quiz: ' + error.message);
+        // Reset progress bar
+        document.getElementById('uploadProgress').style.display = 'none';
+        document.getElementById('progressBar').style.width = '0';
+      });
     });
 
     // Toggle dropdown menus

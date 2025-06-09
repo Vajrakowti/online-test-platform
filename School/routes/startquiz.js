@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const xlsx = require('xlsx');
 const fs = require('fs');
+const { MongoClient } = require('mongodb');
 
 const router = express.Router();
 const EXCEL_DIR = path.join(__dirname, '../uploads');
@@ -9,25 +10,29 @@ const QUIZ_JSON_PATH = path.join(__dirname, '../quizzes.json');
 const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
 const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
 
+// MongoDB connection URL
+const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
+
 // Ensure directories exist
 if (!fs.existsSync(EXCEL_DIR)) {
-    fs.mkdirSync(EXCEL_DIR, { recursive: true });
+    fs.mkdirSync(EXCEL_DIR, { recursive: true, mode: 0o777 });
 }
 if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
-    fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
+    fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true, mode: 0o777 });
 }
-// Ensure attempts directory exists
 if (!fs.existsSync(ATTEMPTS_DIR)) {
-    fs.mkdirSync(ATTEMPTS_DIR);
+    fs.mkdirSync(ATTEMPTS_DIR, { recursive: true, mode: 0o777 });
 }
 
 function loadQuizData(quiz) {
     if (quiz.type === 'excel') {
         // Load Excel quiz
         const excelFilePath = path.join(EXCEL_DIR, quiz.file);
+        console.log('Attempting to load Excel file from:', excelFilePath);
         
         // Check if the file exists before attempting to read it
         if (!fs.existsSync(excelFilePath)) {
+            console.error(`Excel file not found at path: ${excelFilePath}`);
             throw new Error(`Excel file not found: ${quiz.file}. Please contact the administrator.`);
         }
         
@@ -35,39 +40,81 @@ function loadQuizData(quiz) {
             const workbook = xlsx.readFile(excelFilePath);
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            return shuffleArray(xlsx.utils.sheet_to_json(sheet, { header: 1 }).slice(1));
+            const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+            
+            // Remove header row
+            const dataRows = rows.slice(1);
+            
+            // Map each row to [question, option1, option2, option3, option4, correctAnswers]
+            const mappedRows = dataRows.map(row => {
+                // Defensive: ensure at least 6 columns
+                if (!row || row.length < 6) return null;
+                const [question, option1, option2, option3, option4, answerCol, secondAnswerCol] = row;
+                let correctAnswers = [];
+                
+                // Map A/B/C/D to the correct option value for the first answer
+                switch ((answerCol || '').toString().trim().toUpperCase()) {
+                    case 'A':
+                        correctAnswers.push(option1);
+                        break;
+                    case 'B':
+                        correctAnswers.push(option2);
+                        break;
+                    case 'C':
+                        correctAnswers.push(option3);
+                        break;
+                    case 'D':
+                        correctAnswers.push(option4);
+                        break;
+                }
+                
+                // Map A/B/C/D to the correct option value for the second answer, if present and not empty
+                if (secondAnswerCol && secondAnswerCol.toString().trim() !== '') {
+                    switch ((secondAnswerCol || '').toString().trim().toUpperCase()) {
+                        case 'A':
+                            if (!correctAnswers.includes(option1)) correctAnswers.push(option1);
+                            break;
+                        case 'B':
+                            if (!correctAnswers.includes(option2)) correctAnswers.push(option2);
+                            break;
+                        case 'C':
+                            if (!correctAnswers.includes(option3)) correctAnswers.push(option3);
+                            break;
+                        case 'D':
+                            if (!correctAnswers.includes(option4)) correctAnswers.push(option4);
+                            break;
+                    }
+                }
+                
+                return [question, option1, option2, option3, option4, correctAnswers];
+            }).filter(Boolean);
+            
+            if (!mappedRows || mappedRows.length === 0) {
+                throw new Error('Excel file is empty or has no valid questions');
+            }
+            
+            console.log(`Successfully loaded ${mappedRows.length} questions from Excel file`);
+            return shuffleArray(mappedRows);
         } catch (err) {
+            console.error('Error reading Excel file:', err);
             throw new Error(`Error reading Excel file: ${err.message}`);
         }
     } else if (quiz.type === 'manual') {
-        // Load manual quiz
-        const questionsFilePath = path.join(MANUAL_QUESTIONS_DIR, quiz.questionsFile);
-        
-        // Check if the file exists before attempting to read it
-        if (!fs.existsSync(questionsFilePath)) {
-            throw new Error(`Questions file not found: ${quiz.questionsFile}. Please contact the administrator.`);
+        // For manual quizzes, questions are stored directly in the quiz object
+        if (!quiz.questions || !Array.isArray(quiz.questions)) {
+            throw new Error('Invalid quiz format: questions not found');
         }
         
-        try {
-            const questionsData = JSON.parse(
-                fs.readFileSync(questionsFilePath, 'utf8')
-            );
-            
-            // Convert to the same format as Excel data
-            // Format: [question, option1, option2, option3, option4, correctAnswer, questionImage, 
-            //          option1Image, option2Image, option3Image, option4Image]
-            const formattedQuestions = questionsData.map(q => [
-                q.text,
-                ...q.options,
-                q.options[q.correctAnswer],
-                q.image || null,
-                ...(q.optionImages || [null, null, null, null]) // Add option images or default to nulls
-            ]);
-            
-            return shuffleArray(formattedQuestions);
-        } catch (err) {
-            throw new Error(`Error reading questions file: ${err.message}`);
-        }
+        // Convert to the same format as Excel data
+        const formattedQuestions = quiz.questions.map(q => [
+            q.question,
+            ...q.options,
+            q.options[q.correctAnswer],
+            q.questionImage || null,
+            ...(q.optionImages || [null, null, null, null])
+        ]);
+        
+        return shuffleArray(formattedQuestions);
     }
     throw new Error('Invalid quiz type');
 }
@@ -126,37 +173,26 @@ function calculateDuration(quizConfig) {
 }
 
 // Check if quiz has been attempted
-function hasAttemptedQuiz(username, quizName) {
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
-    
-    if (!fs.existsSync(attemptsFile)) {
-        return false;
-    }
-    
+async function hasAttemptedQuiz(username, quizName, db, adminDb) {
     try {
-        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        return attempts.some(attempt => attempt.quizName === quizName);
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const adminDatabase = client.db(adminDb);
+        const attemptsCollection = adminDatabase.collection('attempts');
+        
+        const attempts = await attemptsCollection.findOne({ studentId: username, quizName });
+        await client.close();
+        return !!attempts;
     } catch (err) {
         console.error("Error checking quiz attempts:", err);
         return false;
     }
 }
 
-router.get('/:quizName', (req, res) => {
+router.get('/:quizName', async (req, res) => {
     const quizName = req.params.quizName;
-    
     try {
-        // Check if quizzes.json exists
-        if (!fs.existsSync(QUIZ_JSON_PATH)) {
-            return res.status(500).send(`
-                <h1>System Error</h1>
-                <p>Quiz configuration file not found. Please contact the administrator.</p>
-                <a href="/student">Back to Dashboard</a>
-            `);
-        }
-        
-        const quizzes = JSON.parse(fs.readFileSync(QUIZ_JSON_PATH));
-        
         // Check if user is logged in as a student
         if (!req.session.username || req.session.role !== 'student') {
             return res.redirect('/login');
@@ -164,71 +200,37 @@ router.get('/:quizName', (req, res) => {
         
         const studentUsername = req.session.username;
         
-        // Check for retake eligibility
-        const RETAKE_DIR = path.join(__dirname, '../retakes');
-        let isRetakeEligible = false;
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         
-        if (fs.existsSync(RETAKE_DIR)) {
-            const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
-            if (fs.existsSync(retakeFilePath)) {
-                try {
-                    const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-                    if (retakeData.includes(studentUsername)) {
-                        isRetakeEligible = true;
-                    }
-                } catch (err) {
-                    console.error("Failed to read retake file:", err);
-                }
-            }
+        // Check if quiz has been attempted
+        const hasAttempted = await hasAttemptedQuiz(
+            studentUsername, 
+            quizName, 
+            db,
+            req.session.adminDb
+        );
+        if (hasAttempted) {
+            await client.close();
+            return res.redirect('/student/result/' + encodeURIComponent(quizName));
         }
         
-        // Find quiz configuration - either normal class quiz or student-specific quiz
-        const quizConfig = quizzes.find(q => {
-            // If it's a normal class quiz for student's class
-            if (q.name === quizName && q.class === req.session.class) {
-                return true;
-            }
-            
-            // If it's a student-specific quiz (class 999) and student is in retake list
-            if (q.name === quizName && (q.isStudentSpecific || q.class === '999') && isRetakeEligible) {
-                return true;
-            }
-            
-            return false;
-        });
-
-        // Check if quiz exists
+        // Get quiz configuration
+        const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
         if (!quizConfig) {
-            return res.status(404).send(`
-                <h1>Quiz Not Found</h1>
-                <p>The quiz "${quizName}" does not exist.</p>
-                <a href="/student">Back to Dashboard</a>
-            `);
+            await client.close();
+            return res.status(404).send('Quiz not found');
         }
 
-        // Check if the quiz has already been attempted
-        const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-        let hasAttempted = false;
-
-        if (fs.existsSync(attemptsFile)) {
-            try {
-                const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-                hasAttempted = attempts.some(attempt => attempt.quizName === quizName);
-            } catch (err) {
-                console.error("Error reading attempts file:", err);
-            }
-        }
-
-        // If student has attempted and is not eligible for retake, redirect to results
-        if (hasAttempted && !isRetakeEligible) {
-            return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
-        }
-
-        try {
+        // Calculate remaining duration
             const durationSec = calculateDuration(quizConfig);
-            const quizData = loadQuizData(quizConfig);
 
-            // Update the quiz display template to handle images
+        // Load quiz data
+        const quizData = loadQuizData(quizConfig);
+
+        // Send the quiz page with the data
             res.send(`
             <!DOCTYPE html>
             <html>
@@ -862,6 +864,7 @@ router.get('/:quizName', (req, res) => {
                         gap: 18px;
                         position: relative;
                         pointer-events: auto;
+                        overflow: hidden; /* Prevent double scrollbars */
                     }
                     .panel-summary-card {
                         background: #f8f9fa;
@@ -869,6 +872,7 @@ router.get('/:quizName', (req, res) => {
                         padding: 18px 12px 10px 12px;
                         margin-bottom: 10px;
                         box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                        flex-shrink: 0; /* Prevent summary from shrinking */
                     }
                     .summary-row {
                         display: flex;
@@ -925,6 +929,8 @@ router.get('/:quizName', (req, res) => {
                         border-radius: 12px;
                         padding: 18px 10px 18px 10px;
                         box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+                        max-height: calc(100vh - 400px); /* Limit height and enable scrolling */
+                        overflow-y: auto; /* Enable vertical scrolling */
                     }
                     .panel-title {
                         text-align: center;
@@ -932,12 +938,15 @@ router.get('/:quizName', (req, res) => {
                         font-weight: 600;
                         margin-bottom: 18px;
                         color: #222;
+                        background: #fff;
+                        padding: 10px 0;
                     }
                     .question-grid {
                         display: grid;
                         grid-template-columns: repeat(5, 1fr);
                         gap: 14px;
                         padding: 0 8px;
+                        margin-bottom: 10px; /* Add some bottom margin */
                     }
                     .question-btn {
                         width: 38px;
@@ -1142,7 +1151,7 @@ router.get('/:quizName', (req, res) => {
                                 </div>
                             </div>
                             <div class="panel-section-card">
-                                <div class="panel-title">Computer Awareness</div>
+                                <div class="panel-title">Question Panel</div>
                                 <div class="question-grid" id="questionGrid"></div>
                             </div>
                         </div>
@@ -1152,7 +1161,7 @@ router.get('/:quizName', (req, res) => {
                         <div id="quiz-content">
                             <div class="question-header">
                                 <span class="question-number" id="questionNumber"></span>
-                                <span class="marking-scheme">Marking Scheme : <span class="plus">+1</span> <span class="minus">0</span></span>
+                                <span class="marking-scheme">Marking Scheme : <span class="plus">+4</span> <span class="minus">0</span></span>
                                 <span class="timer"><span id="timer" class="normal"></span></span>
                                 <button type="button" class="mark-btn" id="markBtn" onclick="toggleMarkForReview()"><span id="markBtnText">Mark</span></button>
                             </div>
@@ -1397,9 +1406,20 @@ router.get('/:quizName', (req, res) => {
                         document.getElementById('question').innerText = row[0];
                         // Handle options
                         const options = row.slice(1, 5);
-                        const list = options.map((opt, optIndex) => {
+                        const correctAnswers = row[5];
+                        let list = '';
+                        if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                            // Multi-answer: use checkboxes
+                            const selected = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
+                            list = options.map((opt, optIndex) => {
+                                return '<li><label><input type="checkbox" name="option" value="' + opt + '" ' + (selected.includes(opt) ? 'checked' : '') + '> ' + opt + '</label></li>';
+                            }).join("");
+                        } else {
+                            // Single-answer: use radio
+                            list = options.map((opt, optIndex) => {
                             return '<li><label><input type="radio" name="option" value="' + opt + '" ' + (userAnswers[index] === opt ? 'checked' : '') + '> ' + opt + '</label></li>';
                         }).join("");
+                        }
                         document.getElementById('options').innerHTML = list;
                         // Mark button state
                         const markBtn = document.getElementById('markBtn');
@@ -1495,7 +1515,7 @@ router.get('/:quizName', (req, res) => {
                         document.getElementById('quiz-content').style.display = "none";
                         document.getElementById('quiz-results').style.display = "block";
                         
-                        document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + quiz.length;
+                        document.getElementById('scoreSection').innerText = "Your Final Score: " + score + " out of " + (quiz.length * 4);
                         
                         // Mark this quiz as completed in sessionStorage
                         sessionStorage.setItem(attemptKey, 'completed');
@@ -1513,7 +1533,7 @@ router.get('/:quizName', (req, res) => {
                             body: JSON.stringify({
                                 quizName: quizName,
                                 score: score,
-                                totalQuestions: totalQuestions
+                                totalQuestions: totalQuestions * 4
                             })
                         })
                         .then(response => {
@@ -1543,21 +1563,41 @@ router.get('/:quizName', (req, res) => {
                     }
 
                     function checkAnswer() {
+                        const row = quiz[index];
+                        const correctAnswers = row[5];
+                        let userAnswer;
+                        if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                            // Multi-answer: collect all checked checkboxes
+                            userAnswer = Array.from(document.querySelectorAll('input[name="option"]:checked')).map(cb => cb.value);
+                            // Sort for comparison
+                            const sortedUser = [...userAnswer].sort();
+                            const sortedCorrect = [...correctAnswers].sort();
+                            userAnswers[index] = userAnswer;
+                            answeredQuestions[index] = (sortedUser.length === sortedCorrect.length && sortedUser.every((val, i) => val === sortedCorrect[i]));
+                        } else {
+                            // Single-answer: radio
                         const chosen = document.querySelector('input[name="option"]:checked');
-                        const userAnswer = chosen?.value || "";
-                        const correctAnswer = quiz[index][5];
-                        
+                            userAnswer = chosen?.value || "";
                         userAnswers[index] = userAnswer;
-                        answeredQuestions[index] = userAnswer !== "";
-                        
+                            answeredQuestions[index] = correctAnswers.includes(userAnswer);
+                        }
                         // Recalculate total score by checking all answers
                         score = 0;
                         for (let i = 0; i < quiz.length; i++) {
-                            if (userAnswers[i] === quiz[i][5]) {
-                                score += 1;
+                            const row = quiz[i];
+                            const correct = row[5];
+                            if (Array.isArray(correct) && correct.length > 1) {
+                                const ua = Array.isArray(userAnswers[i]) ? [...userAnswers[i]].sort() : [];
+                                const ca = [...correct].sort();
+                                if (ua.length === ca.length && ua.every((val, idx) => val === ca[idx])) {
+                                    score += 4;
+                                }
+                            } else {
+                                if (userAnswers[i] && correct.includes(userAnswers[i])) {
+                                    score += 4;
                             }
                         }
-                        
+                        }
                         updateSidebar();
                     }
 
@@ -1578,22 +1618,31 @@ router.get('/:quizName', (req, res) => {
                         
                         for (let i = 0; i < quiz.length; i++) {
                             const question = quiz[i][0];
-                            const userAnswer = userAnswers[i] || "Not answered";
-                            const correctAnswer = quiz[i][5];
-                            const isCorrect = userAnswer === correctAnswer;
-                            
+                            const correctAnswers = quiz[i][5];
+                            let userAnswer = userAnswers[i];
+                            let isCorrect = false;
+                            let userDisplay = '';
+                            if (Array.isArray(correctAnswers) && correctAnswers.length > 1) {
+                                // Multi-answer
+                                const ua = Array.isArray(userAnswer) ? [...userAnswer].sort() : [];
+                                const ca = [...correctAnswers].sort();
+                                isCorrect = (ua.length === ca.length && ua.every((val, idx) => val === ca[idx]));
+                                userDisplay = ua.length > 0 ? ua.join(', ') : 'Not answered';
+                            } else {
+                                // Single-answer
+                                isCorrect = userAnswer && correctAnswers.includes(userAnswer);
+                                userDisplay = userAnswer ? userAnswer : 'Not answered';
+                            }
                             reviewHTML += '<div class="review-question">' +
                                 '<h3>Q' + (i+1) + ': ' + question + '</h3>' +
                                 '<div class="review-option ' + (isCorrect ? 'correct-answer' : 'wrong-answer') + '">' +
-                                'Your answer: ' + userAnswer +
+                                'Your answer: ' + userDisplay +
                                 '</div>';
-                                
                             if (!isCorrect) {
                                 reviewHTML += '<div class="review-option correct-answer">' +
-                                    'Correct answer: ' + correctAnswer +
+                                    'Correct answers: ' + (Array.isArray(correctAnswers) ? correctAnswers.join(', ') : correctAnswers) +
                                     '</div>';
                             }
-                            
                             reviewHTML += '</div>';
                         }
                         
@@ -1812,32 +1861,6 @@ router.get('/:quizName', (req, res) => {
             </body>
             </html>
         `);
-        } catch (err) {
-            console.error('Error loading quiz data:', err);
-            if (err.message.includes('Excel file not found') || err.message.includes('Questions file not found')) {
-                // File not found error (more specific)
-                return res.status(404).send(`
-                    <h1>Quiz Resource Not Found</h1>
-                    <p>${err.message}</p>
-                    <p>The administrator may need to re-upload the quiz file.</p>
-                    <a href="/student">Back to Dashboard</a>
-                `);
-            } else if (err.message === "This quiz has already ended") {
-                // Quiz timing error
-                return res.status(400).send(`
-                    <h1>Quiz Unavailable</h1>
-                    <p>${err.message}</p>
-                    <a href="/student">Back to Dashboard</a>
-                `);
-            } else {
-                // Generic error
-                return res.status(500).send(`
-                    <h1>Error Loading Quiz</h1>
-                    <p>There was a problem loading the quiz: ${err.message}</p>
-                    <a href="/student">Back to Dashboard</a>
-                `);
-            }
-        }
     } catch (err) {
         console.error('Error processing quiz request:', err);
         res.status(500).send(`

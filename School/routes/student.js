@@ -1,7 +1,11 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { MongoClient } = require('mongodb');
 const router = express.Router();
+
+// MongoDB connection URL
+const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 
 const QUIZ_FILE = path.join(__dirname, '../quizzes.json');
 const ATTEMPTS_DIR = path.join(__dirname, '../attempts');
@@ -12,68 +16,79 @@ if (!fs.existsSync(ATTEMPTS_DIR)) {
 }
 
 // Route to serve student.html
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     if (req.session.fname && req.session.role === 'student') {
+        try {
+            // Connect to MongoDB using admin-specific database
+            const client = new MongoClient(url);
+            await client.connect();
+            const db = client.db(req.session.adminDb);
+            
+            // Get all quizzes
+            const quizzesCollection = db.collection('quizzes');
+            const quizzes = await quizzesCollection.find({}).toArray();
+            
+            // Get student's attempts
+            const attemptsCollection = db.collection('attempts');
+            const attempts = await attemptsCollection.find({ 
+                studentId: req.session.username 
+            }).toArray();
+            
+            // Create a map of attempted quizzes
+            const attemptedQuizzes = new Map();
+            attempts.forEach(attempt => {
+                attemptedQuizzes.set(attempt.quizName, attempt);
+            });
+            
+            // Separate quizzes into attempted and not attempted
+            const attemptedQuizzesList = [];
+            const availableQuizzes = [];
+            
+            quizzes.forEach(quiz => {
+                if (attemptedQuizzes.has(quiz.name)) {
+                    attemptedQuizzesList.push({
+                        ...quiz,
+                        attempt: attemptedQuizzes.get(quiz.name)
+                    });
+                } else {
+                    availableQuizzes.push(quiz);
+                }
+            });
+            
+            await client.close();
+            
         // Read the student.html file and replace the welcome message
-        fs.readFile(path.join(__dirname, '../public/student.html'), 'utf8', (err, data) => {
+            fs.readFile(path.join(__dirname, '../public/student.html'), 'utf8',
+                async (err, data) => {
             if (err) {
-                console.error("Error reading student.html:", err);
-                return res.status(500).send("Error loading dashboard");
+                        console.error('Error reading student.html:', err);
+                        return res.status(500).send('Error loading student dashboard');
             }
             
-            // Replace the welcome message with the student's name
-            let updatedHtml = data.replace(
-                '<h2>Welcome, Student</h2>',
-                `<h2>Welcome, ${req.session.fname}</h2>`
-            );
+                    // Replace welcome message
+                    let modifiedData = data.replace('Welcome, Student!', `Welcome, ${req.session.fname}!`);
             
-            // Add script to check sessionStorage for completed quizzes
-            const sessionStorageCheckScript = `
-            <script>
-                // Function to check sessionStorage for completed quizzes and update server
-                function checkSessionStorageForCompletedQuizzes() {
-                    const completedQuizzes = [];
-                    for (let i = 0; i < sessionStorage.length; i++) {
-                        const key = sessionStorage.key(i);
-                        if (key && key.startsWith('quiz_attempt_')) {
-                            const quizName = key.replace('quiz_attempt_', '').replace(/_/g, ' ');
-                            completedQuizzes.push(quizName);
-                        }
-                    }
-                    return completedQuizzes;
-                }
-                
-                // On page load, send completed quizzes to server
-                document.addEventListener('DOMContentLoaded', function() {
-                    const recentlyCompletedQuizzes = checkSessionStorageForCompletedQuizzes();
-                    if (recentlyCompletedQuizzes.length > 0) {
-                        fetch('/student/update-completed-quizzes', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ quizNames: recentlyCompletedQuizzes })
-                        })
-                        .then(response => response.json())
-                        .then(() => {
-                            // Reload quizzes display after updating
-                            if (window.refreshQuizLists) {
-                                window.refreshQuizLists();
+                    // Add quizzes data to the page
+                    modifiedData = modifiedData.replace(
+                        'const quizzes = [];',
+                        `const quizzes = ${JSON.stringify(availableQuizzes)};`
+                    );
+                    
+                    // Add attempted quizzes data
+                    modifiedData = modifiedData.replace(
+                        'const attemptedQuizzes = [];',
+                        `const attemptedQuizzes = ${JSON.stringify(attemptedQuizzesList)};`
+                    );
+                    
+                    res.send(modifiedData);
                             }
-                        })
-                        .catch(error => console.error('Error updating completed quizzes:', error));
-                    }
-                });
-            </script>
-            `;
-            
-            // Insert the script before the closing body tag
-            updatedHtml = updatedHtml.replace('</body>', sessionStorageCheckScript + '</body>');
-            
-            res.send(updatedHtml);
-        });
+            );
+        } catch (err) {
+            console.error('Error loading student dashboard:', err);
+            res.status(500).send('Error loading student dashboard');
+        }
     } else {
-        res.redirect("/login");
+        res.redirect('/login');
     }
 });
 
@@ -98,7 +113,7 @@ router.get('/info', (req, res) => {
   });
 
 
-// Route to fetch quiz data - UPDATED TO USE MONGODB
+// Route to fetch quiz data
 router.get('/quizzes', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
@@ -107,26 +122,36 @@ router.get('/quizzes', async (req, res) => {
     try {
         const username = req.session.username;
         const studentClass = req.session.class;
-        const db = req.app.locals.db;
+        
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         
         // Get all quizzes
         const quizzesCollection = db.collection('quizzes');
-        const quizzes = await quizzesCollection.find({}).toArray();
+        const quizzes = await quizzesCollection.find({
+            $or: [
+                { class: studentClass },
+                { $and: [
+                    { $or: [{ isStudentSpecific: true }, { class: '999' }] },
+                    { allowedStudents: username }
+                ]}
+            ]
+        }).toArray();
         
         // Get student's attempts
         const attemptsCollection = db.collection('attempts');
-        const attempts = await attemptsCollection.find({ studentId: username }).toArray();
+        const attempts = await attemptsCollection.find({ username }).toArray();
         
         // Get retake quizzes
         const retakesCollection = db.collection('retakes');
         const retakes = await retakesCollection.find({}).toArray();
         
-        // Filter quizzes based on class, attempts and retakes
+        await client.close();
+        
+        // Filter quizzes based on attempts and retakes
         const availableQuizzes = quizzes.filter(quiz => {
-            // Check if quiz is for student's class or is a retake quiz
-            const isForStudentClass = quiz.class === studentClass;
-            const isRetakeQuiz = quiz.isStudentSpecific || quiz.class === '999';
-            
             // Check if student has attempted this quiz
             const attempt = attempts.find(a => a.quizName === quiz.name);
             
@@ -135,9 +160,8 @@ router.get('/quizzes', async (req, res) => {
             const isEligibleForRetake = retake && retake.retakes.includes(username);
             
             // Show quiz if:
-            // 1. Quiz is for student's class OR is a retake quiz that student is eligible for
-            // 2. Student hasn't attempted it yet OR is eligible for retake
-            return (isForStudentClass || (isRetakeQuiz && isEligibleForRetake)) && (!attempt || isEligibleForRetake);
+            // 1. Student hasn't attempted it yet OR is eligible for retake
+            return !attempt || isEligibleForRetake;
         });
         
         res.json(availableQuizzes);
@@ -156,23 +180,20 @@ router.get('/check-retake/:quizName', async (req, res) => {
     try {
         const { quizName } = req.params;
         const username = req.session.username;
-        const db = req.app.locals.db;
         
-        // Check MongoDB first
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Check retake eligibility in MongoDB
         const retakesCollection = db.collection('retakes');
         const retake = await retakesCollection.findOne({ quizName });
         
+        await client.close();
+        
         if (retake && retake.retakes.includes(username)) {
             return res.json({ isEligible: true });
-        }
-        
-        // Check local file for backward compatibility
-        const retakesPath = path.join(__dirname, '../retakes', `${quizName}.json`);
-        if (fs.existsSync(retakesPath)) {
-            const retakeUsernames = JSON.parse(fs.readFileSync(retakesPath, 'utf8'));
-            if (retakeUsernames.includes(username)) {
-                return res.json({ isEligible: true });
-            }
         }
         
         res.json({ isEligible: false });
@@ -183,7 +204,7 @@ router.get('/check-retake/:quizName', async (req, res) => {
 });
 
 // New route to update completed quizzes from sessionStorage
-router.post('/update-completed-quizzes', (req, res) => {
+router.post('/update-completed-quizzes', async (req, res) => {
     if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
@@ -193,58 +214,41 @@ router.post('/update-completed-quizzes', (req, res) => {
         return res.status(400).json({ error: "Invalid request format" });
     }
     
-    const studentUsername = req.session.username;
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-    
-    // First check if these quizzes are already recorded in the attempts file
-    let attempts = [];
-    let needsUpdate = false;
-    
-    if (fs.existsSync(attemptsFile)) {
-        try {
-            attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-            
-            // For each quiz name from sessionStorage, check if it's already in the attempts
-            quizNames.forEach(quizName => {
-                if (!attempts.some(attempt => attempt.quizName === quizName)) {
-                    // If not found, add a placeholder entry
-                    attempts.push({
-                        quizName,
-                        score: 0,  // We don't know the score
-                        totalQuestions: 0,  // We don't know the total
-                        attemptedAt: new Date().toISOString(),
-                        fromSessionStorage: true  // Mark as recovered from session storage
-                    });
-                    needsUpdate = true;
-                }
-            });
-            
-            // If we added any new entries, save the updated attempts file
-            if (needsUpdate) {
-                fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
-            }
-            
-        } catch (err) {
-            console.error("Failed to process attempts file:", err);
-        }
-    } else {
-        // If the attempts file doesn't exist yet, create it with the sessionStorage entries
-        const newAttempts = quizNames.map(quizName => ({
-            quizName,
-            score: 0,
-            totalQuestions: 0,
-            attemptedAt: new Date().toISOString(),
-            fromSessionStorage: true
-        }));
+    try {
+        const studentUsername = req.session.username;
         
-        try {
-            fs.writeFileSync(attemptsFile, JSON.stringify(newAttempts, null, 2));
-        } catch (err) {
-            console.error("Failed to create attempts file:", err);
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get existing attempts
+        const attemptsCollection = db.collection('attempts');
+        const attempts = await attemptsCollection.findOne({ username: studentUsername }) || { username: studentUsername, attempts: [] };
+        
+        // Add new attempts
+        for (const quizName of quizNames) {
+            if (!attempts.attempts.some(a => a.quizName === quizName)) {
+                attempts.attempts.push({
+                    quizName,
+                    timestamp: new Date()
+                });
+            }
         }
+        
+        // Update attempts in MongoDB
+        await attemptsCollection.updateOne(
+            { username: studentUsername },
+            { $set: attempts },
+            { upsert: true }
+        );
+        
+        await client.close();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating completed quizzes:', err);
+        res.status(500).json({ error: 'Failed to update completed quizzes' });
     }
-    
-    res.json({ success: true });
 });
 
 // Route to get attempts for a student
@@ -255,7 +259,11 @@ router.get('/attempts', async (req, res) => {
 
     try {
         const username = req.session.username;
-        const db = req.app.locals.db;
+        
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         const attemptsCollection = db.collection('attempts');
         
         // Get all attempts for this student
@@ -263,6 +271,7 @@ router.get('/attempts', async (req, res) => {
             .sort({ attemptedAt: -1 })
             .toArray();
         
+        await client.close();
         res.json(attempts);
     } catch (err) {
         console.error('Error getting attempts:', err);
@@ -280,8 +289,10 @@ router.post('/save-attempt', async (req, res) => {
         const { quizName, score, totalQuestions, isRetake, answers } = req.body;
         const username = req.session.username;
         
-        // First save to MongoDB
-        const db = req.app.locals.db;
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         const attemptsCollection = db.collection('attempts');
         
         // Create new attempt document
@@ -298,19 +309,9 @@ router.post('/save-attempt', async (req, res) => {
             answers: answers || null
         };
         
-        // Save to MongoDB
+        // Save to MongoDB only
         await attemptsCollection.insertOne(attempt);
-        
-        // Then save to local file
-        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
-        let attempts = [];
-        
-        if (fs.existsSync(attemptsFile)) {
-            attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        }
-        
-        attempts.push(attempt);
-        fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
+        await client.close();
         
         res.json({ success: true });
     } catch (err) {
@@ -327,51 +328,20 @@ router.post('/sync-attempts', async (req, res) => {
 
     try {
         const username = req.session.username;
-        const db = req.app.locals.db;
+        
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         const attemptsCollection = db.collection('attempts');
         
-        // Get attempts from local file
-        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
-        let localAttempts = [];
-        
-        if (fs.existsSync(attemptsFile)) {
-            localAttempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        }
-        
         // Get attempts from MongoDB
-        const mongoAttempts = await attemptsCollection.find({ studentId: username })
+        const attempts = await attemptsCollection.find({ studentId: username })
             .sort({ attemptedAt: -1 })
             .toArray();
         
-        // Merge attempts, keeping the most recent version of each quiz attempt
-        const mergedAttempts = [...localAttempts];
-        
-        mongoAttempts.forEach(mongoAttempt => {
-            const existingIndex = mergedAttempts.findIndex(
-                localAttempt => localAttempt.quizName === mongoAttempt.quizName
-            );
-            
-            if (existingIndex === -1) {
-                mergedAttempts.push(mongoAttempt);
-            } else if (new Date(mongoAttempt.attemptedAt) > new Date(mergedAttempts[existingIndex].attemptedAt)) {
-                mergedAttempts[existingIndex] = mongoAttempt;
-            }
-        });
-        
-        // Update MongoDB with merged data
-        for (const attempt of mergedAttempts) {
-            const { _id, ...attemptWithoutId } = attempt; // Destructure to remove _id
-            await attemptsCollection.updateOne(
-                { studentId: username, quizName: attempt.quizName },
-                { $set: attemptWithoutId },
-                { upsert: true }
-            );
-        }
-        
-        // Update local file
-        fs.writeFileSync(attemptsFile, JSON.stringify(mergedAttempts, null, 2));
-        
-        res.json({ success: true });
+        await client.close();
+        res.json({ success: true, attempts });
     } catch (err) {
         console.error('Error syncing attempts:', err);
         res.status(500).json({ error: 'Failed to sync attempts' });
@@ -387,23 +357,20 @@ router.post('/delete-attempt', async (req, res) => {
     try {
         const { quizName } = req.body;
         const username = req.session.username;
-        const db = req.app.locals.db;
+        
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
         const attemptsCollection = db.collection('attempts');
         
-        // Delete from MongoDB
+        // Delete from MongoDB only
         await attemptsCollection.deleteOne({ 
             studentId: username, 
             quizName: quizName 
         });
         
-        // Update local file
-        const attemptsFile = path.join(ATTEMPTS_DIR, `${username}.json`);
-        if (fs.existsSync(attemptsFile)) {
-            let attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-            attempts = attempts.filter(attempt => attempt.quizName !== quizName);
-            fs.writeFileSync(attemptsFile, JSON.stringify(attempts, null, 2));
-        }
-        
+        await client.close();
         res.json({ success: true });
     } catch (err) {
         console.error('Error deleting attempt:', err);
@@ -411,7 +378,7 @@ router.post('/delete-attempt', async (req, res) => {
     }
 });
 
-router.get('/quiz/:quizName', (req, res) => {
+router.get('/quiz/:quizName', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.redirect("/login");
     }
@@ -420,54 +387,85 @@ router.get('/quiz/:quizName', (req, res) => {
     const studentClass = req.session.class || '1';
     const studentUsername = req.session.username;
 
-    // Check for retake eligibility
-    const RETAKE_DIR = path.join(__dirname, '../retakes');
-    let isRetakeEligible = false;
-    
-    if (fs.existsSync(RETAKE_DIR)) {
-        const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
-        if (fs.existsSync(retakeFilePath)) {
-            try {
-                const retakeData = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-                if (retakeData.includes(studentUsername)) {
-                    isRetakeEligible = true;
+    try {
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Find the quiz in the admin's database
+        const quiz = await db.collection('quizzes').findOne({ name: quizName });
+        
+        if (!quiz) {
+            await client.close();
+            return res.status(404).send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Quiz Not Found</title>
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            padding: 20px;
+                            background-color: #f8f9fa;
+                            text-align: center;
                 }
-            } catch (err) {
-                console.error("Failed to read retake file:", err);
-            }
+                        .error-container {
+                            background: white;
+                            padding: 30px;
+                            border-radius: 12px;
+                            max-width: 500px;
+                            margin: 50px auto;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+                        }
+                        .back-btn {
+                            display: inline-block;
+                            margin-top: 20px;
+                            padding: 10px 24px;
+                            background-color: #4e73df;
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 6px;
+                            font-weight: 500;
+                            transition: all 0.3s;
+                        }
+                        .back-btn:hover {
+                            background-color: #3a5ec0;
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
-    }
-
-    fs.readFile(QUIZ_FILE, 'utf-8', (err, data) => {
-        if (err) {
-            console.error("Failed to read quizzes file:", err);
-            return res.status(500).send("Error loading quiz.");
+                    </style>
+                </head>
+                <body>
+                    <div class="error-container">
+                        <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Found</h2>
+                        <p style="color: #6c757d;">The requested quiz does not exist in your admin's database.</p>
+                        <a href="/student" class="back-btn">Back to Dashboard</a>
+                    </div>
+                </body>
+                </html>
+            `);
         }
 
-        try {
-            const quizzes = JSON.parse(data);
-            
-            // Find the quiz - either regular class quiz or student-specific quiz
-            const quiz = quizzes.find(q => {
-                // If it's a normal class quiz
-                if (q.name === quizName && q.class === studentClass) {
-                    return true;
+        // Check if student has already attempted this quiz
+        const hasAttempted = await db.collection('attempts').findOne({ 
+            username: studentUsername, 
+            quizName: quizName 
+        });
+
+        if (hasAttempted) {
+            await client.close();
+            return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
                 }
                 
-                // If it's a retake quiz (class 999) that student is eligible for
-                if (q.name === quizName && (q.isStudentSpecific || q.class === '999') && isRetakeEligible) {
-                    return true;
-                }
-                
-                return false;
-            });
-
-            if (!quiz) {
-                return res.status(404).send(`
+        // Check if quiz is available for student's class
+        if (quiz.class !== studentClass && !quiz.isStudentSpecific) {
+            await client.close();
+            return res.status(403).send(`
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Quiz Not Found</title>
+                    <title>Quiz Not Available</title>
                         <style>
                             body {
                                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -504,7 +502,7 @@ router.get('/quiz/:quizName', (req, res) => {
                     <body>
                         <div class="error-container">
                             <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Available</h2>
-                            <p style="color: #6c757d;">The requested quiz is not available for your class or does not exist.</p>
+                        <p style="color: #6c757d;">This quiz is not available for your class.</p>
                             <a href="/student" class="back-btn">Back to Dashboard</a>
                         </div>
                     </body>
@@ -512,6 +510,9 @@ router.get('/quiz/:quizName', (req, res) => {
                 `);
             }
 
+        await client.close();
+
+        // Send the quiz page with the data
             res.send(`
                 <!DOCTYPE html>
                 <html>
@@ -811,77 +812,92 @@ router.get('/quiz/:quizName', (req, res) => {
                 </body>
                 </html>
             `);
-        } catch (parseErr) {
-            console.error("Failed to parse quizzes JSON:", parseErr);
-            res.status(500).send("Error loading quiz data.");
-        }
-    });
-});
-
-
-// Attempt Result Page (unchanged)
-router.get('/result/:quizName', (req, res) => {
-    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
-        return res.redirect('/login');
-    }
-
-    const quizName = decodeURIComponent(req.params.quizName);
-    const studentUsername = req.session.username; // Use username from session
-    const attemptsFile = path.join(ATTEMPTS_DIR, `${studentUsername}.json`);
-    
-    if (!fs.existsSync(attemptsFile)) {
-        return res.status(404).send(`
+    } catch (err) {
+        console.error('Error processing quiz request:', err);
+        res.status(500).send(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>No Attempts Found</title>
+                <title>Error</title>
                 <style>
                     body {
-                        font-family: Arial, sans-serif;
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                         padding: 20px;
-                        background-color: #f4f4f4;
+                        background-color: #f8f9fa;
                         text-align: center;
                     }
                     .error-container {
                         background: white;
                         padding: 30px;
-                        border-radius: 8px;
+                        border-radius: 12px;
                         max-width: 500px;
                         margin: 50px auto;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
                     }
                     .back-btn {
                         display: inline-block;
                         margin-top: 20px;
-                        padding: 10px 20px;
-                        background-color: #6c757d;
+                        padding: 10px 24px;
+                        background-color: #4e73df;
                         color: white;
                         text-decoration: none;
-                        border-radius: 4px;
+                        border-radius: 6px;
+                        font-weight: 500;
+                        transition: all 0.3s;
+                    }
+                    .back-btn:hover {
+                        background-color: #3a5ec0;
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                     }
                 </style>
             </head>
             <body>
                 <div class="error-container">
-                    <h2>No Attempt Found</h2>
-                    <p>No quiz attempts were found for your account.</p>
+                    <h2 style="color: #4e73df; margin-bottom: 15px;">Error</h2>
+                    <p style="color: #6c757d;">There was a problem loading the quiz. Please try again later.</p>
                     <a href="/student" class="back-btn">Back to Dashboard</a>
                 </div>
             </body>
             </html>
         `);
     }
-    
+});
+
+
+// Attempt Result Page
+router.get('/result/:quizName', async (req, res) => {
+    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+
+    const quizName = decodeURIComponent(req.params.quizName);
+    const studentUsername = req.session.username;
+
     try {
-        const attempts = JSON.parse(fs.readFileSync(attemptsFile, 'utf8'));
-        const attempt = attempts.find(a => a.quizName === quizName);
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        const attemptsCollection = db.collection('attempts');
+        
+        // Get the latest attempt for this quiz
+        const attempt = await attemptsCollection.findOne(
+            { 
+                studentId: studentUsername,
+                quizName: quizName
+            },
+            { sort: { attemptedAt: -1 } }
+        );
+
+        await client.close();
         
         if (!attempt) {
             return res.status(404).send(`
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Attempt Not Found</title>
+                    <title>No Attempts Found</title>
                     <style>
                         body {
                             font-family: Arial, sans-serif;
@@ -910,8 +926,8 @@ router.get('/result/:quizName', (req, res) => {
                 </head>
                 <body>
                     <div class="error-container">
-                        <h2>Attempt Not Found</h2>
-                        <p>No attempt was found for the quiz: ${quizName}</p>
+                        <h2>No Attempt Found</h2>
+                        <p>No quiz attempts were found for your account.</p>
                         <a href="/student" class="back-btn">Back to Dashboard</a>
                     </div>
                 </body>
@@ -1114,7 +1130,7 @@ router.get('/result/:quizName', (req, res) => {
             </html>
         `);
     } catch (err) {
-        console.error("Failed to read attempts file:", err);
+        console.error("Failed to read attempts:", err);
         res.status(500).send(`
             <!DOCTYPE html>
             <html>
@@ -1182,30 +1198,35 @@ router.get('/messages', (req, res) => {
 });
 
 // API endpoint to get messages for a student
-router.get('/api/messages', (req, res) => {
+router.get('/api/messages', async (req, res) => {
     if (!req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
     
-    const studentUsername = req.session.username;
-    const db = req.app.locals.db;
-    
-    // Get messages for this student
-    db.collection('messages')
-        .find({ studentUsername: studentUsername })
-        .sort({ timestamp: -1 }) // Sort by newest first
-        .toArray()
-        .then(messages => {
-            res.json(messages);
-        })
-        .catch(err => {
-            console.error('Error fetching messages:', err);
-            res.status(500).json({ error: 'Failed to load messages' });
-        });
+    try {
+        const studentUsername = req.session.username;
+        
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get messages for this student
+        const messages = await db.collection('messages')
+            .find({ studentUsername: studentUsername })
+            .sort({ timestamp: -1 }) // Sort by newest first
+            .toArray();
+            
+        await client.close();
+        res.json(messages);
+    } catch (err) {
+        console.error('Error fetching messages:', err);
+        res.status(500).json({ error: 'Failed to load messages' });
+    }
 });
 
 // API endpoint to send a new message
-router.post('/messages/send', (req, res) => {
+router.post('/messages/send', async (req, res) => {
     if (!req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
@@ -1216,38 +1237,42 @@ router.post('/messages/send', (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    const db = req.app.locals.db;
-    const studentUsername = req.session.username;
-    const studentName = req.session.fname;
-    const studentClass = req.session.class || '1';
-    
-    // Create new message
-    const newMessage = {
-        studentUsername,
-        studentName,
-        class: studentClass,
-        issueType,
-        quizName,
-        messageContent,
-        timestamp: new Date(),
-        read: false,
-        replies: []
-    };
-    
-    // Save to database
-    db.collection('messages')
-        .insertOne(newMessage)
-        .then(result => {
-            res.json({ 
-                success: true, 
-                message: 'Message sent successfully',
-                id: result.insertedId
-            });
-        })
-        .catch(err => {
-            console.error('Error sending message:', err);
-            res.status(500).json({ error: 'Failed to send message' });
+    try {
+        const studentUsername = req.session.username;
+        const studentName = req.session.fname;
+        const studentClass = req.session.class || '1';
+        
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Create new message
+        const newMessage = {
+            studentUsername,
+            studentName,
+            class: studentClass,
+            issueType,
+            quizName,
+            messageContent,
+            timestamp: new Date(),
+            read: false,
+            replies: []
+        };
+        
+        // Save to admin-specific database
+        const result = await db.collection('messages').insertOne(newMessage);
+        await client.close();
+        
+        res.json({ 
+            success: true, 
+            message: 'Message sent successfully',
+            id: result.insertedId
         });
+    } catch (err) {
+        console.error('Error sending message:', err);
+        res.status(500).json({ error: 'Failed to send message' });
+    }
 });
 
 // Add logout route

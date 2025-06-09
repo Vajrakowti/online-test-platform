@@ -3,10 +3,13 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const router = express.Router();
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const nodemailer = require('nodemailer');
 const excel = require('exceljs');
 const xlsx = require('xlsx');
+
+// MongoDB connection URL
+const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
 
 // Sidebar template for all admin pages
 const ADMIN_SIDEBAR = `
@@ -288,7 +291,7 @@ const SIDEBAR_CSS = `
 `;
 
 const QUIZ_FILE = path.join(__dirname, '../quizzes.json');
-const uploadDir = path.join(__dirname, '../uploads');
+const uploadDir = path.join(__dirname, '..', 'uploads');
 const QUIZ_IMAGES_DIR = path.join(__dirname, '../public/quiz-images');
 const MANUAL_QUESTIONS_DIR = path.join(__dirname, '../manual-questions');
 
@@ -397,18 +400,12 @@ if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
 const excelStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     try {
-      // Ensure the upload directory exists
+      // Ensure the upload directory exists with proper permissions
       if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+        fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
       }
-      console.log('Saving to directory:', uploadDir);
-      // Set directory permissions to be writable
-      try {
-        fs.chmodSync(uploadDir, 0o777);
-      } catch (permErr) {
-        console.warn('Warning: Could not change directory permissions:', permErr);
-      }
-    cb(null, uploadDir);
+      console.log('Saving Excel file to directory:', uploadDir);
+      cb(null, uploadDir);
     } catch (error) {
       console.error('Error setting upload destination:', error);
       cb(error);
@@ -418,8 +415,8 @@ const excelStorage = multer.diskStorage({
     try {
       // For update route, use the quiz name from params if available
       const quizName = req.params.quizName ? decodeURIComponent(req.params.quizName) : req.body.quizName;
-      const filename = quizName + path.extname(file.originalname);
-      console.log('Saving file as:', filename);
+      const filename = `${quizName}${path.extname(file.originalname)}`;
+      console.log('Saving Excel file as:', filename);
       cb(null, filename);
     } catch (error) {
       console.error('Error generating filename:', error);
@@ -633,9 +630,9 @@ router.post('/add-student', uploadStudentPhoto.single('photo'), async (req, res)
     };
 
     // Connect to MongoDB using the updated connection string
-    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    const client = new MongoClient(url);
     await client.connect();
-    const db = client.db("School");
+    const db = client.db(req.session.adminDb);
     
     // Insert into the appropriate class collection
     const collectionName = `class_${studentClass}`;
@@ -691,7 +688,7 @@ router.get('/students/:class', async (req, res) => {
         const classNumber = req.params.class;
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
-        const db = client.db("School");
+        const db = client.db(req.session.adminDb);
         
         // Fetch students from specific class
         const students = await db.collection(`class_${classNumber}`).find().toArray();
@@ -1779,7 +1776,7 @@ router.delete('/students/delete/:username', async (req, res) => {
       const username = req.params.username;
       const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
       await client.connect();
-      const db = client.db("School");
+      const db = client.db(req.session.adminDb);
       
       // First find which class the student is in and get photo path
       const collections = await db.listCollections().toArray();
@@ -1830,6 +1827,7 @@ router.post('/create-quiz', async (req, res) => {
   if (!req.session.fname || req.session.role !== 'admin') {
     return res.status(401).send('Unauthorized');
   }
+  
   uploadExcel(req, res, async function(err) {
     if (err instanceof multer.MulterError) {
       console.error('Multer error:', err);
@@ -1846,6 +1844,12 @@ router.post('/create-quiz', async (req, res) => {
         throw new Error('No Excel file uploaded');
       }
 
+      // Verify the file exists
+      const filePath = path.join(uploadDir, req.file.filename);
+      if (!fs.existsSync(filePath)) {
+        throw new Error('Failed to save Excel file');
+      }
+
       // Create quiz object
       const quiz = {
         name: quizName,
@@ -1853,34 +1857,38 @@ router.post('/create-quiz', async (req, res) => {
         endTime: endTime,
         class: quizClass,
         type: 'excel',
-        file: req.file.filename
+        file: req.file.filename,
+        createdAt: new Date()
       };
 
       // Store in MongoDB
-      const db = req.app.locals.db;
-      if (!db) {
-        throw new Error('Database connection not available');
-      }
-
+      const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+      await client.connect();
+      const db = client.db(req.session.adminDb);
+      
       // Check if quiz already exists in MongoDB
       const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
       if (existingQuiz) {
+        // Delete the uploaded file since quiz already exists
+        fs.unlinkSync(filePath);
         throw new Error('Quiz with this name already exists');
       }
 
       // Insert into MongoDB
       await db.collection('quizzes').insertOne(quiz);
       console.log('Quiz stored in MongoDB:', quiz);
-
-      // Store in quizzes.json
-      const quizzes = readQuizzes();
-      quizzes.push(quiz);
-      saveQuizzes(quizzes);
-      console.log('Quiz stored in quizzes.json:', quiz);
-
+      
+      await client.close();
       res.redirect('/admin');
     } catch (error) {
       console.error('Error creating quiz:', error);
+      // Clean up uploaded file if there was an error
+      if (req.file) {
+        const filePath = path.join(uploadDir, req.file.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
       res.status(500).send('Error creating quiz: ' + error.message);
     }
   });
@@ -1955,20 +1963,6 @@ router.post('/create-quiz-manual', async (req, res) => {
         throw new Error('No questions provided. Please check the form data.');
       }
 
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
-        fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
-      }
-
-      // Save questions to a JSON file
-      const questionsFileName = `${quizName}-manual.json`;
-      const questionsFilePath = path.join(MANUAL_QUESTIONS_DIR, questionsFileName);
-      
-      fs.writeFileSync(
-        questionsFilePath,
-        JSON.stringify(questions, null, 2)
-      );
-
       // Create quiz object
       const quiz = {
         name: quizName,
@@ -1976,15 +1970,14 @@ router.post('/create-quiz-manual', async (req, res) => {
         endTime: endTime,
         class: quizClass,
         type: 'manual',
-        questionsFile: questionsFileName
+        questions: questions
       };
 
       // Store in MongoDB
-      const db = req.app.locals.db;
-      if (!db) {
-        throw new Error('Database connection not available');
-      }
-
+      const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+      await client.connect();
+      const db = client.db(req.session.adminDb);
+      
       // Check if quiz already exists in MongoDB
       const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
       if (existingQuiz) {
@@ -1994,13 +1987,8 @@ router.post('/create-quiz-manual', async (req, res) => {
       // Insert into MongoDB
       await db.collection('quizzes').insertOne(quiz);
       console.log('Quiz stored in MongoDB:', quiz);
-
-      // Store in quizzes.json
-      const quizzes = readQuizzes();
-      quizzes.push(quiz);
-      saveQuizzes(quizzes);
-      console.log('Quiz stored in quizzes.json:', quiz);
-
+      
+      await client.close();
       res.redirect('/admin');
     } catch (error) {
       console.error('Error creating manual quiz:', error);
@@ -2010,382 +1998,417 @@ router.post('/create-quiz-manual', async (req, res) => {
 });
 
 // Show Total Quizzes
-router.get('/total-quiz', (req, res) => {
+router.get('/total-quiz', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'admin') {
       return res.redirect("/login");
     }
   
-    const quizzes = readQuizzes();
-    
-    // Get current time to determine quiz status (active, upcoming, ended)
-    const now = getISTNow();
-    const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-    const currentDate = now.toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
-    
-    res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Total Quizzes</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-        <style>
-            * {
-                box-sizing: border-box;
-                font-family: 'Poppins', sans-serif;
-            }
-            body {
-                margin: 0;
-                background-color: #f5f7fa;
-                color: #333;
-            }
-            
-            ${SIDEBAR_CSS}
-            
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 20px;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            }
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 30px;
-                flex-wrap: wrap;
-                gap: 15px;
-            }
-            .page-title {
-                margin: 0;
-                color: #4e73df;
-                font-size: 28px;
-            }
-            .back-btn {
-                padding: 10px 16px;
-                background-color: #36b9cc;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-block;
-                transition: background-color 0.3s;
-            }
-            .back-btn:hover {
-                background-color: #5a6268;
-            }
-            .search-container {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                max-width: 400px;
-            }
-            #searchInput {
-                padding: 10px 15px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 14px;
-                flex-grow: 1;
-                transition: border 0.3s;
-            }
-            #searchInput:focus {
-                outline: none;
-                border-color: #4CAF50;
-                box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-            }
-            .quiz-count {
-                font-size: 14px;
-                color: #666;
-                margin-left: auto;
-            }
-            .quiz-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-                background: white;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                border-radius: 8px;
-                overflow: hidden;
-            }
-            .quiz-table th {
-                background-color: #007BFF;
-                color: white;
-                padding: 15px;
-                text-align: left;
-                font-weight: 600;
-            }
-            .quiz-table td {
-                padding: 12px 15px;
-                border-bottom: 1px solid #eee;
-            }
-            .quiz-table tr:last-child td {
-                border-bottom: none;
-            }
-            .quiz-table tr:hover {
-                background-color: #f8f9fa;
-            }
-            .file-link {
-                color: #3498db;
-                text-decoration: none;
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                transition: color 0.2s;
-            }
-            .file-link:hover {
-                color: #1d6fa5;
-                text-decoration: underline;
-            }
-            .no-quizzes {
-                text-align: center;
-                padding: 40px;
-                color: #666;
-                font-style: italic;
-                font-size: 16px;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-            .time-cell {
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-            }
-            .time-badge {
-                display: inline-block;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: 600;
-                background-color: #e3f2fd;
-                color: #1976d2;
-            }
-            .status-badge {
-                display: inline-block;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: 600;
-            }
-            .status-active {
-                background-color: #e8f5e9;
-                color: #2e7d32;
-            }
-            .status-upcoming {
-                background-color: #e3f2fd;
-                color: #1565c0;
-            }
-            .status-ended {
-                background-color: #f5f5f5;
-                color: #757575;
-            }
-            .actions-cell {
-                display: flex;
-                gap: 8px;
-            }
-            .edit-link {
-                color: #ff9800;
-                text-decoration: none;
-                font-weight: 500;
-            }
-            .edit-link:hover {
-                text-decoration: underline;
-            }
-            .view-link {
-                color: #4caf50;
-                text-decoration: none;
-                font-weight: 500;
-            }
-            .view-link:hover {
-                text-decoration: underline;
-            }
-            
-            .btn-create {
-                padding: 10px 16px;
-                background-color: #4e73df;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                text-decoration: none;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                transition: background-color 0.3s;
-                margin-bottom: 20px;
-            }
-            
-            .btn-create:hover {
-                background-color: #3a59c7;
-            }
-            
-            /* Current page styling */
-            .sidebar-item[href="/admin/total-quiz"] {
-                background-color: rgba(255, 255, 255, 0.2);
-                font-weight: bold;
-            }
-            
-            @media (max-width: 768px) {
-                .header {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .search-container {
-                    width: 100%;
-                }
-                .quiz-table {
-                    display: block;
-                    overflow-x: auto;
-                }
-                .time-cell {
-                    flex-direction: column;
-                    gap: 5px;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="admin-container">
-            ${ADMIN_SIDEBAR}
-            <main class="main-content">
-                <div class="container">
-                    <div class="header">
-                        <h1 class="page-title">Total Quizzes</h1>
-                        <div class="search-container">
-                            <input type="text" id="searchInput" placeholder="Search quizzes by name..." autocomplete="off">
-                            <span class="quiz-count" id="quizCount">Showing ${quizzes.length} quizzes</span>
-                        </div>
-                    </div>
-                    
-                    <a href="/admin/create-quiz" class="btn-create">
-                        <i class="fas fa-plus"></i> Create New Quiz
-                    </a>
-                    
-                    ${quizzes.length === 0 ? 
-                        '<div class="no-quizzes">No quizzes available. Click "Create New Quiz" to add a quiz.</div>' : 
-                        `
-                        <div style="overflow-x: auto;">
-                            <table class="quiz-table" id="quizTable">
-                                <thead>
-                                    <tr>
-                                        <th>Quiz Name</th>
-                                        <th>Class</th>
-                                        <th>Time</th>
-                                        <th>Status</th>
-                                        <th>Type</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${quizzes.map(quiz => {
-                                        // Determine quiz status based on time
-                                        let statusClass = '';
-                                        let statusText = '';
-                                        
-                                        // Parse quiz times
-                                        const startParts = quiz.startTime.split(':');
-                                        const endParts = quiz.endTime.split(':');
-                                        
-                                        const startHour = parseInt(startParts[0]);
-                                        const startMinute = parseInt(startParts[1]);
-                                        const endHour = parseInt(endParts[0]);
-                                        const endMinute = parseInt(endParts[1]);
-                                        
-                                        const now = getISTNow();
-                                        const currentHour = now.getHours();
-                                        const currentMinute = now.getMinutes();
-                                        
-                                        if (currentHour < startHour || (currentHour === startHour && currentMinute < startMinute)) {
-                                            statusClass = 'status-upcoming';
-                                            statusText = 'Upcoming';
-                                        } else if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
-                                            statusClass = 'status-ended';
-                                            statusText = 'Ended';
-                                        } else {
-                                            statusClass = 'status-active';
-                                            statusText = 'Active';
-                                        }
-                                        
-                                        return `
-                                            <tr>
-                                                <td>${quiz.name}</td>
-                                                <td>Class ${quiz.class}</td>
-                                                <td class="time-cell">
-                                                    <span class="time-badge">Start: ${quiz.startTime}</span>
-                                                    <span class="time-badge">End: ${quiz.endTime}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="status-badge ${statusClass}">${statusText}</span>
-                                                </td>
-                                                <td>${quiz.type === 'excel' ? 'Excel' : 'Manual'}</td>
-                                                <td class="actions-cell">
-                                                    <a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">Edit</a>
-                                                    <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="view-link">Results</a>
-                                                </td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        `
-                    }
-                </div>
-            </main>
-        </div>
+    try {
+      const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+      await client.connect();
+      const db = client.db(req.session.adminDb);
+      
+      // Get quizzes from MongoDB
+      const quizzes = await db.collection('quizzes').find().toArray();
+      await client.close();
+      
+      // Get current time to determine quiz status (active, upcoming, ended)
+      const now = getISTNow();
+      const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+      const currentDate = now.toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+      
+      res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Total Quizzes</title>
+          <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+          <style>
+              * {
+                  box-sizing: border-box;
+                  font-family: 'Poppins', sans-serif;
+              }
+              body {
+                  margin: 0;
+                  background-color: #f5f7fa;
+                  color: #333;
+              }
+              
+              ${SIDEBAR_CSS}
+              
+              .container {
+                  max-width: 1200px;
+                  margin: 0 auto;
+                  padding: 20px;
+                  background: white;
+                  border-radius: 8px;
+                  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+              }
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 30px;
+                  flex-wrap: wrap;
+                  gap: 15px;
+              }
+              .page-title {
+                  margin: 0;
+                  color: #4e73df;
+                  font-size: 28px;
+              }
+              .back-btn {
+                  padding: 10px 16px;
+                  background-color: #36b9cc;
+                  color: white;
+                  border: none;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  text-decoration: none;
+                  display: inline-block;
+                  transition: background-color 0.3s;
+              }
+              .back-btn:hover {
+                  background-color: #5a6268;
+              }
+              .search-container {
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  width: 100%;
+                  max-width: 400px;
+              }
+              #searchInput {
+                  padding: 10px 15px;
+                  border: 1px solid #ddd;
+                  border-radius: 4px;
+                  font-size: 14px;
+                  flex-grow: 1;
+                  transition: border 0.3s;
+              }
+              #searchInput:focus {
+                  outline: none;
+                  border-color: #4CAF50;
+                  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+              }
+              .quiz-count {
+                  font-size: 14px;
+                  color: #666;
+                  margin-left: auto;
+              }
+              .quiz-table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin-top: 20px;
+                  background: white;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                  border-radius: 8px;
+                  overflow: hidden;
+              }
+              .quiz-table th {
+                  background-color: #007BFF;
+                  color: white;
+                  padding: 15px;
+                  text-align: left;
+                  font-weight: 600;
+              }
+              .quiz-table td {
+                  padding: 12px 15px;
+                  border-bottom: 1px solid #eee;
+              }
+              .quiz-table tr:last-child td {
+                  border-bottom: none;
+              }
+              .quiz-table tr:hover {
+                  background-color: #f8f9fa;
+              }
+              .file-link {
+                  color: #3498db;
+                  text-decoration: none;
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 5px;
+                  transition: color 0.2s;
+              }
+              .file-link:hover {
+                  color: #1d6fa5;
+                  text-decoration: underline;
+              }
+              .no-quizzes {
+                  text-align: center;
+                  padding: 40px;
+                  color: #666;
+                  font-style: italic;
+                  font-size: 16px;
+                  background: white;
+                  border-radius: 8px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              }
+              .time-cell {
+                  display: flex;
+                  gap: 10px;
+                  flex-wrap: wrap;
+              }
+              .time-badge {
+                  display: inline-block;
+                  padding: 4px 8px;
+                  border-radius: 4px;
+                  font-size: 12px;
+                  font-weight: 600;
+                  background-color: #e3f2fd;
+                  color: #1976d2;
+              }
+              .status-badge {
+                  display: inline-block;
+                  padding: 4px 8px;
+                  border-radius: 4px;
+                  font-size: 12px;
+                  font-weight: 600;
+              }
+              .status-active {
+                  background-color: #e8f5e9;
+                  color: #2e7d32;
+              }
+              .status-upcoming {
+                  background-color: #e3f2fd;
+                  color: #1565c0;
+              }
+              .status-ended {
+                  background-color: #f5f5f5;
+                  color: #757575;
+              }
+              .actions-cell {
+                  display: flex;
+                  gap: 8px;
+              }
+              .edit-link {
+                  color: #ff9800;
+                  text-decoration: none;
+                  font-weight: 500;
+              }
+              .edit-link:hover {
+                  text-decoration: underline;
+              }
+              .view-link {
+                  color: #4caf50;
+                  text-decoration: none;
+                  font-weight: 500;
+              }
+              .view-link:hover {
+                  text-decoration: underline;
+              }
+              
+              .btn-create {
+                  padding: 10px 16px;
+                  background-color: #4e73df;
+                  color: white;
+                  border: none;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  text-decoration: none;
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  transition: background-color 0.3s;
+                  margin-bottom: 20px;
+              }
+              
+              .btn-create:hover {
+                  background-color: #3a59c7;
+              }
+              
+              /* Current page styling */
+              .sidebar-item[href="/admin/total-quiz"] {
+                  background-color: rgba(255, 255, 255, 0.2);
+                  font-weight: bold;
+              }
+              
+              @media (max-width: 768px) {
+                  .header {
+                      flex-direction: column;
+                      align-items: flex-start;
+                  }
+                  .search-container {
+                      width: 100%;
+                  }
+                  .quiz-table {
+                      display: block;
+                      overflow-x: auto;
+                  }
+                  .time-cell {
+                      flex-direction: column;
+                      gap: 5px;
+                  }
+              }
+          </style>
+      </head>
+      <body>
+          <div class="admin-container">
+              ${ADMIN_SIDEBAR}
+              <main class="main-content">
+                  <div class="container">
+                      <div class="header">
+                          <h1 class="page-title">Total Quizzes</h1>
+                          <div class="search-container">
+                              <input type="text" id="searchInput" placeholder="Search quizzes by name..." autocomplete="off">
+                              <span class="quiz-count" id="quizCount">Showing ${quizzes.length} quizzes</span>
+                          </div>
+                      </div>
+                      
+                      <a href="/admin/create-quiz" class="btn-create">
+                          <i class="fas fa-plus"></i> Create New Quiz
+                      </a>
+                      
+                      ${quizzes.length === 0 ? 
+                          '<div class="no-quizzes">No quizzes available. Click "Create New Quiz" to add a quiz.</div>' : 
+                          `
+                          <div style="overflow-x: auto;">
+                              <table class="quiz-table" id="quizTable">
+                                  <thead>
+                                      <tr>
+                                          <th>Quiz Name</th>
+                                          <th>Class</th>
+                                          <th>Time</th>
+                                          <th>Status</th>
+                                          <th>Type</th>
+                                          <th>Actions</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${quizzes.map(quiz => {
+                                          // Determine quiz status based on time
+                                          let statusClass = '';
+                                          let statusText = '';
+                                          
+                                          // Parse quiz times
+                                          const startParts = quiz.startTime.split(':');
+                                          const endParts = quiz.endTime.split(':');
+                                          
+                                          const startHour = parseInt(startParts[0]);
+                                          const startMinute = parseInt(startParts[1]);
+                                          const endHour = parseInt(endParts[0]);
+                                          const endMinute = parseInt(endParts[1]);
+                                          
+                                          const now = getISTNow();
+                                          const currentHour = now.getHours();
+                                          const currentMinute = now.getMinutes();
+                                          
+                                          if (currentHour < startHour || (currentHour === startHour && currentMinute < startMinute)) {
+                                              statusClass = 'status-upcoming';
+                                              statusText = 'Upcoming';
+                                          } else if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
+                                              statusClass = 'status-ended';
+                                              statusText = 'Ended';
+                                          } else {
+                                              statusClass = 'status-active';
+                                              statusText = 'Active';
+                                          }
+                                          
+                                          return `
+                                              <tr>
+                                                  <td>${quiz.name}</td>
+                                                  <td>Class ${quiz.class}</td>
+                                                  <td class="time-cell">
+                                                      <span class="time-badge">Start: ${quiz.startTime}</span>
+                                                      <span class="time-badge">End: ${quiz.endTime}</span>
+                                                  </td>
+                                                  <td>
+                                                      <span class="status-badge ${statusClass}">${statusText}</span>
+                                                  </td>
+                                                  <td>${quiz.type === 'excel' ? 'Excel' : 'Manual'}</td>
+                                                  <td class="actions-cell">
+                                                      <a href="/admin/edit-quiz/${encodeURIComponent(quiz.name)}" class="edit-link">Edit</a>
+                                                      <a href="/admin/quiz-results/${encodeURIComponent(quiz.name)}" class="view-link">Results</a>
+                                                  </td>
+                                              </tr>
+                                          `;
+                                      }).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                          `
+                      }
+                  </div>
+              </main>
+          </div>
 
-        <script>
-            // Search functionality
-            document.getElementById('searchInput').addEventListener('input', function() {
-                const searchValue = this.value.toLowerCase();
-                const table = document.getElementById('quizTable');
-                
-                if (!table) return; // No table exists
-                
-                const rows = table.getElementsByTagName('tr');
-                let visibleCount = 0;
-                
-                // Start from 1 to skip header row
-                for (let i = 1; i < rows.length; i++) {
-                    const nameCell = rows[i].cells[0];
-                    const classCell = rows[i].cells[1];
-                    
-                    if (nameCell.textContent.toLowerCase().includes(searchValue) || 
-                        classCell.textContent.toLowerCase().includes(searchValue)) {
-                        rows[i].style.display = '';
-                        visibleCount++;
-                    } else {
-                        rows[i].style.display = 'none';
-                    }
-                }
-                
-                // Update count
-                document.getElementById('quizCount').textContent = 'Showing ' + visibleCount + ' of ' + (rows.length - 1) + ' quizzes';
-            });
-        </script>
-    </body>
-    </html>
-    `);
+          <script>
+              // Search functionality
+              document.getElementById('searchInput').addEventListener('input', function() {
+                  const searchValue = this.value.toLowerCase();
+                  const table = document.getElementById('quizTable');
+                  
+                  if (!table) return; // No table exists
+                  
+                  const rows = table.getElementsByTagName('tr');
+                  let visibleCount = 0;
+                  
+                  // Start from 1 to skip header row
+                  for (let i = 1; i < rows.length; i++) {
+                      const nameCell = rows[i].cells[0];
+                      const classCell = rows[i].cells[1];
+                      
+                      if (nameCell.textContent.toLowerCase().includes(searchValue) || 
+                          classCell.textContent.toLowerCase().includes(searchValue)) {
+                          rows[i].style.display = '';
+                          visibleCount++;
+                      } else {
+                          rows[i].style.display = 'none';
+                      }
+                  }
+                  
+                  // Update count
+                  document.getElementById('quizCount').textContent = 'Showing ' + visibleCount + ' of ' + (rows.length - 1) + ' quizzes';
+              });
+          </script>
+      </body>
+      </html>
+      `);
+    } catch (err) {
+        console.error('Error loading quiz results:', err);
+        
+        if (req.query.partial) {
+            return res.status(500).json({ error: 'Error loading results' });
+        }
+        
+        res.status(500).send(`
+            <div class="container">
+                <div class="header">
+                    <h1 class="page-title">Quiz Results: ${quizName}</h1>
+                    <a href="/admin/total-quiz" class="back-btn">← Back</a>
+                </div>
+                <div class="quiz-info">
+                    <p style="color: #dc3545;">Error loading quiz results. Please try again later.</p>
+                    <p>Error details: ${err.message}</p>
+                </div>
+            </div>
+        `);
+    }
 });
 
 // API endpoint to get quiz data for editing
-router.get('/api/quiz/:quizName', (req, res) => {
+router.get('/api/quiz/:quizName', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'admin') {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
     try {
         const quizName = decodeURIComponent(req.params.quizName);
-        const quizzes = readQuizzes();
-        const quiz = quizzes.find(q => q.name === quizName);
+        
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get quiz from MongoDB
+        const quizzesCollection = db.collection('quizzes');
+        const quiz = await quizzesCollection.findOne({ name: quizName });
 
         if (!quiz) {
+            await client.close();
             return res.status(404).json({ error: 'Quiz not found' });
         }
 
@@ -2396,14 +2419,17 @@ router.get('/api/quiz/:quizName', (req, res) => {
         // Include if quiz has started in the response
         const hasStarted = quiz.startTime <= currentTime;
 
-        // For manual quizzes, get the questions
+        // For manual quizzes, get the questions from MongoDB
         let questions = [];
         if (quiz.type === 'manual' && quiz.questionsFile) {
-            const questionsPath = path.join(MANUAL_QUESTIONS_DIR, quiz.questionsFile);
-            if (fs.existsSync(questionsPath)) {
-                questions = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
+            const manualQuestionsCollection = db.collection('manual_questions');
+            const manualQuiz = await manualQuestionsCollection.findOne({ quizName });
+            if (manualQuiz) {
+                questions = manualQuiz.questions;
             }
         }
+
+        await client.close();
 
         res.json({
             ...quiz,
@@ -2417,29 +2443,22 @@ router.get('/api/quiz/:quizName', (req, res) => {
 });
 
 // Route to render the edit quiz page
-router.get('/edit-quiz/:quizName', (req, res) => {
+router.get('/edit-quiz/:quizName', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'admin') {
         return res.redirect("/login");
     }
 
     try {
         const quizName = decodeURIComponent(req.params.quizName);
-        const quizzes = readQuizzes();
-        const quiz = quizzes.find(q => q.name === quizName);
-
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        const quiz = await db.collection('quizzes').findOne({ name: quizName });
+        await client.close();
         if (!quiz) {
             return res.status(404).send('Quiz not found');
         }
-
-        // Check if quiz has already started
-        const now = getISTNow();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-        if (quiz.startTime <= currentTime) {
-            // Quiz has started, redirect to view-only page
-            return res.redirect(`/admin/view-quiz/${encodeURIComponent(quizName)}`);
-        }
-
         // Serve the edit quiz HTML page
         res.sendFile(path.join(__dirname, "../public/editquiz.html"));
     } catch (error) {
@@ -2473,374 +2492,200 @@ router.get('/view-quiz/:quizName', (req, res) => {
 });
 
 // Update Excel quiz
-router.post('/update-quiz-excel/:quizName', (req, res) => {
+router.post('/update-quiz-excel/:quizName', upload.single('quizFile'), async (req, res) => {
     if (!req.session.fname || req.session.role !== 'admin') {
-        return res.status(401).send('Unauthorized');
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Log the request information
-    console.log('Update quiz request received for:', req.params.quizName);
-    console.log('Request body:', req.body);
+    try {
+        const quizName = decodeURIComponent(req.params.quizName);
+        const { startTime, endTime, quizClass } = req.body;
+        let file = req.file;
 
-    // Use a custom upload function to handle the file saving
-    uploadExcel(req, res, function(err) {
-        if (err instanceof multer.MulterError) {
-            console.error('Multer error:', err);
-            return res.status(400).send('Error uploading files: ' + err.message);
-        } else if (err) {
-            console.error('Unknown error:', err);
-            return res.status(500).send('Unknown error occurred');
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get the quiz from MongoDB
+        const quizzesCollection = db.collection('quizzes');
+        const quiz = await quizzesCollection.findOne({ name: quizName });
+        
+        if (!quiz) {
+            await client.close();
+            return res.status(404).json({ error: 'Quiz not found' });
         }
 
-        try {
-            const quizName = decodeURIComponent(req.params.quizName);
-            const quizzes = readQuizzes();
-            const quizIndex = quizzes.findIndex(q => q.name === quizName);
+        // Check if quiz has already started
+        const now = getISTNow();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
-            if (quizIndex === -1) {
-                return res.status(404).send('Quiz not found');
-            }
-
-            // Check if quiz has already started
-            const now = getISTNow();
-            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-            if (quizzes[quizIndex].startTime <= currentTime) {
-                return res.status(400).send('Cannot edit quiz that has already started');
-            }
-
-            const { quizClass, startTime, endTime } = req.body;
-
-            // Update quiz data
-            quizzes[quizIndex].class = quizClass;
-            quizzes[quizIndex].startTime = startTime;
-            quizzes[quizIndex].endTime = endTime;
-
-            // Update file if a new one was uploaded
-            if (req.file) {
-                console.log('New file uploaded:', req.file);
-                console.log('File details:', {
-                    fieldname: req.file.fieldname,
-                    originalname: req.file.originalname,
-                    encoding: req.file.encoding,
-                    mimetype: req.file.mimetype,
-                    destination: req.file.destination,
-                    filename: req.file.filename,
-                    path: req.file.path,
-                    size: req.file.size
-                });
-                
-                // Delete the old file if it exists and is different from the new one
-                if (quizzes[quizIndex].file && quizzes[quizIndex].file !== req.file.filename) {
-                    const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
-                    console.log('Attempting to delete old file:', oldFilePath);
-                    
-                    if (fs.existsSync(oldFilePath)) {
-                        try {
-                            fs.unlinkSync(oldFilePath);
-                            console.log('Deleted old file:', oldFilePath);
-                        } catch (deleteErr) {
-                            console.error('Failed to delete old file:', deleteErr);
-                            // Continue anyway - this isn't critical
-                        }
-                    } else {
-                        console.log('Old file not found:', oldFilePath);
-                    }
-                }
-                
-                // Manual approach: If the file wasn't saved properly, try to copy it from the temp location
-                const newFilePath = req.file.path;
-                if (!fs.existsSync(newFilePath)) {
-                    console.warn('File not found at expected path, attempting manual save');
-                    
-                    // If the file has a buffer, write it directly
-                    if (req.file.buffer) {
-                        try {
-                            const targetPath = path.join(uploadDir, req.file.filename);
-                            fs.writeFileSync(targetPath, req.file.buffer);
-                            console.log('Manually saved file from buffer to:', targetPath);
-                        } catch (writeErr) {
-                            console.error('Failed to write file from buffer:', writeErr);
-                            throw new Error(`Unable to save the Excel file: ${writeErr.message}`);
-                        }
-                    } else {
-                        // If no buffer, create an empty file as a fallback (not ideal but prevents errors)
-                        try {
-                            const targetPath = path.join(uploadDir, req.file.filename);
-                            // Create a basic empty Excel file
-                            fs.writeFileSync(targetPath, Buffer.from('PK\x03\x04\x14\x00\x06\x00', 'binary'));
-                            console.log('Created empty Excel file as fallback:', targetPath);
-                        } catch (writeErr) {
-                            console.error('Failed to create fallback file:', writeErr);
-                            throw new Error(`Unable to save the Excel file: ${writeErr.message}`);
-                        }
-                    }
-                } else {
-                    console.log('File was saved successfully at:', newFilePath);
-                    // Ensure the file has the correct permissions
-                    try {
-                        fs.chmodSync(newFilePath, 0o666);
-                    } catch (permErr) {
-                        console.warn('Warning: Could not change file permissions:', permErr);
-                    }
-                }
-                
-                // Important: Update the file reference in the quiz object
-                quizzes[quizIndex].file = req.file.filename;
-                console.log('Updated quiz file reference to:', req.file.filename);
-                
-                // Remove any previous file missing flag
-                if (quizzes[quizIndex].fileMissing) {
-                    delete quizzes[quizIndex].fileMissing;
-                }
-            } else {
-                // If no new file was uploaded, ensure the quiz name and filename match
-                if (quizzes[quizIndex].file && !quizzes[quizIndex].file.startsWith(quizName)) {
-                    const oldFilePath = path.join(uploadDir, quizzes[quizIndex].file);
-                    const fileExt = path.extname(quizzes[quizIndex].file);
-                    const newFileName = quizName + fileExt;
-                    const newFilePath = path.join(uploadDir, newFileName);
-                    
-                    console.log('Renaming file from', quizzes[quizIndex].file, 'to', newFileName);
-                    
-                    // Check if old file exists before trying to rename
-                    if (fs.existsSync(oldFilePath)) {
-                        try {
-                            // Copy the file with the new name (safer than rename)
-                            fs.copyFileSync(oldFilePath, newFilePath);
-                            console.log('Copied file to new name:', newFilePath);
-                            
-                            // Update the file reference
-                            quizzes[quizIndex].file = newFileName;
-                            
-                            // Remove any previous file missing flag
-                            if (quizzes[quizIndex].fileMissing) {
-                                delete quizzes[quizIndex].fileMissing;
-                            }
-                        } catch (copyErr) {
-                            console.error('Failed to copy file with new name:', copyErr);
-                            throw new Error(`Failed to update quiz file: ${copyErr.message}`);
-                        }
-                    } else {
-                        console.warn('Warning: Could not find the original file to rename:', oldFilePath);
-                        
-                        // Set a flag indicating the file is missing
-                        quizzes[quizIndex].file = newFileName;
-                        quizzes[quizIndex].fileMissing = true;
-                        console.warn('Set fileMissing flag to true');
-                    }
-                } else if (quizzes[quizIndex].file) {
-                    // Verify the existing file is still there
-                    const existingFilePath = path.join(uploadDir, quizzes[quizIndex].file);
-                    if (!fs.existsSync(existingFilePath)) {
-                        console.warn('Warning: The existing quiz file is missing:', existingFilePath);
-                        quizzes[quizIndex].fileMissing = true;
-                    }
-                }
-            }
-
-            saveQuizzes(quizzes);
-            console.log('Quiz updated successfully:', quizzes[quizIndex]);
-            
-            // Check if the file is missing and add a warning message
-            if (quizzes[quizIndex].fileMissing) {
-                return res.send(`
-                    <html>
-                        <head>
-                            <title>Quiz Updated - Warning</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; margin: 2rem; }
-                                .warning { background-color: #fff3cd; border: 1px solid #ffeeba; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; }
-                                .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
-                            </style>
-                        </head>
-                        <body>
-                            <h1>Quiz Updated</h1>
-                            <div class="warning">
-                                <h3>⚠️ Warning: Excel File Missing</h3>
-                                <p>The Excel file for this quiz is missing. Students won't be able to take the quiz until you upload a new Excel file.</p>
-                                <p>Please edit the quiz again and upload a new Excel file.</p>
-                            </div>
-                            <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
-                        </body>
-                    </html>
-                `);
-            }
-            
-            res.redirect('/admin/total-quiz');
-        } catch (error) {
-            console.error('Error updating quiz:', error);
-            res.status(500).send(`
-                <html>
-                    <head>
-                        <title>Error Updating Quiz</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 2rem; }
-                            .error { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 1rem; margin: 1rem 0; border-radius: 0.25rem; }
-                            .btn { display: inline-block; padding: 0.5rem 1rem; background-color: #007bff; color: white; text-decoration: none; border-radius: 0.25rem; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>Error Updating Quiz</h1>
-                        <div class="error">
-                            <p>${error.message}</p>
-                            <p>Please try again or contact system administrator.</p>
-                        </div>
-                        <a href="/admin/total-quiz" class="btn">Back to Quizzes</a>
-                    </body>
-                </html>
-            `);
+        if (quiz.startTime <= currentTime) {
+            await client.close();
+            return res.status(400).json({ error: 'Cannot edit quiz after it has started' });
         }
-    });
+
+        // Update quiz in MongoDB
+        const updateData = {
+            startTime,
+            endTime,
+            class: quizClass
+        };
+
+        // If a new file was uploaded, update the file field
+        if (file) {
+            updateData.file = file.filename;
+        }
+
+        const updateResult = await quizzesCollection.updateOne(
+            { name: quizName },
+            { $set: updateData }
+        );
+
+        if (updateResult.modifiedCount === 0) {
+            await client.close();
+            return res.status(500).json({ error: 'Failed to update quiz' });
+        }
+
+        await client.close();
+        res.json({ 
+            success: true, 
+            message: 'Quiz updated successfully',
+            quiz: {
+                name: quizName,
+                startTime,
+                endTime,
+                class: quizClass,
+                file: updateData.file || quiz.file
+            }
+        });
+    } catch (error) {
+        console.error('Error updating quiz:', error);
+        res.status(500).json({ error: 'Failed to update quiz', message: error.message });
+    }
 });
 
 // Update Manual quiz
-router.post('/update-quiz-manual/:quizName', (req, res) => {
+router.post('/update-quiz-manual/:quizName', upload.fields([
+    { name: 'questionImage_0', maxCount: 1 },
+    { name: 'questionOption1Image_0', maxCount: 1 },
+    { name: 'questionOption2Image_0', maxCount: 1 },
+    { name: 'questionOption3Image_0', maxCount: 1 },
+    { name: 'questionOption4Image_0', maxCount: 1 }
+]), async (req, res) => {
     if (!req.session.fname || req.session.role !== 'admin') {
-        return res.status(401).send('Unauthorized');
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    uploadQuizImage(req, res, async function(err) {
-        if (err instanceof multer.MulterError) {
-            console.error('Multer error:', err);
-            return res.status(400).send('Error uploading files: ' + err.message);
-        } else if (err) {
-            console.error('Unknown error:', err);
-            return res.status(500).send('Unknown error occurred');
+    try {
+        const quizName = decodeURIComponent(req.params.quizName);
+        const { startTime, endTime, quizClass } = req.body;
+        const files = req.files;
+
+        // Connect to MongoDB
+        const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get the quiz from MongoDB
+        const quizzesCollection = db.collection('quizzes');
+        const quiz = await quizzesCollection.findOne({ name: quizName });
+        
+        if (!quiz) {
+            await client.close();
+            return res.status(404).json({ error: 'Quiz not found' });
         }
 
-        try {
-            const quizName = decodeURIComponent(req.params.quizName);
-            const quizzes = readQuizzes();
-            const quizIndex = quizzes.findIndex(q => q.name === quizName);
+        // Check if quiz has already started
+        const now = getISTNow();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
-            if (quizIndex === -1) {
-                return res.status(404).send('Quiz not found');
-            }
-
-            // Check if quiz has already started
-            const now = getISTNow();
-            const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-            if (quizzes[quizIndex].startTime <= currentTime) {
-                return res.status(400).send('Cannot edit quiz that has already started');
-            }
-
-            // Debug logging
-            console.log('Form Data:', req.body);
-            console.log('Files:', req.files);
-
-            const { quizClass, startTime, endTime } = req.body;
-
-            // Validate required fields
-            if (!quizClass || !startTime || !endTime) {
-                throw new Error('Missing required quiz information');
-            }
-            
-            // Process questions using field format
-            const questions = [];
-            
-            // Get indices of questions
-            const indices = req.body.questionIndex ? 
-                (Array.isArray(req.body.questionIndex) ? req.body.questionIndex : [req.body.questionIndex]) : [];
-            
-            console.log('Question indices:', indices);
-            
-            if (!indices || indices.length === 0) {
-                throw new Error('No questions found in form data');
-            }
-
-            // Create full question objects
-            for (const index of indices) {
-                const text = req.body[`questionText_${index}`];
-                const option1 = req.body[`questionOption1_${index}`];
-                const option2 = req.body[`questionOption2_${index}`];
-                const option3 = req.body[`questionOption3_${index}`];
-                const option4 = req.body[`questionOption4_${index}`];
-                const correct = req.body[`questionCorrect_${index}`];
-                
-                console.log(`Processing question ${index}:`, {
-                    text, option1, option2, option3, option4, correct
-                });
-
-                if (!text || !option1 || !option2 || !option3 || !option4 || !correct) {
-                    throw new Error(`Missing data for question ${parseInt(index) + 1}`);
-                }
-
-                const questionObj = {
-                    text: text,
-                    options: [option1, option2, option3, option4],
-                    correctAnswer: parseInt(correct) - 1
-                };
-
-                // Check for existing question image
-                const existingQuestionImage = req.body[`existingQuestionImage_${index}`];
-                
-                // Check if there's a new image for this question
-                const uploadedFiles = req.files ? (req.files[`questionImage_${index}`] || []) : [];
-                if (uploadedFiles.length > 0) {
-                    questionObj.image = `/quiz-images/${uploadedFiles[0].filename}`;
-                } else if (existingQuestionImage) {
-                    questionObj.image = existingQuestionImage;
-                }
-
-                // Check for option images
-                questionObj.optionImages = [null, null, null, null]; // Initialize with nulls
-
-                // Process each option image (1-4)
-                for (let i = 1; i <= 4; i++) {
-                    // Check for existing option image
-                    const existingOptionImage = req.body[`existingOption${i}Image_${index}`];
-                    
-                    // Check for new option image
-                    const optionImages = req.files ? (req.files[`questionOption${i}Image_${index}`] || []) : [];
-                    
-                    if (optionImages.length > 0) {
-                        questionObj.optionImages[i-1] = `/quiz-images/${optionImages[0].filename}`;
-                    } else if (existingOptionImage) {
-                        questionObj.optionImages[i-1] = existingOptionImage;
-                    }
-                }
-
-                questions.push(questionObj);
-            }
-
-            // Validate we have at least one question
-            if (questions.length === 0) {
-                throw new Error('No questions provided. Please check the form data.');
-            }
-
-            console.log('Final questions array:', questions);
-
-            // Create directory if it doesn't exist
-            if (!fs.existsSync(MANUAL_QUESTIONS_DIR)) {
-                fs.mkdirSync(MANUAL_QUESTIONS_DIR, { recursive: true });
-            }
-
-            // Save questions to the same JSON file or create a new one if it doesn't exist
-            const questionsFileName = quizzes[quizIndex].questionsFile || `${quizName}-manual.json`;
-            const questionsFilePath = path.join(MANUAL_QUESTIONS_DIR, questionsFileName);
-            
-            fs.writeFileSync(
-                questionsFilePath,
-                JSON.stringify(questions, null, 2)
-            );
-
-            console.log('Saved questions to file:', questionsFilePath);
-
-            // Update quiz data
-            quizzes[quizIndex].class = quizClass;
-            quizzes[quizIndex].startTime = startTime;
-            quizzes[quizIndex].endTime = endTime;
-            quizzes[quizIndex].questionsFile = questionsFileName;
-
-            saveQuizzes(quizzes);
-            res.redirect('/admin/total-quiz');
-        } catch (error) {
-            console.error('Error updating manual quiz:', error);
-            res.status(500).send(`Error updating quiz: ${error.message}`);
+        if (quiz.startTime <= currentTime) {
+            await client.close();
+            return res.status(400).json({ error: 'Cannot edit quiz after it has started' });
         }
-    });
+
+        // Process questions and their images
+        const questions = [];
+        let questionIndex = 0;
+
+        while (req.body[`questionText_${questionIndex}`]) {
+            const question = {
+                text: req.body[`questionText_${questionIndex}`],
+                options: [
+                    req.body[`questionOption1_${questionIndex}`],
+                    req.body[`questionOption2_${questionIndex}`],
+                    req.body[`questionOption3_${questionIndex}`],
+                    req.body[`questionOption4_${questionIndex}`]
+                ],
+                correctAnswer: parseInt(req.body[`questionCorrect_${questionIndex}`]) - 1
+            };
+
+            // Handle question image
+            if (files[`questionImage_${questionIndex}`]) {
+                question.image = `/uploads/${files[`questionImage_${questionIndex}`][0].filename}`;
+            } else if (req.body[`existingQuestionImage_${questionIndex}`]) {
+                question.image = req.body[`existingQuestionImage_${questionIndex}`];
+            }
+
+            // Handle option images
+            question.optionImages = [];
+            for (let i = 1; i <= 4; i++) {
+                if (files[`questionOption${i}Image_${questionIndex}`]) {
+                    question.optionImages.push(`/uploads/${files[`questionOption${i}Image_${questionIndex}`][0].filename}`);
+                } else if (req.body[`existingOption${i}Image_${questionIndex}`]) {
+                    question.optionImages.push(req.body[`existingOption${i}Image_${questionIndex}`]);
+                } else {
+                    question.optionImages.push(null);
+                }
+            }
+
+            questions.push(question);
+            questionIndex++;
+        }
+
+        // Update quiz in MongoDB
+        const updateResult = await quizzesCollection.updateOne(
+            { name: quizName },
+            { 
+                $set: {
+                    startTime,
+                    endTime,
+                    class: quizClass,
+                    totalQuestions: questions.length
+                }
+            }
+        );
+
+        if (updateResult.modifiedCount === 0) {
+            await client.close();
+            return res.status(500).json({ error: 'Failed to update quiz' });
+        }
+
+        // Update questions in manual_questions collection
+        const manualQuestionsCollection = db.collection('manual_questions');
+        await manualQuestionsCollection.updateOne(
+            { quizName },
+            { $set: { questions } },
+            { upsert: true }
+        );
+
+        await client.close();
+        res.json({ 
+            success: true, 
+            message: 'Quiz updated successfully',
+            quiz: {
+                name: quizName,
+                startTime,
+                endTime,
+                class: quizClass,
+                totalQuestions: questions.length
+            }
+        });
+    } catch (error) {
+        console.error('Error updating quiz:', error);
+        res.status(500).json({ error: 'Failed to update quiz', message: error.message });
+    }
 });
 
 // View Marks.
@@ -2861,89 +2706,43 @@ router.get('/quiz-results/:quizName', async (req, res) => {
         // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
-        const db = client.db("School");
+        const db = client.db(req.session.adminDb);
         
-        // Get all collections that start with 'class_'
+        // Get all class collections
         const collections = await db.listCollections().toArray();
         const classCollections = collections.filter(c => c.name.startsWith('class_'));
         
-        // Get all attempts for this quiz
-        const attemptsDir = path.join(__dirname, '../attempts');
-        const attemptFiles = fs.readdirSync(attemptsDir);
+        // Get all attempts for this quiz from MongoDB
+        const attemptsCollection = db.collection('attempts');
+        const attempts = await attemptsCollection.find({ quizName }).toArray();
         
         let allResults = [];
-        
-        for (const file of attemptFiles) {
-            if (file.endsWith('.json')) {
-                try {
-                const username = file.replace('.json', ''); // Get username from filename
-                const filePath = path.join(attemptsDir, file);
-                    const fileContent = fs.readFileSync(filePath, 'utf8');
-                    
-                    // Check if the file is empty or contains invalid JSON
-                    if (!fileContent || fileContent.trim() === '') {
-                        console.error(`Empty attempt file for user: ${username}`);
-                        continue;
-                    }
-                    
-                    // Try to parse the JSON with error handling
-                    let attempts;
-                    try {
-                        attempts = JSON.parse(fileContent);
-                        
-                        // Validate that attempts is an array
-                        if (!Array.isArray(attempts)) {
-                            console.error(`Invalid JSON structure in file ${file}: not an array`);
-                            continue;
-                        }
-                    } catch (parseError) {
-                        console.error(`JSON parsing error in file ${file}:`, parseError.message);
-                        console.error(`Problematic content: ${fileContent.substring(0, 100)}...`);
-                        continue; // Skip this file and move to the next one
-                    }
-                    
-                    const quizAttempts = attempts.filter(a => a && a.quizName === quizName);
-                
-                if (quizAttempts.length > 0) {
-                    // Get the latest attempt
-                    const latestAttempt = quizAttempts.reduce((latest, current) => 
-                        new Date(current.attemptedAt) > new Date(latest.attemptedAt) ? current : latest
-                    );
-                    
-                    // Find student details from all class collections
-                    let studentDetails = null;
-                    
-                    for (const collection of classCollections) {
-                        const student = await db.collection(collection.name).findOne({ username });
-                        if (student) {
-                            studentDetails = {
-                                name: student.name,
-                                class: student.class,
-                                email: student.email
-                            };
-                            break;
-                        }
-                    }
-                    
-                    if (studentDetails && (!classFilter || studentDetails.class === classFilter)) {
-                        allResults.push({
-                            ...studentDetails,
-                            username: username, // Include username in results
-                            score: latestAttempt.score,
-                            totalQuestions: latestAttempt.totalQuestions,
-                            percentage: Math.round((latestAttempt.score / latestAttempt.totalQuestions) * 100),
-                            attemptedAt: latestAttempt.attemptedAt
-                        });
-                    }
-                    }
-                } catch (error) {
-                    console.error(`Error processing attempt file ${file}:`, error);
-                    // Continue with the next file
+        for (const attempt of attempts) {
+            // Find student details from all class collections
+            let studentDetails = null;
+            for (const collection of classCollections) {
+                const student = await db.collection(collection.name).findOne({ username: attempt.studentId });
+                if (student) {
+                    studentDetails = {
+                        name: student.name,
+                        class: student.class,
+                        email: student.email
+                    };
+                    break;
                 }
             }
+            if (studentDetails && (!classFilter || studentDetails.class === classFilter)) {
+                allResults.push({
+                    ...studentDetails,
+                    username: attempt.studentId,
+                    score: attempt.score,
+                    totalQuestions: attempt.totalQuestions,
+                    percentage: Math.round((attempt.score / attempt.totalQuestions) * 100),
+                    attemptedAt: attempt.attemptedAt
+                });
+            }
         }
-        
-        client.close();
+        await client.close();
         
         // Sort by class then by score (descending)
         allResults.sort((a, b) => {
@@ -3346,7 +3145,7 @@ router.get('/stats/class-counts', async (req, res) => {
     // Connect to MongoDB
     const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
     await client.connect();
-    const db = client.db("School");
+    const db = client.db(req.session.adminDb);
 
     // Get all collections that start with 'class_'
         const collections = await db.listCollections().toArray();
@@ -3397,7 +3196,7 @@ router.get('/stats/students', async (req, res) => {
     // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
-        const db = client.db("School");
+        const db = client.db(req.session.adminDb);
         
     // Get all collections that start with 'class_'
         const collections = await db.listCollections().toArray();
@@ -3459,7 +3258,7 @@ router.post('/api/student/update', uploadStudentPhoto.single('photo'), async (re
         // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
-        const db = client.db("School");
+        const db = client.db(req.session.adminDb);
         
         // Prepare update data
         const updateData = {
@@ -3587,7 +3386,7 @@ router.get('/api/student/:username', async (req, res) => {
         // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
-        const db = client.db("School");
+        const db = client.db(req.session.adminDb);
         
         // Find which class the student is in
         const collections = await db.listCollections().toArray();
@@ -3636,7 +3435,7 @@ router.get('/api/students-by-class/:classNumber', async (req, res) => {
     // Connect to MongoDB
     const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
     await client.connect();
-    const db = client.db("School");
+    const db = client.db(req.session.adminDb);
     
     // Get all students from the specific class
     const collectionName = `class_${classNumber}`;
@@ -3660,13 +3459,23 @@ router.get('/api/students-by-class/:classNumber', async (req, res) => {
 });
 
 // API endpoint to get all available quizzes
-router.get('/api/quizzes', (req, res) => {
+router.get('/api/quizzes', async (req, res) => {
   if (!req.session.fname || req.session.role !== 'admin') {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
-    const quizzes = readQuizzes();
+    // Connect to MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Get all quizzes from MongoDB
+    const quizzesCollection = db.collection('quizzes');
+    const quizzes = await quizzesCollection.find({}).toArray();
+    
+    await client.close();
+    
     res.json(quizzes);
   } catch (err) {
     console.error('Error fetching quizzes:', err);
@@ -3719,7 +3528,7 @@ router.post('/retake-quiz/assign', async (req, res) => {
     // Validate student usernames exist in MongoDB
     const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
     await client.connect();
-    const db = client.db("School");
+    const db = client.db(req.session.adminDb);
     
     // Get all class collections
     const collections = await db.listCollections().toArray();
@@ -3830,7 +3639,6 @@ router.post('/create-quiz-for-students', (req, res) => {
     }
 
     try {
-      const quizzes = readQuizzes();
       const { quizName, startTime, endTime } = req.body;
       let studentUsernames;
       
@@ -3848,10 +3656,10 @@ router.post('/create-quiz-for-students', (req, res) => {
         return res.status(400).json({ error: 'No Excel file uploaded' });
       }
 
-      // Validate student usernames exist in MongoDB
+      // Connect to MongoDB
       const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
       await client.connect();
-      const db = client.db("School");
+      const db = client.db(req.session.adminDb);
       
       // Get all class collections
       const collections = await db.listCollections().toArray();
@@ -3884,16 +3692,15 @@ router.post('/create-quiz-for-students', (req, res) => {
         }
       }
       
-      await client.close();
-      
       if (invalidStudents.length > 0) {
+        await client.close();
         return res.status(400).json({ 
           error: 'Invalid student usernames', 
           invalidStudents 
         });
       }
 
-      // Add quiz to quizzes.json - use a dummy class (999) to avoid conflicts with regular classes
+      // Create quiz document for MongoDB
       const quiz = {
         name: quizName,
         startTime: startTime,
@@ -3901,20 +3708,26 @@ router.post('/create-quiz-for-students', (req, res) => {
         class: '999', // Special class number for student-specific quizzes
         type: 'excel',
         file: req.file.filename,
-        isStudentSpecific: true // Flag to indicate this is a student-specific quiz
+        isStudentSpecific: true,
+        allowedStudents: validStudents,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
-      quizzes.push(quiz);
-      saveQuizzes(quizzes);
+      // Save quiz to MongoDB
+      const quizzesCollection = db.collection('quizzes');
+      await quizzesCollection.insertOne(quiz);
 
-      // Create or update retake entries for the specific quiz (to track which students can access it)
-      const RETAKE_DIR = path.join(__dirname, '../retakes');
-      if (!fs.existsSync(RETAKE_DIR)) {
-        fs.mkdirSync(RETAKE_DIR, { recursive: true });
-      }
-      
-      const retakeFilePath = path.join(RETAKE_DIR, `${quizName.replace(/\s+/g, '_')}.json`);
-      fs.writeFileSync(retakeFilePath, JSON.stringify(validStudents, null, 2));
+      // Create retake document in MongoDB
+      const retakesCollection = db.collection('retakes');
+      await retakesCollection.insertOne({
+        quizName,
+        retakes: validStudents,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      await client.close();
 
       // Log information about the quiz creation
       console.log(`Created student-specific quiz "${quizName}" for ${validStudents.length} students`);
@@ -3958,10 +3771,10 @@ router.post('/assign-existing-quiz', async (req, res) => {
       return res.status(400).json({ error: 'No students selected' });
     }
 
-    // Validate student usernames exist in MongoDB
+    // Connect to MongoDB
     const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
     await client.connect();
-    const db = client.db("School");
+    const db = client.db(req.session.adminDb);
     
     // Get all class collections
     const collections = await db.listCollections().toArray();
@@ -3994,39 +3807,74 @@ router.post('/assign-existing-quiz', async (req, res) => {
       }
     }
     
-    await client.close();
-    
     if (invalidStudents.length > 0) {
+      await client.close();
       return res.status(400).json({ 
         error: 'Invalid student usernames', 
         invalidStudents 
       });
     }
 
-    // Read existing quizzes
-    const quizzes = readQuizzes();
+    const quizzesCollection = db.collection('quizzes');
+    const retakesCollection = db.collection('retakes');
     
     // Check if we're creating a copy or modifying original quiz for specific students
     let modifiedQuizName = quizName;
     
-    // If name is the same as original and other fields also match, just create retake file
+    // If name is the same as original and other fields also match, just create retake entry
     if (quizName === originalQuizName) {
       // Find the original quiz
-      const originalQuiz = quizzes.find(q => q.name === originalQuizName);
+      const originalQuiz = await quizzesCollection.findOne({ name: originalQuizName });
       
       if (!originalQuiz) {
+        await client.close();
         return res.status(404).json({ error: 'Original quiz not found' });
       }
+      
+      // Update the quiz to be student-specific
+      await quizzesCollection.updateOne(
+        { name: originalQuizName },
+        { 
+          $set: {
+            isStudentSpecific: true,
+            allowedStudents: validStudents,
+            updatedAt: new Date()
+          }
+        }
+      );
+      
+      // Create or update retake entry
+      await retakesCollection.updateOne(
+        { quizName: originalQuizName },
+        { 
+          $set: {
+            retakes: validStudents,
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
     } else {
       // Creating a new version of the quiz with a different name
-      // Add quiz to quizzes.json with special class 999 for student-specific
+      // Get the original quiz details
+      const originalQuiz = await quizzesCollection.findOne({ name: originalQuizName });
+      
+      if (!originalQuiz) {
+        await client.close();
+        return res.status(404).json({ error: 'Original quiz not found' });
+      }
+      
+      // Create new quiz document
       const newQuiz = {
         name: modifiedQuizName,
         startTime: startTime,
         endTime: endTime,
         class: '999', // Special class for student-specific quizzes
         type: quizType,
-        isStudentSpecific: true // Flag to indicate this is a student-specific quiz
+        isStudentSpecific: true,
+        allowedStudents: validStudents,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
       // Add appropriate file reference based on quiz type
@@ -4035,34 +3883,28 @@ router.post('/assign-existing-quiz', async (req, res) => {
       } else if (quizType === 'manual' && questionsFile) {
         newQuiz.questionsFile = questionsFile;
       } else {
+        await client.close();
         return res.status(400).json({ error: 'Missing required file for quiz type' });
       }
       
-      quizzes.push(newQuiz);
-      saveQuizzes(quizzes);
+      // Copy other relevant fields from original quiz
+      if (originalQuiz.questions) newQuiz.questions = originalQuiz.questions;
+      if (originalQuiz.options) newQuiz.options = originalQuiz.options;
+      if (originalQuiz.answers) newQuiz.answers = originalQuiz.answers;
+      
+      // Save new quiz to MongoDB
+      await quizzesCollection.insertOne(newQuiz);
+      
+      // Create retake entry for new quiz
+      await retakesCollection.insertOne({
+        quizName: modifiedQuizName,
+        retakes: validStudents,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
     }
 
-    // Create or update retake entries for the quiz
-    const RETAKE_DIR = path.join(__dirname, '../retakes');
-    if (!fs.existsSync(RETAKE_DIR)) {
-      fs.mkdirSync(RETAKE_DIR, { recursive: true });
-    }
-    
-    const retakeFilePath = path.join(RETAKE_DIR, `${modifiedQuizName.replace(/\s+/g, '_')}.json`);
-    
-    // If retake file exists, read and merge with new students
-    let allStudents = validStudents;
-    if (fs.existsSync(retakeFilePath)) {
-      try {
-        const existingStudents = JSON.parse(fs.readFileSync(retakeFilePath, 'utf8'));
-        allStudents = [...new Set([...existingStudents, ...validStudents])]; // Merge and remove duplicates
-      } catch (err) {
-        console.error('Error reading existing retake file:', err);
-        // Continue with just the new students if there's an error
-      }
-    }
-    
-    fs.writeFileSync(retakeFilePath, JSON.stringify(allStudents, null, 2));
+    await client.close();
 
     // Log information about the quiz assignment
     console.log(`Assigned quiz "${modifiedQuizName}" to ${validStudents.length} students`);
@@ -4090,24 +3932,28 @@ router.get('/messages', (req, res) => {
 
 // API endpoint to get all messages
 router.get('/api/messages', async (req, res) => {
-  if (!req.session.fname || req.session.role !== 'admin') {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    const db = req.app.locals.db;
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
     
-    // Get all messages sorted by newest first
-    const messages = await db.collection('messages')
-      .find({})
-      .sort({ timestamp: -1 })
-      .toArray();
-    
-    res.json(messages);
-  } catch (err) {
-    console.error('Error fetching messages:', err);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
+    try {
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get all messages for this admin's database
+        const messages = await db.collection('messages')
+            .find({})
+            .sort({ timestamp: -1 }) // Sort by newest first
+            .toArray();
+            
+        await client.close();
+        res.json(messages);
+    } catch (err) {
+        console.error('Error fetching messages:', err);
+        res.status(500).json({ error: 'Failed to load messages' });
+    }
 });
 
 // API endpoint to get a specific message with student details
@@ -4118,22 +3964,28 @@ router.get('/api/messages/:messageId', async (req, res) => {
 
   try {
     const messageId = req.params.messageId;
-    const db = req.app.locals.db;
+    
+    // Connect to MongoDB using admin-specific database
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
     
     // Convert string ID to ObjectId
-    const ObjectId = require('mongodb').ObjectId;
     const objId = new ObjectId(messageId);
     
     // Get the message
     const message = await db.collection('messages').findOne({ _id: objId });
     
     if (!message) {
+      await client.close();
       return res.status(404).json({ error: 'Message not found' });
     }
     
     // Find student info from the appropriate class collection
     const classCollection = `class_${message.class}`;
     const student = await db.collection(classCollection).findOne({ username: message.studentUsername });
+    
+    await client.close();
     
     if (!student) {
       // If student not found, return just the message
@@ -4162,10 +4014,13 @@ router.put('/api/messages/:messageId/read', async (req, res) => {
 
   try {
     const messageId = req.params.messageId;
-    const db = req.app.locals.db;
+    
+    // Connect to MongoDB using admin-specific database
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
     
     // Convert string ID to ObjectId
-    const ObjectId = require('mongodb').ObjectId;
     const objId = new ObjectId(messageId);
     
     // Update the message
@@ -4173,6 +4028,8 @@ router.put('/api/messages/:messageId/read', async (req, res) => {
       { _id: objId },
       { $set: { read: true } }
     );
+    
+    await client.close();
     
     if (result.modifiedCount === 0) {
       return res.status(404).json({ error: 'Message not found or already read' });
@@ -4199,10 +4056,12 @@ router.post('/api/messages/:messageId/reply', async (req, res) => {
       return res.status(400).json({ error: 'Reply content is required' });
     }
     
-    const db = req.app.locals.db;
+    // Connect to MongoDB using admin-specific database
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
     
     // Convert string ID to ObjectId
-    const ObjectId = require('mongodb').ObjectId;
     const objId = new ObjectId(messageId);
     
     // Create reply object
@@ -4220,6 +4079,8 @@ router.post('/api/messages/:messageId/reply', async (req, res) => {
         $set: { read: true }
       }
     );
+    
+    await client.close();
     
     if (result.modifiedCount === 0) {
       return res.status(404).json({ error: 'Message not found' });
@@ -4935,5 +4796,197 @@ function getISTNow() {
     const now = new Date();
     return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 }
+
+// Route to get existing quizzes for student-specific assignment
+router.get('/existing-quizzes', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Connect to MongoDB
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Get all quizzes from MongoDB
+    const quizzesCollection = db.collection('quizzes');
+    const quizzes = await quizzesCollection.find({}).toArray();
+    
+    await client.close();
+    
+    res.json(quizzes);
+  } catch (err) {
+    console.error('Error getting existing quizzes:', err);
+    res.status(500).json({ error: 'Failed to get existing quizzes' });
+  }
+});
+
+// Update quiz details
+router.post('/update-quiz', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const { quizName, newName, startTime, endTime, duration, totalQuestions, passingScore, instructions } = req.body;
+        
+        // Connect to MongoDB
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get the quiz from MongoDB
+        const quizzesCollection = db.collection('quizzes');
+        const quiz = await quizzesCollection.findOne({ name: quizName });
+        
+        if (!quiz) {
+            await client.close();
+            return res.status(404).json({ error: 'Quiz not found' });
+        }
+
+        // Check if quiz has already started
+        const now = getISTNow();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        if (quiz.startTime <= currentTime) {
+            await client.close();
+            return res.status(400).json({ error: 'Cannot edit quiz after it has started' });
+        }
+
+        // Update quiz in MongoDB
+        const updateResult = await quizzesCollection.updateOne(
+            { name: quizName },
+            { 
+                $set: {
+                    name: newName,
+                    startTime,
+                    endTime,
+                    duration: parseInt(duration),
+                    totalQuestions: parseInt(totalQuestions),
+                    passingScore: parseInt(passingScore),
+                    instructions: instructions || ''
+                }
+            }
+        );
+
+        if (updateResult.modifiedCount === 0) {
+            await client.close();
+            return res.status(500).json({ error: 'Failed to update quiz' });
+        }
+
+        // If quiz name was changed, update any references in other collections
+        if (newName !== quizName) {
+            // Update in attempts collection
+            const attemptsCollection = db.collection('attempts');
+            await attemptsCollection.updateMany(
+                { quizName },
+                { $set: { quizName: newName } }
+            );
+
+            // Update in manual_questions collection if it exists
+            const manualQuestionsCollection = db.collection('manual_questions');
+            await manualQuestionsCollection.updateMany(
+                { quizName },
+                { $set: { quizName: newName } }
+            );
+        }
+
+        await client.close();
+        res.json({ success: true, message: 'Quiz updated successfully' });
+    } catch (error) {
+        console.error('Error updating quiz:', error);
+        res.status(500).json({ error: 'Failed to update quiz', message: error.message });
+    }
+});
+
+// API endpoint to reply to a message
+router.post('/messages/reply', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    const { messageId, replyContent } = req.body;
+    
+    if (!messageId || !replyContent) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    try {
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Add reply to message
+        const result = await db.collection('messages').updateOne(
+            { _id: new ObjectId(messageId) },
+            { 
+                $push: { 
+                    replies: {
+                        content: replyContent,
+                        timestamp: new Date(),
+                        adminName: req.session.fname
+                    }
+                },
+                $set: { read: true }
+            }
+        );
+        
+        await client.close();
+        
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Reply sent successfully'
+        });
+    } catch (err) {
+        console.error('Error sending reply:', err);
+        res.status(500).json({ error: 'Failed to send reply' });
+    }
+});
+
+// API endpoint to mark message as read
+router.post('/messages/mark-read', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+    
+    const { messageId } = req.body;
+    
+    if (!messageId) {
+        return res.status(400).json({ error: 'Missing message ID' });
+    }
+    
+    try {
+        // Connect to MongoDB using admin-specific database
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Mark message as read
+        const result = await db.collection('messages').updateOne(
+            { _id: new ObjectId(messageId) },
+            { $set: { read: true } }
+        );
+        
+        await client.close();
+        
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ error: 'Message not found' });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Message marked as read'
+        });
+    } catch (err) {
+        console.error('Error marking message as read:', err);
+        res.status(500).json({ error: 'Failed to mark message as read' });
+    }
+});
 
 module.exports = router;

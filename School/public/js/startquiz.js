@@ -1,3 +1,122 @@
+let currentQuiz = null;
+let timeLeft = 0;
+let timerInterval = null;
+
+// Function to display the quiz
+function displayQuiz(quizData) {
+    const questionsContainer = document.getElementById('questions');
+    questionsContainer.innerHTML = '';
+    
+    quizData.forEach((question, index) => {
+        const [questionText, option1, option2, option3, option4, correctAnswers] = question;
+        
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+        questionDiv.innerHTML = `
+            <h3>Question ${index + 1}</h3>
+            <p>${questionText}</p>
+            <div class="options">
+                <label>
+                    <input type="radio" name="q${index}" value="${option1}">
+                    ${option1}
+                </label>
+                <label>
+                    <input type="radio" name="q${index}" value="${option2}">
+                    ${option2}
+                </label>
+                <label>
+                    <input type="radio" name="q${index}" value="${option3}">
+                    ${option3}
+                </label>
+                <label>
+                    <input type="radio" name="q${index}" value="${option4}">
+                    ${option4}
+                </label>
+            </div>
+        `;
+        questionsContainer.appendChild(questionDiv);
+    });
+}
+
+// Function to start the timer
+function startTimer(duration) {
+    timeLeft = duration;
+    const timerDisplay = document.getElementById('time');
+    
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = timeLeft;
+        
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            submitQuiz();
+        }
+    }, 1000);
+}
+
+// Function to submit the quiz
+async function submitQuiz() {
+    if (!currentQuiz) return;
+    
+    const answers = [];
+    let score = 0;
+    
+    currentQuiz.forEach((question, index) => {
+        const selectedOption = document.querySelector(`input[name="q${index}"]:checked`);
+        const answer = selectedOption ? selectedOption.value : null;
+        answers.push(answer);
+        
+        // Check if the answer is correct
+        const [_, __, ___, ____, _____, correctAnswers] = question;
+        if (correctAnswers.includes(answer)) {
+            score++;
+        }
+    });
+    
+    try {
+        const response = await fetch('/student/save-attempt', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                quizName,
+                score,
+                totalQuestions: currentQuiz.length,
+                answers
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to save attempt');
+        }
+        
+        // Redirect to results page
+        window.location.href = `/student/result/${encodeURIComponent(quizName)}`;
+    } catch (err) {
+        console.error('Error submitting quiz:', err);
+        alert('Failed to save your quiz attempt. Please try again.');
+    }
+}
+
+// Initialize the quiz when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof quiz !== 'undefined' && quiz) {
+        currentQuiz = quiz;
+        displayQuiz(quiz);
+        startTimer(duration);
+    } else {
+        console.error('Quiz data not found');
+        document.getElementById('quiz-container').innerHTML = `
+            <div class="error">
+                <h2>Error Loading Quiz</h2>
+                <p>There was a problem loading the quiz data. Please try again later.</p>
+                <button onclick="window.location.href='/student'">Return to Dashboard</button>
+            </div>
+        `;
+    }
+});
+
 async function loadQuiz(quizName) {
     try {
         // First try to get from MongoDB
@@ -110,39 +229,5 @@ async function deleteAttempt(quizName) {
     } catch (err) {
         console.error('Error deleting attempt:', err);
         throw err;
-    }
-}
-
-// Update the submitQuiz function
-async function submitQuiz() {
-    if (!currentQuiz) return;
-    
-    const answers = [];
-    let score = 0;
-    
-    currentQuiz.questions.forEach((question, index) => {
-        const selectedOption = document.querySelector(`input[name="q${index}"]:checked`);
-        const answer = selectedOption ? selectedOption.value : null;
-        answers.push(answer);
-        
-        if (answer === question.correctAnswer) {
-            score++;
-        }
-    });
-    
-    try {
-        await saveAttempt(currentQuiz.name, answers, score);
-        
-        // Update UI to show results
-        document.getElementById('quiz-container').innerHTML = `
-            <div class="quiz-result">
-                <h2>Quiz Completed!</h2>
-                <p>Your score: ${score}/${currentQuiz.questions.length}</p>
-                <button onclick="window.location.href='/student/dashboard'">Return to Dashboard</button>
-            </div>
-        `;
-    } catch (err) {
-        console.error('Error submitting quiz:', err);
-        alert('Failed to save your quiz attempt. Please try again.');
     }
 } 
