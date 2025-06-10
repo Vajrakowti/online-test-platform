@@ -647,7 +647,7 @@ router.post('/add-student', uploadStudentPhoto.single('photo'), async (req, res)
 
     client.close();
 
-    res.redirect(`/admin/students/${studentClass}`);
+    res.redirect(`/admin/students/${encodeURIComponent(studentClass)}`);
   } catch (err) {
     console.error('Error adding student:', err);
     
@@ -4987,6 +4987,54 @@ router.post('/messages/mark-read', async (req, res) => {
         console.error('Error marking message as read:', err);
         res.status(500).json({ error: 'Failed to mark message as read' });
     }
+});
+
+// API endpoint to get all class names and their student counts
+router.get('/api/classes', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    const collections = await db.listCollections().toArray();
+    const classCollections = collections.filter(c => c.name.startsWith('class_'));
+    const classes = [];
+    for (const collection of classCollections) {
+      const className = collection.name.replace('class_', '');
+      const count = await db.collection(collection.name).countDocuments();
+      classes.push({ name: className, count });
+    }
+    await client.close();
+    res.json(classes);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch classes' });
+  }
+});
+
+// Update /admin/stats/class-counts to return all classes
+router.get('/stats/class-counts', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    const collections = await db.listCollections().toArray();
+    const classCollections = collections.filter(c => c.name.startsWith('class_'));
+    const classCounts = {};
+    for (const collection of classCollections) {
+      const className = collection.name.replace('class_', '');
+      const count = await db.collection(collection.name).countDocuments();
+      classCounts[className] = count;
+    }
+    await client.close();
+    res.json(classCounts);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
