@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Results</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #f8f9fc;
+            --accent-color: #36b9cc;
+            --success-color: #1cc88a;
+            --danger-color: #e74a3b;
+            --warning-color: #f6c23e;
+            --info-color: #36b9cc;
+            --text-color: #5a5c69;
+            --border-color: #e3e6f0;
+            --light-grey: #f0f2f5;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            background-color: var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .top-bar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .results-wrapper {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .results-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.08);
+            padding: 30px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .results-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        .results-header h2 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .results-header p {
+            font-size: 1.2rem;
+            color: var(--text-color);
+        }
+
+        .section-results {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--secondary-color);
+        }
+
+        .section-results h3 {
+            color: var(--info-color);
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .question-result-container {
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 8px;
+            background-color: white;
+            position: relative; /* For correct/incorrect indicator */
+        }
+
+        .question-result-container .question-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 15px;
+        }
+
+        .options-results {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .option-result {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            color: var(--text-color);
+        }
+
+        /* Styling for correct/incorrect answers */
+        .option-result.correct-answer {
+            background-color: #d4edda; /* Light green */
+            border-color: #28a745; /* Darker green */
+            font-weight: 600;
+        }
+
+        .option-result.student-selected.incorrect-answer {
+            background-color: #f8d7da; /* Light red */
+            border-color: #dc3545; /* Darker red */
+            font-weight: 600;
+        }
+
+        .option-result input[type="radio"] {
+            margin: 0;
+            transform: scale(1.2);
+            pointer-events: none; /* Disable interaction */
+        }
+
+        .result-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 1.5rem;
+        }
+
+        .result-indicator.correct {
+            color: var(--success-color);
+        }
+
+        .result-indicator.incorrect {
+            color: var(--danger-color);
+        }
+
+        .back-button-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .btn-back-to-dashboard {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .btn-back-to-dashboard:hover {
+            background-color: #3756a4;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .results-container {
+                padding: 20px;
+            }
+            .results-header h2 {
+                font-size: 1.5rem;
+            }
+            .results-header p {
+                font-size: 1rem;
+            }
+            .section-results {
+                padding: 15px;
+            }
+            .section-results h3 {
+                font-size: 1.4rem;
+            }
+            .question-result-container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1 id="quizNameHeader">Quiz Results</h1>
+    </div>
+
+    <div class="results-wrapper">
+        <div class="results-container">
+            <div class="results-header">
+                <h2 id="quizTitleDisplay"></h2>
+                <p>Your Score: <span id="scoreDisplay"></span> / <span id="totalQuestionsDisplay"></span></p>
+                <p>Submitted On: <span id="submittedAtDisplay"></span></p>
+            </div>
+
+            <div id="resultsContent">
+                <!-- Detailed question results will be rendered here -->
+            </div>
+
+            <div class="back-button-container">
+                <button class="btn-back-to-dashboard" onclick="window.location.href='/student/dashboard'">
+                    Back to Dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const pathParts = window.location.pathname.split('/');
+            const quizName = pathParts[pathParts.length - 1];
+
+            document.getElementById('quizNameHeader').textContent = `Results for ${decodeURIComponent(quizName)}`;
+
+            fetch(`/student/api/result-data/${quizName}`)
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/login';
+                            return null;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        console.log('Fetched result data:', data);
+                        document.getElementById('quizTitleDisplay').textContent = data.quizName;
+                        document.getElementById('scoreDisplay').textContent = data.score;
+                        document.getElementById('totalQuestionsDisplay').textContent = data.totalQuestions;
+
+                        const submittedDate = new Date(data.submittedAt);
+                        document.getElementById('submittedAtDisplay').textContent = submittedDate.toLocaleString();
+
+                        renderResults(data.questionsWithResults);
+                    } else if (data && data.error) {
+                        alert('Error loading results: ' + data.error);
+                        window.location.href = '/student/dashboard';
+                    } else {
+                        alert('Error loading results: Invalid data received.');
+                        window.location.href = '/student/dashboard';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching result data:', error);
+                    document.getElementById('resultsContent').innerHTML = `
+                        <div style="text-align: center; margin-top: 50px; font-family: sans-serif; color: var(--danger-color);">
+                            <h3>Error Loading Results</h3>
+                            <p>${error.message}</p>
+                            <p>Please try again later or contact support.</p>
+                            <button class="btn-back-to-dashboard" onclick="window.location.href='/student/dashboard'">
+                                Back to Dashboard
+                            </button>
+                        </div>
+                    `;
+                });
+        });
+
+        function renderResults(questionsWithResults) {
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = ''; // Clear existing content
+
+            // Group questions by section name
+            const sectionsMap = new Map();
+            questionsWithResults.forEach(q => {
+                if (!sectionsMap.has(q.sectionName)) {
+                    sectionsMap.set(q.sectionName, []);
+                }
+                sectionsMap.get(q.sectionName).push(q);
+            });
+
+            let globalQuestionNumber = 0;
+            sectionsMap.forEach((questions, sectionName) => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'section-results';
+                sectionDiv.innerHTML = `<h3>${sectionName}</h3>`;
+
+                questions.forEach(q => {
+                    globalQuestionNumber++;
+                    const questionResultDiv = document.createElement('div');
+                    questionResultDiv.className = 'question-result-container';
+
+                    let indicatorHtml = '';
+                    if (q.isCorrect) {
+                        indicatorHtml = '<i class="fas fa-check-circle result-indicator correct"></i>';
+                    } else {
+                        indicatorHtml = '<i class="fas fa-times-circle result-indicator incorrect"></i>';
+                    }
+
+                    questionResultDiv.innerHTML = `
+                        <div class="question-text">${globalQuestionNumber}. ${q.question}</div>
+                        <div class="options-results">
+                            ${q.options.map(option => {
+                                const isStudentSelected = q.studentAnswer === option;
+                                const isCorrectOption = q.correctAnswers.includes(option);
+                                let optionClass = '';
+                                if (isCorrectOption) {
+                                    optionClass += ' correct-answer';
+                                }
+                                if (isStudentSelected && !q.isCorrect) {
+                                    optionClass += ' student-selected incorrect-answer';
+                                }
+
+                                return `
+                                    <div class="option-result${optionClass}">
+                                        <input type="radio" name="question_${globalQuestionNumber}" value="${option}" ${isStudentSelected ? 'checked' : ''} disabled>
+                                        <label>${option}</label>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        ${indicatorHtml}
+                    `;
+                    sectionDiv.appendChild(questionResultDiv);
+                });
+                resultsContent.appendChild(sectionDiv);
+            });
+        }
+    </script>
+</body>
+</html> 

@@ -573,6 +573,65 @@
     .insert-symbol-btn:hover {
       background-color: #eef1ff;
     }
+
+    /* Add styles for sections */
+    .section-item {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .section-header {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .section-header input[type="text"] {
+      flex-grow: 1;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      background-color: #fff;
+      color: #333;
+      display: block !important;
+      height: 38px !important;
+      min-width: 150px;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+    
+    .remove-section-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .remove-section-btn:hover {
+      background: #c82333;
+    }
+
+    .section-item .section-header input[type="text"] {
+      flex-grow: 1;
+      /* Temporarily set a fixed width to force visibility if flexbox is the issue */
+      width: 200px; /* Explicit width for debugging */
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      background-color: #fff; /* Revert to white */
+      color: #333;
+      display: block !important;
+      height: 38px !important;
+      min-width: 150px;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
   </style>
 </head>
 <body>
@@ -643,12 +702,12 @@
       <input type="hidden" name="quizType" value="excel">
       <div class="form-group">
         <label class="required">Quiz Name:</label>
-        <input type="text" name="quizName" placeholder="Enter quiz name" required>
+        <input type="text" name="quizName" id="quizName" required>
       </div>
       
       <div class="form-group">
         <label class="required">Class:</label>
-        <select name="quizClass" required>
+        <select name="quizClass" id="quizClass" required>
           <option value="">Select Class</option>
           <option value="1">Class 1</option>
           <option value="2">Class 2</option>
@@ -665,23 +724,30 @@
       
       <div class="form-group">
         <label class="required">Start Time:</label>
-        <input type="time" name="startTime" required>
+        <input type="time" name="startTime" id="startTime" required>
       </div>
       
       <div class="form-group">
         <label class="required">End Time:</label>
-        <input type="time" name="endTime" required>
+        <input type="time" name="endTime" id="endTime" required>
       </div>
       
       <div class="form-group">
-        <label class="required">Upload Excel Sheet:</label>
-        <div class="file-upload-wrapper">
-          <input type="file" name="quizFile" id="quizFile" accept=".xlsx,.xls" required>
-          <label for="quizFile" class="file-upload-btn">
-            <i class="fas fa-file-excel"></i> Choose Excel File
-          </label>
-          <div id="fileName" class="file-name">No file chosen</div>
+        <label>Quiz Sections:</label>
+        <div id="sectionsContainer">
+          <div class="section-item">
+            <div class="section-header">
+              <input type="text" name="sectionNames[]" placeholder="Section Name" required>
+              <input type="file" name="sectionFiles[]" accept=".xlsx,.xls" required>
+              <button type="button" class="remove-section-btn" onclick="removeSection(this)">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
         </div>
+        <button type="button" class="btn btn-submit" onclick="addSection()">
+          <i class="fas fa-plus"></i> Add Section
+        </button>
       </div>
       
       <button type="submit" class="btn btn-submit">
@@ -1067,6 +1133,27 @@
       document.querySelector('.quiz-type-btn[data-type="excel"]').click();
       initMathKeyboard();
     };
+
+    function addSection() {
+      const sectionsContainer = document.getElementById('sectionsContainer');
+      const sectionDiv = document.createElement('div');
+      sectionDiv.className = 'section-item';
+      sectionDiv.innerHTML = `
+        <div class="section-header">
+          <input type="text" name="sectionNames[]" placeholder="Section Name" required>
+          <input type="file" name="sectionFiles[]" accept=".xlsx,.xls" required>
+          <button type="button" class="remove-section-btn" onclick="removeSection(this)">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+      sectionsContainer.appendChild(sectionDiv);
+    }
+
+    function removeSection(button) {
+      const sectionItem = button.closest('.section-item');
+      sectionItem.remove();
+    }
   </script>
   
   <script>

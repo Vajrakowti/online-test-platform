@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
 const router = express.Router();
+const { loadQuizData } = require('./startquiz'); // Import loadQuizData
 
 // MongoDB connection URL
 const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
@@ -1321,6 +1322,104 @@ router.get('/manual-questions/:quizName', async (req, res) => {
     } catch (err) {
         console.error('Error getting manual questions:', err);
         res.status(500).json({ error: 'Failed to get manual questions' });
+    }
+});
+
+// Route to serve results page (student/result.html)
+router.get('/result/:quizName', async (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+    res.sendFile(path.join(__dirname, '../public/result.html'));
+});
+
+// New API endpoint to get detailed quiz result data
+router.get('/api/result-data/:quizName', async (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const quizName = req.params.quizName;
+    const studentUsername = req.session.username;
+    let client;
+
+    try {
+        client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+
+        const attemptsCollection = db.collection('attempts');
+        const quizzesCollection = db.collection('quizzes');
+
+        // 1. Get the student's attempt
+        const studentAttempt = await attemptsCollection.findOne({
+            quizName: quizName,
+            studentId: studentUsername
+        });
+
+        if (!studentAttempt) {
+            await client.close();
+            return res.status(404).json({ error: 'Quiz attempt not found.' });
+        }
+
+        // 2. Get the quiz configuration to load full questions
+        const quizConfig = await quizzesCollection.findOne({ name: quizName });
+
+        if (!quizConfig) {
+            await client.close();
+            return res.status(404).json({ error: 'Quiz configuration not found.' });
+        }
+
+        // 3. Load all questions and correct answers using loadQuizData
+        const fullQuizData = loadQuizData(quizConfig); // This returns { sections: [...] }
+
+        let allQuestionsFlat = [];
+        let globalIdxCounter = 0;
+        fullQuizData.sections.forEach(section => {
+            section.questions.forEach(q => {
+                allQuestionsFlat.push({
+                    question: q.question,
+                    options: q.options,
+                    correctAnswers: q.correctAnswers,
+                    sectionName: section.name,
+                    globalIndex: globalIdxCounter
+                });
+                globalIdxCounter++;
+            });
+        });
+
+        // 4. Combine student's answers with full question data
+        const questionsWithResults = allQuestionsFlat.map((q, globalIndex) => {
+            const studentAnswerRecord = studentAttempt.answers.find(a => a.questionIndex === globalIndex);
+            const studentAnswer = studentAnswerRecord ? studentAnswerRecord.submittedAnswer : 'Not Answered';
+            const isCorrect = studentAnswerRecord ? studentAnswerRecord.isCorrect : false; // Use the isCorrect from attempt
+
+            return {
+                question: q.question,
+                options: q.options,
+                correctAnswers: q.correctAnswers,
+                studentAnswer: studentAnswer,
+                isCorrect: isCorrect,
+                sectionName: q.sectionName
+            };
+        });
+
+        res.json({
+            success: true,
+            quizName: quizName,
+            score: studentAttempt.score,
+            totalQuestions: studentAttempt.totalQuestions,
+            questionsWithResults: questionsWithResults,
+            submittedAt: studentAttempt.submittedAt
+        });
+
+    } catch (error) {
+        console.error('Error fetching result data:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    } finally {
+        if (client) {
+            await client.close();
+        }
     }
 });
 

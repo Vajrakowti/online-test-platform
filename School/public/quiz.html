@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #f8f9fc;
+            --accent-color: #36b9cc;
+            --success-color: #1cc88a;
+            --danger-color: #e74a3b;
+            --warning-color: #f6c23e;
+            --info-color: #36b9cc;
+            --text-color: #5a5c69;
+            --border-color: #e3e6f0;
+            --light-grey: #f0f2f5;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            background-color: var(--secondary-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .top-bar h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .timer-container {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .quiz-wrapper {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .main-quiz-content {
+            flex: 3;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.08);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .question-panel-sidebar {
+            flex: 1;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.08);
+            padding: 20px;
+            min-width: 280px;
+        }
+
+        .question-panel-header {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .status-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        .status-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 600;
+            color: white;
+        }
+
+        /* Updated Status Colors */
+        .status-0 { background-color: var(--light-grey); color: var(--text-color); } /* Not Visited */
+        .status-1 { background-color: var(--success-color); } /* Answered */
+        .status-2 { background-color: var(--warning-color); } /* Marked for Review */
+        .status-3 { background-color: var(--danger-color); } /* Not Answered */
+        .status-4 { background-color: var(--info-color); } /* Answered and Marked for Review */
+        
+        .question-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 10px;
+        }
+
+        .question-grid-item {
+            background-color: var(--light-grey);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .question-grid-item:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .question-grid-item.current {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* Section Navigation Styles */
+        .section-nav {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-nav-btn {
+            background-color: var(--info-color); /* A distinct color for section buttons */
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .section-nav-btn:hover {
+            background-color: #2c9faf;
+        }
+
+        .current-section-title {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        
+        .question-container {
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .question {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        
+        .question-number {
+            font-weight: bold;
+            margin-right: 10px;
+            color: var(--primary-color);
+        }
+        
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            color: var(--text-color);
+        }
+        
+        .option:hover {
+            background-color: var(--light-grey);
+            border-color: var(--primary-color);
+        }
+        
+        .option input[type="radio"] {
+            margin: 0;
+            transform: scale(1.2);
+        }
+        
+        .quiz-navigation-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: auto; /* Pushes buttons to the bottom */
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .quiz-navigation-buttons button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.2s;
+            flex: 1; /* Allow buttons to grow */
+            min-width: 150px; /* Minimum width for buttons */
+        }
+
+        .btn-prev {
+            background-color: var(--info-color);
+            color: white;
+        }
+        .btn-prev:hover {
+            background-color: #2c9faf;
+            transform: translateY(-2px);
+        }
+
+        .btn-clear {
+            background-color: var(--warning-color);
+            color: var(--text-color);
+        }
+        .btn-clear:hover {
+            background-color: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        .btn-save-next {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn-save-next:hover {
+            background-color: #3756a4;
+            transform: translateY(-2px);
+        }
+
+        .btn-submit-test {
+            background-color: var(--success-color);
+            color: white;
+        }
+        .btn-submit-test:hover {
+            background-color: #17a673;
+            transform: translateY(-2px);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .quiz-wrapper {
+                flex-direction: column;
+                padding: 15px;
+            }
+            .question-panel-sidebar {
+                min-width: unset;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .top-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .quiz-navigation-buttons button {
+                flex: none;
+                width: 100%;
+            }
+            .main-quiz-content, .question-panel-sidebar {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1 id="quizNameHeader">Quiz</h1>
+        <div class="timer-container">
+            <i class="far fa-clock"></i>
+            <span id="timer">00:00:00</span>
+        </div>
+    </div>
+
+    <div class="quiz-wrapper">
+        <div class="main-quiz-content">
+            <div id="sectionNavigation" class="section-nav">
+                <!-- Section navigation (buttons) will be dynamically added here -->
+            </div>
+            <h2 id="currentSectionTitle" class="current-section-title"></h2> <!-- To show current section name -->
+
+            <div id="questionsContainer">
+                <!-- Questions will be dynamically loaded here, one at a time -->
+            </div>
+
+            <div class="quiz-navigation-buttons">
+                <button class="btn-prev" id="prevQuestionBtn"><i class="fas fa-chevron-left"></i> Previous</button>
+                <button class="btn-clear" id="clearResponseBtn">Clear Response</button>
+                <button class="btn-save-next" id="saveNextBtn">Save & Next <i class="fas fa-chevron-right"></i></button>
+                <button class="btn-submit-test" id="submitQuizBtn">Submit Test</button>
+            </div>
+        </div>
+
+        <div class="question-panel-sidebar">
+            <h3 class="question-panel-header">Question Panel</h3>
+            <div class="status-legend">
+                <div class="status-item"><span class="status-box status-3">0</span> Not Answered</div>
+                <div class="status-item"><span class="status-box status-1">0</span> Answered</div>
+                <div class="status-item"><span class="status-box status-2">0</span> Marked for Review</div>
+                <div class="status-item"><span class="status-box status-0">0</span> Not Visited</div>
+                <div class="status-item"><span class="status-box status-4">0</span> Answered and Marked for Review</div>
+            </div>
+            <div class="question-grid" id="questionGrid">
+                <!-- Question numbers will be dynamically loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let quizDataGlobal = null;
+        let allQuestionsFlat = []; // Stores all questions with global index and section info
+        let currentQuestionIndex = 0; // Global index of the currently displayed question
+        let answers = []; // Stores student's answers {questionIndex: globalIdx, answer: "optionValue"}
+
+        // questionStatuses:
+        // 0: Not Visited (Initial state, light-grey)
+        // 1: Answered (Green)
+        // 2: Marked for Review (Yellow)
+        // 3: Not Answered (Red, when visited but no answer)
+        // 4: Answered & Marked for Review (Blue/Info)
+        let questionStatuses = []; 
+
+        // Function to display the quiz content (questions, sections, options)
+        function displayQuizContent() {
+            if (!quizDataGlobal || !quizDataGlobal.quizData || !quizDataGlobal.quizData.sections) {
+                console.error("Quiz data not loaded or invalid.");
+                return;
+            }
+
+            document.getElementById('quizNameHeader').textContent = quizDataGlobal.quiz.name;
+            updateTimer(quizDataGlobal.duration);
+
+            // Flatten all questions and store their section context
+            allQuestionsFlat = [];
+            let globalIdxCounter = 0;
+            quizDataGlobal.quizData.sections.forEach((section, sectionIdx) => {
+                section.questions.forEach((question, qIdx) => {
+                    allQuestionsFlat.push({
+                        question: question.question,
+                        options: question.options,
+                        correctAnswers: question.correctAnswers,
+                        sectionName: section.name,
+                        globalIndex: globalIdxCounter,
+                        sectionIndex: sectionIdx,
+                        questionIndexInSection: qIdx
+                    });
+                    globalIdxCounter++;
+                });
+            });
+
+            const questionsContainer = document.getElementById('questionsContainer');
+            questionsContainer.innerHTML = ''; // Clear existing content
+
+            // Populate question statuses initially (all not visited, status 0)
+            questionStatuses = Array(allQuestionsFlat.length).fill(0); 
+            answers = Array(allQuestionsFlat.length).fill(null); // Initialize answers array with null
+
+            // Render all questions, but initially hide all except the first one
+            allQuestionsFlat.forEach((q, globalIdx) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-container';
+                questionDiv.id = `q-${globalIdx}`;
+                questionDiv.style.display = 'none'; // Initially hide all questions
+
+                questionDiv.innerHTML = `
+                    <div class="question">
+                        <span class="question-number">${globalIdx + 1}.</span>
+                        <span class="question-text">${q.question}</span>
+                    </div>
+                    <div class="options">
+                        ${q.options.map((option, oIdx) => `
+                            <div class="option">
+                                <input type="radio" 
+                                       name="question_${globalIdx}" 
+                                       id="q${globalIdx}_o${oIdx}" 
+                                       value="${option}">
+                                <label for="q${globalIdx}_o${oIdx}">${option}</label>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                questionsContainer.appendChild(questionDiv);
+            });
+
+            renderSectionNavigation(); // Render section navigation buttons
+            renderQuestionPanel(); // Render/update question panel with numbers
+            showQuestion(currentQuestionIndex); // Show the first question
+        }
+
+        // New function to render section navigation (buttons)
+        function renderSectionNavigation() {
+            const sectionNavContainer = document.getElementById('sectionNavigation');
+            sectionNavContainer.innerHTML = ''; // Clear existing
+            
+            // Use a Set to get unique section names while preserving order from quizDataGlobal.quizData.sections
+            const uniqueSectionNames = [];
+            const seenSectionNames = new Set();
+            quizDataGlobal.quizData.sections.forEach(section => {
+                if (!seenSectionNames.has(section.name)) {
+                    uniqueSectionNames.push(section.name);
+                    seenSectionNames.add(section.name);
+                }
+            });
+
+            uniqueSectionNames.forEach(sectionName => {
+                // Find the global index of the first question for this section
+                const firstQuestionGlobalIndex = allQuestionsFlat.findIndex(q => q.sectionName === sectionName);
+                if (firstQuestionGlobalIndex !== -1) {
+                    const sectionBtn = document.createElement('button');
+                    sectionBtn.className = 'section-nav-btn'; 
+                    sectionBtn.textContent = sectionName;
+                    sectionBtn.onclick = () => showQuestion(firstQuestionGlobalIndex);
+                    sectionNavContainer.appendChild(sectionBtn);
+                }
+            });
+        }
+
+        // Function to display a specific question by its global index
+        function showQuestion(index) {
+            if (index >= 0 && index < allQuestionsFlat.length) {
+                // Hide currently visible question
+                const prevQuestionDiv = document.getElementById(`q-${currentQuestionIndex}`);
+                if (prevQuestionDiv) {
+                    prevQuestionDiv.style.display = 'none';
+                }
+
+                currentQuestionIndex = index;
+
+                // Show the new current question
+                const currentQuestionDiv = document.getElementById(`q-${currentQuestionIndex}`);
+                if (currentQuestionDiv) {
+                    currentQuestionDiv.style.display = 'block';
+                }
+
+                // Update section title header
+                const currentSectionName = allQuestionsFlat[currentQuestionIndex].sectionName;
+                document.getElementById('currentSectionTitle').textContent = currentSectionName;
+
+                // Mark current question as 'Not Answered' if it was 'Not Visited'
+                if (questionStatuses[currentQuestionIndex] === 0) { // If Not Visited
+                    questionStatuses[currentQuestionIndex] = 3; // Change to Not Answered
+                }
+
+                // Re-check selected radio button if an answer exists for this question
+                const savedAnswer = answers[currentQuestionIndex];
+                if (savedAnswer) {
+                    const selectedRadio = document.querySelector(`input[name="question_${currentQuestionIndex}"][value="${savedAnswer.answer}"]`);
+                    if (selectedRadio) {
+                        selectedRadio.checked = true;
+                    }
+                } else {
+                    // If no saved answer, ensure no radio button is checked
+                    const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+                    currentQuestionRadios.forEach(radio => radio.checked = false);
+                }
+
+                renderQuestionPanel(); // Update panel to reflect current question and status
+            } else {
+                // Handle navigation boundaries
+                if (index < 0) {
+                    alert("This is the first question.");
+                    // No change to currentQuestionIndex, remains at 0
+                } else if (index >= allQuestionsFlat.length) {
+                    alert("This is the last question. Click Submit Test to finish.");
+                    // No change to currentQuestionIndex, remains at last question
+                }
+            }
+        }
+
+        // Timer function (placeholder, assumes actual timer logic is handled)
+        function updateTimer(durationInSeconds) {
+            let timerSpan = document.getElementById('timer');
+            let totalSeconds = durationInSeconds;
+
+            function formatTime(seconds) {
+                const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+                const s = String(seconds % 60).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            }
+
+            // Initial display
+            timerSpan.textContent = formatTime(totalSeconds);
+
+            const timerInterval = setInterval(() => {
+                totalSeconds--;
+                if (totalSeconds < 0) {
+                    clearInterval(timerInterval);
+                    timerSpan.textContent = "00:00:00";
+                    alert("Time's up! Your quiz will be submitted automatically.");
+                    submitQuiz(); // Auto-submit when timer runs out
+                } else {
+                    timerSpan.textContent = formatTime(totalSeconds);
+                }
+            }, 1000);
+        }
+
+        function nextQuestion() {
+            saveAnswer(); // Save current answer before moving
+            if (currentQuestionIndex < allQuestionsFlat.length - 1) {
+                showQuestion(currentQuestionIndex + 1);
+            } else {
+                alert("You are at the last question.");
+            }
+        }
+
+        function prevQuestion() {
+            saveAnswer(); // Save current answer before moving
+            if (currentQuestionIndex > 0) {
+                showQuestion(currentQuestionIndex - 1);
+            } else {
+                alert("You are at the first question.");
+            }
+        }
+
+        // Modified saveAnswer to correctly update statuses
+        function saveAnswer() {
+            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOption) {
+                answers[currentQuestionIndex] = {
+                    questionIndex: currentQuestionIndex,
+                    answer: selectedOption.value
+                };
+                // If the question was Not Visited (0) or Not Answered (3), change to Answered (1)
+                if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
+                    questionStatuses[currentQuestionIndex] = 1; 
+                }
+                // If it was Marked for Review (2), now it's Answered & Marked for Review (4)
+                // This state isn't directly set by saveAnswer but could be combined if a "Mark for Review" button was pressed prior.
+                // For now, if "Mark for Review" is implemented, it will need to handle if an answer exists.
+            } else {
+                // If no option selected (e.g., cleared response)
+                answers[currentQuestionIndex] = null;
+                // If it was Answered (1) or Answered & Marked for Review (4), change to Not Answered (3)
+                if (questionStatuses[currentQuestionIndex] === 1 || questionStatuses[currentQuestionIndex] === 4) {
+                    questionStatuses[currentQuestionIndex] = 3; 
+                }
+                 // If it was Marked for Review (2) and now no answer, keep it as Marked for Review (2)
+                 // If it was Not Visited (0), keep it as Not Visited (0)
+            }
+            renderQuestionPanel(); // Update question panel status
+        }
+
+        function clearResponse() {
+            const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+            currentQuestionRadios.forEach(radio => radio.checked = false);
+            answers[currentQuestionIndex] = null;
+            questionStatuses[currentQuestionIndex] = 3; // Mark as Not Answered
+            renderQuestionPanel();
+        }
+
+        function submitQuiz() {
+            // Final save of current answer before submission
+            saveAnswer();
+
+            // Prepare answers for submission (only submitted questions)
+            const finalAnswers = answers.map((answer, index) => {
+                // Only include answers for questions that were actually visited and potentially answered
+                if (answer !== null) {
+                    return { questionIndex: index, answer: answer.answer };
+                }
+                return null;
+            }).filter(Boolean); // Remove null entries
+
+            console.log('Submitting answers:', finalAnswers);
+            // Example submission (replace with your actual submission endpoint)
+            fetch('/student/startquiz/submit-quiz', { // Assuming a /student/submit-quiz endpoint
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    quizName: quizDataGlobal.quiz.name,
+                    studentUsername: quizDataGlobal.quiz.studentUsername, // You might need to get this from session
+                    answers: finalAnswers
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Quiz submitted successfully! Score: ' + data.score);
+                    window.location.href = `/student/result/${encodeURIComponent(quizDataGlobal.quiz.name)}`; // Redirect to results page
+                } else {
+                    alert('Quiz submission failed: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error submitting quiz:', error);
+                alert('Error submitting quiz. Please try again.');
+            });
+        }
+
+        // Render Question Panel
+        function renderQuestionPanel() {
+            const questionGrid = document.getElementById('questionGrid');
+            questionGrid.innerHTML = '';
+            questionStatuses.forEach((status, index) => {
+                const item = document.createElement('div');
+                // `status` directly maps to the CSS class suffix (0-4)
+                item.className = `question-grid-item status-${status} ${index === currentQuestionIndex ? 'current' : ''}`;
+                item.textContent = index + 1;
+                item.onclick = () => showQuestion(index);
+                questionGrid.appendChild(item);
+            });
+            updateStatusCounts();
+        }
+
+        function updateStatusCounts() {
+            const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }; // Initialize counts for all statuses
+            questionStatuses.forEach(status => {
+                counts[status]++;
+            });
+
+            document.querySelector('.status-0').textContent = counts[0]; // Not Visited
+            document.querySelector('.status-1').textContent = counts[1]; // Answered
+            document.querySelector('.status-2').textContent = counts[2]; // Marked for Review
+            document.querySelector('.status-3').textContent = counts[3]; // Not Answered
+            document.querySelector('.status-4').textContent = counts[4]; // Answered and Marked for Review
+        }
+
+
+        // Event Listeners for navigation buttons
+        document.getElementById('prevQuestionBtn').addEventListener('click', prevQuestion);
+        document.getElementById('saveNextBtn').addEventListener('click', nextQuestion);
+        document.getElementById('clearResponseBtn').addEventListener('click', clearResponse);
+        document.getElementById('submitQuizBtn').addEventListener('click', submitQuiz);
+
+
+        // Fetch quiz data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const pathParts = window.location.pathname.split('/');
+            const quizName = pathParts[pathParts.length - 1]; // e.g., "demo112233"
+
+            fetch(`/student/startquiz/api/quiz-data/${quizName}`)
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/login'; // Redirect to login if unauthorized
+                            return null;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        console.log('Fetched quiz data:', data);
+                        quizDataGlobal = data; // Store data globally
+                        displayQuizContent(); // Call display function to render UI
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching quiz data:', error);
+                    document.body.innerHTML = `
+                        <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
+                            <h1>Error Loading Quiz</h1>
+                            <p>${error.message}</p>
+                            <p>Please try again or contact support.</p>
+                            <a href="/student/dashboard" style="padding: 10px 20px; background-color: var(--primary-color); color: white; text-decoration: none; border-radius: 5px;">Back to Dashboard</a>
+                        </div>
+                    `;
+                });
+        });
+    </script>
+</body>
+</html>

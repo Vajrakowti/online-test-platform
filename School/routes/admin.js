@@ -374,7 +374,10 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, req.body.quizName + path.extname(file.originalname));
+    // Ensure unique filename for each section file
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const originalExt = path.extname(file.originalname);
+    cb(null, req.body.quizName + '-' + file.fieldname + '-' + uniqueSuffix + originalExt);
   }
 });
 const upload = multer({ storage: storage });
@@ -425,17 +428,23 @@ const excelStorage = multer.diskStorage({
   }
 });
 
-const uploadExcel = multer({ 
-  storage: excelStorage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-        file.mimetype === 'application/vnd.ms-excel') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only Excel files are allowed!'), false);
+const uploadExcel = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            cb(null, uploadDir);
+        },
+        filename: function (req, file, cb) {
+            // Ensure unique filename for each section file
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            const originalExt = path.extname(file.originalname);
+            // Use file.fieldname (e.g., 'sectionFiles[0]') to differentiate files from the same form field array
+            cb(null, req.body.quizName + '-' + file.fieldname + '-' + uniqueSuffix + originalExt);
+        }
+    }),
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB
     }
-  }
-}).single('quizFile');
+}).array('sectionFiles[]'); // Ensure this is .array for multiple files
 
 // Update the storage configuration for quiz images
 const quizImageStorage = multer.diskStorage({
@@ -1839,25 +1848,28 @@ router.post('/create-quiz', async (req, res) => {
 
     try {
       const { quizName, quizClass, startTime, endTime } = req.body;
+      const sectionNames = Array.isArray(req.body.sectionNames) ? req.body.sectionNames : [req.body.sectionNames];
+      const sectionFiles = req.files || [];
 
-      if (!req.file) {
-        throw new Error('No Excel file uploaded');
+      if (!sectionFiles || sectionFiles.length === 0) {
+        throw new Error('No Excel files uploaded');
       }
 
-      // Verify the file exists
-      const filePath = path.join(uploadDir, req.file.filename);
-      if (!fs.existsSync(filePath)) {
-        throw new Error('Failed to save Excel file');
+      if (sectionNames.length !== sectionFiles.length) {
+        throw new Error('Number of section names must match number of files');
       }
 
-      // Create quiz object
+      // Create quiz object with sections
       const quiz = {
         name: quizName,
         startTime: startTime,
         endTime: endTime,
         class: quizClass,
         type: 'excel',
-        file: req.file.filename,
+        sections: sectionNames.map((name, index) => ({
+          name: name,
+          file: sectionFiles[index].filename
+        })),
         createdAt: new Date()
       };
 
@@ -1869,27 +1881,31 @@ router.post('/create-quiz', async (req, res) => {
       // Check if quiz already exists in MongoDB
       const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
       if (existingQuiz) {
-        // Delete the uploaded file since quiz already exists
-        fs.unlinkSync(filePath);
+        // Delete the uploaded files since quiz already exists
+        sectionFiles.forEach(file => {
+          const filePath = path.join(uploadDir, file.filename);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
         throw new Error('Quiz with this name already exists');
       }
 
       // Insert into MongoDB
       await db.collection('quizzes').insertOne(quiz);
-      console.log('Quiz stored in MongoDB:', quiz);
-      
-      await client.close();
-      res.redirect('/admin');
-    } catch (error) {
-      console.error('Error creating quiz:', error);
-      // Clean up uploaded file if there was an error
-      if (req.file) {
-        const filePath = path.join(uploadDir, req.file.filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
-      res.status(500).send('Error creating quiz: ' + error.message);
+      console.log('Quiz object to be stored in MongoDB:', quiz);
+      console.log('Filenames in uploaded sectionFiles:', sectionFiles.map(f => f.filename));
+
+      res.redirect('/admin/total-quiz');
+    } catch (err) {
+      console.error('Error creating quiz:', err);
+      res.status(500).send(`
+        <div style="padding: 20px; background: #ffeeee; color: #ff0000; border-radius: 5px;">
+          <h3>Error creating quiz</h3>
+          <p>${err.message}</p>
+          <a href="/admin/create-quiz" style="color: #007bff;">Try again</a>
+        </div>
+      `);
     }
   });
 });
@@ -1989,7 +2005,7 @@ router.post('/create-quiz-manual', async (req, res) => {
       console.log('Quiz stored in MongoDB:', quiz);
       
       await client.close();
-      res.redirect('/admin');
+      res.redirect('/admin/total-quiz');
     } catch (error) {
       console.error('Error creating manual quiz:', error);
       res.status(500).send('Error creating quiz: ' + error.message);
