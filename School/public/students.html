@@ -727,76 +727,6 @@
 
             <div class="class-grid" id="classGrid">
                 <!-- Class cards will be generated dynamically -->
-                <a href="/admin/students/1" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 1</div>
-                    <div class="student-count" id="class1-count">Loading...</div>
-                </a>
-                <a href="/admin/students/2" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 2</div>
-                    <div class="student-count" id="class2-count">Loading...</div>
-                </a>
-                <a href="/admin/students/3" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 3</div>
-                    <div class="student-count" id="class3-count">Loading...</div>
-                </a>
-                <a href="/admin/students/4" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 4</div>
-                    <div class="student-count" id="class4-count">Loading...</div>
-                </a>
-                <a href="/admin/students/5" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 5</div>
-                    <div class="student-count" id="class5-count">Loading...</div>
-                </a>
-                <a href="/admin/students/6" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 6</div>
-                    <div class="student-count" id="class6-count">Loading...</div>
-                </a>
-                <a href="/admin/students/7" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 7</div>
-                    <div class="student-count" id="class7-count">Loading...</div>
-                </a>
-                <a href="/admin/students/8" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 8</div>
-                    <div class="student-count" id="class8-count">Loading...</div>
-                </a>
-                <a href="/admin/students/9" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 9</div>
-                    <div class="student-count" id="class9-count">Loading...</div>
-                </a>
-                <a href="/admin/students/10" class="class-card">
-                    <div class="class-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="class-name">Class 10</div>
-                    <div class="student-count" id="class10-count">Loading...</div>
-                </a>
             </div>
         </main>
     </div>
@@ -943,5 +873,42 @@
       });
     });
   </script>
+
+<script>
+function renderClassCards(classes) {
+  const classGrid = document.getElementById('classGrid');
+  classGrid.innerHTML = '';
+  classes.forEach(cls => {
+    const className = cls.name;
+    const count = cls.count;
+    const card = document.createElement('a');
+    card.href = `/admin/students/${encodeURIComponent(className)}`;
+    card.className = 'class-card';
+    card.innerHTML = `
+      <div class="class-icon">
+        <i class="fas fa-users"></i>
+      </div>
+      <div class="class-name">Class ${className}</div>
+      <div class="student-count">${count} students</div>
+    `;
+    classGrid.appendChild(card);
+  });
+}
+
+function fetchAndRenderClasses() {
+  fetch('/admin/api/classes')
+    .then(res => res.json())
+    .then(classes => {
+      renderClassCards(classes);
+      // Update total classes stat
+      document.querySelector('.stat-value').textContent = classes.length;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  fetchAndRenderClasses();
+  fetchStudentStats();
+});
+</script>
 </body>
 </html>

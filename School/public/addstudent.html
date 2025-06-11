@@ -667,8 +667,10 @@
                   <option value="8">Class 8</option>
                   <option value="9">Class 9</option>
                   <option value="10">Class 10</option>
+                  <option value="custom">Custom Class</option>
                 </select>
-                <div class="error-message">Please select a class</div>
+                <input type="text" id="customClassInput" placeholder="Enter custom class name" style="display:none; margin-top:8px;" />
+                <div class="error-message" id="customClassError" style="display:none;">Please enter a custom class name</div>
               </div>
 
               <div class="form-group">
@@ -778,6 +780,68 @@
                 });
             }
         });
+    });
+
+    // Custom class logic with persistence
+    const studentClassSelect = document.getElementById('studentClass');
+    const customClassInput = document.getElementById('customClassInput');
+    const customClassError = document.getElementById('customClassError');
+
+    // Load custom classes from localStorage
+    function loadCustomClasses() {
+      const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+      customClasses.forEach(cls => {
+        if (!Array.from(studentClassSelect.options).some(opt => opt.value === cls)) {
+          const opt = document.createElement('option');
+          opt.value = cls;
+          opt.text = cls;
+          studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
+        }
+      });
+    }
+    loadCustomClasses();
+
+    studentClassSelect.addEventListener('change', function() {
+      if (this.value === 'custom') {
+        customClassInput.style.display = 'block';
+        customClassInput.required = true;
+      } else {
+        customClassInput.style.display = 'none';
+        customClassInput.required = false;
+        customClassError.style.display = 'none';
+      }
+    });
+    form.addEventListener('submit', function(e) {
+      if (studentClassSelect.value === 'custom' && !customClassInput.value.trim()) {
+        customClassError.style.display = 'block';
+        customClassInput.focus();
+        e.preventDefault();
+        return;
+      } else {
+        customClassError.style.display = 'none';
+      }
+      // Before submit, if custom class is used, set its value to studentClass
+      if (studentClassSelect.value === 'custom') {
+        const customValue = customClassInput.value.trim();
+        if (customValue) {
+          // Add to dropdown and localStorage if not already present
+          let exists = Array.from(studentClassSelect.options).some(opt => opt.value === customValue);
+          if (!exists) {
+            let opt = document.createElement('option');
+            opt.value = customValue;
+            opt.text = customValue;
+            opt.selected = true;
+            studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
+            // Save to localStorage
+            let customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+            if (!customClasses.includes(customValue)) {
+              customClasses.push(customValue);
+              localStorage.setItem('customClasses', JSON.stringify(customClasses));
+            }
+          }
+          studentClassSelect.value = customValue;
+        }
+      }
     });
   </script>
 
