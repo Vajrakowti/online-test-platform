@@ -759,12 +759,23 @@
       </div>
       
       <div class="form-group">
-        <label class="required">Start Time:</label>
+        <label class="required">Exam Date:</label>
+        <input type="date" name="examDate" id="examDate" required>
+      </div>
+      
+      <div class="form-group">
+        <label class="required">Test Duration (minutes):</label>
+        <input type="number" name="testDuration" id="testDuration" min="1" value="60" required>
+        <span class="question-marks-info">(Enter duration in minutes, e.g. 120 for 2 hours)</span>
+      </div>
+      
+      <div class="form-group">
+        <label class="required">Test Available From:</label>
         <input type="time" name="startTime" id="startTime" required>
       </div>
       
       <div class="form-group">
-        <label class="required">End Time:</label>
+        <label class="required">Test Available Until:</label>
         <input type="time" name="endTime" id="endTime" required>
       </div>
       
@@ -798,7 +809,7 @@
           </div>
         </div>
         <button type="button" class="btn btn-submit" onclick="addSection()">
-image.png          <i class="fas fa-plus"></i> Add Section
+          <i class="fas fa-plus"></i> Add Section
         </button>
       </div>
       
@@ -832,12 +843,23 @@ image.png          <i class="fas fa-plus"></i> Add Section
       </div>
       
       <div class="form-group">
-        <label class="required">Start Time:</label>
+        <label class="required">Exam Date:</label>
+        <input type="date" name="examDate" required>
+      </div>
+      
+      <div class="form-group">
+        <label class="required">Test Duration (minutes):</label>
+        <input type="number" name="testDuration" min="1" value="60" required>
+        <span class="question-marks-info">(Enter duration in minutes, e.g. 120 for 2 hours)</span>
+      </div>
+      
+      <div class="form-group">
+        <label class="required">Test Available From:</label>
         <input type="time" name="startTime" required>
       </div>
       
       <div class="form-group">
-        <label class="required">End Time:</label>
+        <label class="required">Test Available Until:</label>
         <input type="time" name="endTime" required>
       </div>
 
@@ -1195,12 +1217,47 @@ image.png          <i class="fas fa-plus"></i> Add Section
       document.getElementById('question-' + index).remove();
     }
 
+    // Load custom classes from localStorage
+    function loadCustomClasses() {
+      try {
+        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+        const quizClassSelect = document.getElementById('quizClass');
+        
+        // Remove any existing custom classes (except the default ones)
+        Array.from(quizClassSelect.options).forEach(option => {
+          if (!option.value.match(/^[1-9]|10$/)) {
+            quizClassSelect.removeChild(option);
+          }
+        });
+        
+        // Add custom classes
+        customClasses.forEach(cls => {
+          if (!Array.from(quizClassSelect.options).some(opt => opt.value === cls)) {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.text = cls;
+            quizClassSelect.appendChild(opt);
+          }
+        });
+      } catch (error) {
+        console.error('Error loading custom classes:', error);
+      }
+    }
+
     // Initialize when page loads
     window.onload = function() {
       // Initially display Excel form
       document.querySelector('.quiz-type-btn[data-type="excel"]').click();
       initMathKeyboard();
+      loadCustomClasses(); // Load custom classes
     };
+
+    // Add event listener for storage changes
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'customClasses') {
+        loadCustomClasses();
+      }
+    });
 
     function addSection() {
       const sectionsContainer = document.getElementById('sectionsContainer');

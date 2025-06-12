@@ -167,40 +167,22 @@ function getISTNow() {
 }
 
 function calculateDuration(quizConfig) {
-    const [startH, startM] = quizConfig.startTime.split(':').map(Number);
-    const [endH, endM] = quizConfig.endTime.split(':').map(Number);
+    // Convert test duration from minutes to seconds
+    const durationSec = quizConfig.testDuration * 60;
     
     // Get current IST time
     const now = getISTNow();
-    // Create Date objects for today with the quiz times in IST
-    const quizStartTime = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        startH,
-        startM
-    );
-    const quizEndTime = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        endH,
-        endM
-    );
-
-    // Calculate remaining duration in seconds
-    let durationSec = Math.max(0, Math.floor((quizEndTime - now) / 1000));
+    const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
     
-    // If quiz hasn't started yet, show full duration
-    if (now < quizStartTime) {
-        durationSec = Math.floor((quizEndTime - quizStartTime) / 1000);
+    // Check if quiz is within available time window
+    if (currentTime < quizConfig.startTime) {
+        throw new Error("This quiz has not started yet.");
     }
-
-    // If duration is 0 or negative (quiz already ended)
-    if (durationSec <= 0) {
-        throw new Error("This quiz has already ended");
+    
+    if (currentTime > quizConfig.endTime) {
+        throw new Error("This quiz has already ended.");
     }
-
+    
     return durationSec;
 }
 

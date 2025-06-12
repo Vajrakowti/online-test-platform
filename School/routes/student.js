@@ -18,78 +18,54 @@ if (!fs.existsSync(ATTEMPTS_DIR)) {
 
 // Route to serve student.html
 router.get('/', async (req, res) => {
-    if (req.session.fname && req.session.role === 'student') {
-        try {
-            // Connect to MongoDB using admin-specific database
-            const client = new MongoClient(url);
-            await client.connect();
-            const db = client.db(req.session.adminDb);
-            
-            // Get all quizzes
-            const quizzesCollection = db.collection('quizzes');
-            const quizzes = await quizzesCollection.find({}).toArray();
-            
-            // Get student's attempts
-            const attemptsCollection = db.collection('attempts');
-            const attempts = await attemptsCollection.find({ 
-                studentId: req.session.username 
-            }).toArray();
-            
-            // Create a map of attempted quizzes
-            const attemptedQuizzes = new Map();
-            attempts.forEach(attempt => {
-                attemptedQuizzes.set(attempt.quizName, attempt);
-            });
-            
-            // Separate quizzes into attempted and not attempted
-            const attemptedQuizzesList = [];
-            const availableQuizzes = [];
-            
-            quizzes.forEach(quiz => {
-                if (attemptedQuizzes.has(quiz.name)) {
-                    attemptedQuizzesList.push({
-                        ...quiz,
-                        attempt: attemptedQuizzes.get(quiz.name)
-                    });
-                } else {
-                    availableQuizzes.push(quiz);
-                }
-            });
-            
-            await client.close();
-            
-        // Read the student.html file and replace the welcome message
-            fs.readFile(path.join(__dirname, '../public/student.html'), 'utf8',
-                async (err, data) => {
-            if (err) {
-                        console.error('Error reading student.html:', err);
-                        return res.status(500).send('Error loading student dashboard');
-            }
-            
-                    // Replace welcome message
-                    let modifiedData = data.replace('Welcome, Student!', `Welcome, ${req.session.fname}!`);
-            
-                    // Add quizzes data to the page
-                    modifiedData = modifiedData.replace(
-                        'const quizzes = [];',
-                        `const quizzes = ${JSON.stringify(availableQuizzes)};`
-                    );
-                    
-                    // Add attempted quizzes data
-                    modifiedData = modifiedData.replace(
-                        'const attemptedQuizzes = [];',
-                        `const attemptedQuizzes = ${JSON.stringify(attemptedQuizzesList)};`
-                    );
-                    
-                    res.send(modifiedData);
-                            }
-            );
-        } catch (err) {
-            console.error('Error loading student dashboard:', err);
-            res.status(500).send('Error loading student dashboard');
-        }
-    } else {
-        res.redirect('/login');
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.redirect("/login");
+    }
+
+    try {
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get current date and time in IST
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0];
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
+                          now.getMinutes().toString().padStart(2, '0');
+        
+        // Get all quizzes
+        const quizzes = await db.collection('quizzes').find().toArray();
+        
+        // Get attempted quizzes
+        const attemptedQuizzes = await db.collection('attempts')
+            .find({ studentId: req.session.username })
+            .toArray();
+
+        // Create a Set of attempted quiz names for faster lookup
+        const attemptedQuizNames = new Set(attemptedQuizzes.map(attempt => attempt.quizName));
+
+        // Filter quizzes for today:
+        // 1. Must match today's date exactly
+        // 2. Must not have been attempted
+        // 3. Current time must be within the quiz's time window
+        const todayQuizzes = quizzes.filter(quiz => {
+            const quizDate = new Date(quiz.examDate).toISOString().split('T')[0];
+            return quizDate === currentDate && 
+                   !attemptedQuizNames.has(quiz.name) &&
+                   quiz.startTime <= currentTime &&
+                   quiz.endTime >= currentTime;
+        });
+
+        await client.close();
+
+        res.render('student', {
+            username: req.session.username,
+            quizzes: todayQuizzes,
+            attemptedQuizzes: attemptedQuizzes
+        });
+    } catch (error) {
+        console.error('Error loading student dashboard:', error);
+        res.status(500).send('Error loading dashboard');
     }
 });
 
@@ -389,28 +365,52 @@ router.get('/quiz/:quizName', async (req, res) => {
     const studentUsername = req.session.username;
 
     try {
-        // Connect to MongoDB
         const client = new MongoClient(url);
         await client.connect();
         const db = client.db(req.session.adminDb);
         
-        // Find the quiz in the admin's database
+        // Find the quiz
         const quiz = await db.collection('quizzes').findOne({ name: quizName });
         
         if (!quiz) {
             await client.close();
-            return res.status(404).send(`
+            return res.status(404).send('Quiz not found');
+        }
+
+        // Check if student has already attempted this quiz
+        const hasAttempted = await db.collection('attempts').findOne({ 
+            studentId: studentUsername, 
+            quizName: quizName 
+        });
+
+        if (hasAttempted) {
+            await client.close();
+            return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
+        }
+
+        // Validate quiz date and time
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0];
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
+                          now.getMinutes().toString().padStart(2, '0');
+        
+        const quizDate = new Date(quiz.examDate).toISOString().split('T')[0];
+        
+        // Check if quiz is scheduled for today
+        if (quizDate !== currentDate) {
+            await client.close();
+            return res.status(403).send(`
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Quiz Not Found</title>
+                    <title>Quiz Not Available</title>
                     <style>
                         body {
                             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                             padding: 20px;
                             background-color: #f8f9fa;
                             text-align: center;
-                }
+                        }
                         .error-container {
                             background: white;
                             padding: 30px;
@@ -434,13 +434,13 @@ router.get('/quiz/:quizName', async (req, res) => {
                             background-color: #3a5ec0;
                             transform: translateY(-2px);
                             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
+                        }
                     </style>
                 </head>
                 <body>
                     <div class="error-container">
-                        <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Found</h2>
-                        <p style="color: #6c757d;">The requested quiz does not exist in your admin's database.</p>
+                        <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Available</h2>
+                        <p style="color: #6c757d;">This quiz is scheduled for ${new Date(quiz.examDate).toLocaleDateString()}. Please come back on the scheduled date.</p>
                         <a href="/student" class="back-btn">Back to Dashboard</a>
                     </div>
                 </body>
@@ -448,420 +448,363 @@ router.get('/quiz/:quizName', async (req, res) => {
             `);
         }
 
-        // Check if student has already attempted this quiz
-        const hasAttempted = await db.collection('attempts').findOne({ 
-            username: studentUsername, 
-            quizName: quizName 
-        });
-
-        if (hasAttempted) {
-            await client.close();
-            return res.redirect(`/student/result/${encodeURIComponent(quizName)}`);
-                }
-                
-        // Check if quiz is available for student's class
-        if (quiz.class !== studentClass && !quiz.isStudentSpecific) {
+        // Check if current time is within quiz time window
+        if (currentTime < quiz.startTime || currentTime > quiz.endTime) {
             await client.close();
             return res.status(403).send(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                    <title>Quiz Not Available</title>
-                        <style>
-                            body {
-                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                padding: 20px;
-                                background-color: #f8f9fa;
-                                text-align: center;
-                            }
-                            .error-container {
-                                background: white;
-                                padding: 30px;
-                                border-radius: 12px;
-                                max-width: 500px;
-                                margin: 50px auto;
-                                box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-                            }
-                            .back-btn {
-                                display: inline-block;
-                                margin-top: 20px;
-                                padding: 10px 24px;
-                                background-color: #4e73df;
-                                color: white;
-                                text-decoration: none;
-                                border-radius: 6px;
-                                font-weight: 500;
-                                transition: all 0.3s;
-                            }
-                            .back-btn:hover {
-                                background-color: #3a5ec0;
-                                transform: translateY(-2px);
-                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="error-container">
-                            <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Available</h2>
-                        <p style="color: #6c757d;">This quiz is not available for your class.</p>
-                            <a href="/student" class="back-btn">Back to Dashboard</a>
-                        </div>
-                    </body>
-                    </html>
-                `);
-            }
-
-        await client.close();
-
-        // Send the quiz page with the data
-            res.send(`
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>${quiz.name} - Start Quiz</title>
+                    <title>Quiz Not Available</title>
                     <style>
-                        :root {
-                            --primary: #4e73df;
-                            --primary-dark: #3a5ec0;
-                            --secondary: #f8f9fc;
-                            --success: #1cc88a;
-                            --danger: #e74a3b;
-                            --warning: #f6c23e;
-                            --light: #f8f9fa;
-                            --dark: #5a5c69;
-                        }
                         body {
-                            font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            background-color: #f8f9fc;
-                            margin: 0;
-                            padding: 0;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            min-height: 100vh;
-                            color: #5a5c69;
-                        }
-                        .quiz-card {
-                            background: white;
-                            border-radius: 15px;
-                            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-                            width: 90%;
-                            max-width: 800px;
-                            overflow: hidden;
-                            margin: 30px 0;
-                        }
-                        .quiz-header {
-                            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-                            color: white;
-                            padding: 25px 30px;
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            padding: 20px;
+                            background-color: #f8f9fa;
                             text-align: center;
                         }
-                        .quiz-header h2 {
-                            margin: 0;
-                            font-size: 1.8rem;
-                            font-weight: 700;
-                        }
-                        .class-badge {
-                            display: inline-block;
-                            background-color: rgba(255,255,255,0.2);
-                            padding: 4px 12px;
-                            border-radius: 20px;
-                            font-size: 0.9rem;
-                            margin-left: 10px;
-                            font-weight: 600;
-                        }
-                        .quiz-body {
-                            padding: 30px;
-                        }
-                        .details-section {
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                            gap: 20px;
-                            margin-bottom: 30px;
-                            background: var(--secondary);
-                            padding: 20px;
-                            border-radius: 10px;
-                        }
-                        .detail-item {
-                            display: flex;
-                            flex-direction: column;
-                        }
-                        .detail-label {
-                            font-size: 0.85rem;
-                            color: var(--dark);
-                            font-weight: 600;
-                            margin-bottom: 5px;
-                            opacity: 0.8;
-                        }
-                        .detail-value {
-                            font-size: 1.1rem;
-                            font-weight: 700;
-                            color: var(--primary-dark);
-                        }
-                        .instructions-section {
-                            margin-bottom: 30px;
-                        }
-                        .instructions-section h3 {
-                            color: var(--primary);
-                            border-bottom: 2px solid var(--secondary);
-                            padding-bottom: 10px;
-                            margin-top: 0;
-                        }
-                        .instructions-list {
-                            padding-left: 20px;
-                        }
-                        .instructions-list li {
-                            margin-bottom: 12px;
-                            line-height: 1.5;
-                        }
-                        .attempted {
-                            color: var(--success);
-                            font-weight: bold;
-                        }
-                        .not-attempted {
-                            color: var(--danger);
-                            font-weight: bold;
-                        }
-                        .checkbox-container {
-                            display: flex;
-                            align-items: center;
-                            margin: 25px 0;
-                            padding: 15px;
-                            background: var(--secondary);
-                            border-radius: 8px;
-                        }
-                        .checkbox-container input {
-                            width: 20px;
-                            height: 20px;
-                            margin-right: 15px;
-                            accent-color: var(--primary);
-                        }
-                        .checkbox-container label {
-                            font-weight: 600;
-                            cursor: pointer;
-                        }
-                        .start-btn {
-                            display: block;
-                            width: 100%;
-                            padding: 14px;
-                            background-color: var(--primary);
-                            color: white;
-                            border: none;
-                            border-radius: 8px;
-                            font-size: 1.1rem;
-                            font-weight: 600;
-                            cursor: pointer;
-                            transition: all 0.3s;
-                        }
-                        .start-btn:hover:not(:disabled) {
-                            background-color: var(--primary-dark);
-                            transform: translateY(-2px);
-                            box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
-                        }
-                        .start-btn:disabled {
-                            background-color: #cccccc;
-                            cursor: not-allowed;
-                            transform: none;
-                            box-shadow: none;
-                        }
-                        .modal {
-                            display: none;
-                            position: fixed;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            background-color: rgba(0,0,0,0.5);
-                            z-index: 1000;
-                            justify-content: center;
-                            align-items: center;
-                        }
-                        .modal-content {
-                            background-color: white;
+                        .error-container {
+                            background: white;
                             padding: 30px;
                             border-radius: 12px;
-                            max-width: 400px;
-                            text-align: center;
-                            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+                            max-width: 500px;
+                            margin: 50px auto;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
                         }
-                        .modal h3 {
-                            color: var(--primary);
-                            margin-top: 0;
-                        }
-                        .modal-btn {
+                        .back-btn {
+                            display: inline-block;
+                            margin-top: 20px;
                             padding: 10px 24px;
-                            background-color: var(--primary);
+                            background-color: #4e73df;
                             color: white;
-                            border: none;
+                            text-decoration: none;
                             border-radius: 6px;
-                            font-weight: 600;
-                            cursor: pointer;
+                            font-weight: 500;
                             transition: all 0.3s;
                         }
-                        .modal-btn:hover {
-                            background-color: var(--primary-dark);
+                        .back-btn:hover {
+                            background-color: #3a5ec0;
                             transform: translateY(-2px);
                             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                         }
-                        @media (max-width: 600px) {
-                            .quiz-body {
-                                padding: 20px;
-                            }
-                            .details-section {
-                                grid-template-columns: 1fr;
-                            }
-                        }
                     </style>
-                    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
                 </head>
                 <body>
-                    <div class="quiz-card">
-                        <div class="quiz-header">
-                            <h2>${quiz.name}</h2>
-                        </div>
-                        
-                        <div class="quiz-body">
-                            <div class="details-section">
-                                <div class="detail-item">
-                                    <span class="detail-label">Start Time</span>
-                                    <span class="detail-value">${quiz.startTime}</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">End Time</span>
-                                    <span class="detail-value">${quiz.endTime}</span>
-                                </div>
-                            </div>
-                            
-                            <div class="instructions-section">
-                                <h3>Exam Instructions</h3>
-                                <ol class="instructions-list">
-                                    <li>The quiz consists of multiple-choice questions.</li>
-                                    <li>Use the <strong>Next</strong> and <strong>Previous</strong> buttons to navigate between questions.</li>
-                                    <li>The side panel shows all questions - <span class="attempted">green</span> for attempted, <span class="not-attempted">red</span> for not attempted.</li>
-                                    <li>You can click on any question number in the side panel to jump to that question.</li>
-                                    <li>Do not switch tabs or windows during the exam - you have only <strong>2 tab changes</strong> allowed.</li>
-                                    <li>After 2 tab changes, your exam will be automatically submitted.</li>
-                                    <li>The exam will automatically submit when the time expires.</li>
-                                    <li>Once submitted, you cannot retake the exam.</li>
-                                    <li>Do not refresh the page during the exam.</li>
-                                    <li>Make sure you have a stable internet connection before starting.</li>
-                                </ol>
-                            </div>
-                            
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="agreeCheckbox" onchange="toggleStartButton()">
-                                <label for="agreeCheckbox">I have read and understood all the instructions</label>
-                            </div>
-                            
-                            <button id="startButton" class="start-btn" onclick="checkQuizTime()" disabled>Next</button>
-                        </div>
+                    <div class="error-container">
+                        <h2 style="color: #4e73df; margin-bottom: 15px;">Quiz Not Available</h2>
+                        <p style="color: #6c757d;">This quiz is only available between ${quiz.startTime} and ${quiz.endTime}.</p>
+                        <a href="/student" class="back-btn">Back to Dashboard</a>
                     </div>
-                    
-                    <!-- Modal for time validation messages -->
-                    <div id="timeModal" class="modal">
-                        <div class="modal-content">
-                            <h3 id="modalMessage"></h3>
-                            <button class="modal-btn" onclick="document.getElementById('timeModal').style.display='none'">OK</button>
-                        </div>
-                    </div>
-
-                    <script>
-                        function toggleStartButton() {
-                            const checkbox = document.getElementById('agreeCheckbox');
-                            const startButton = document.getElementById('startButton');
-                            startButton.disabled = !checkbox.checked;
-                        }
-                        
-                        function checkQuizTime() {
-                            const now = new Date();
-                            const currentHours = now.getHours();
-                            const currentMinutes = now.getMinutes();
-                            
-                            const startTime = "${quiz.startTime}".split(':');
-                            const endTime = "${quiz.endTime}".split(':');
-                            
-                            const startHour = parseInt(startTime[0]);
-                            const startMinute = parseInt(startTime[1]);
-                            const endHour = parseInt(endTime[0]);
-                            const endMinute = parseInt(endTime[1]);
-                            
-                            // Create Date objects for comparison
-                            const quizStart = new Date();
-                            quizStart.setHours(startHour, startMinute, 0, 0);
-                            
-                            const quizEnd = new Date();
-                            quizEnd.setHours(endHour, endMinute, 0, 0);
-                            
-                            if (now < quizStart) {
-                                // Quiz hasn't started yet
-                                showModal(\`Exam will start at ${quiz.startTime}\`);
-                            } else if (now > quizEnd) {
-                                // Quiz has ended
-                                showModal(\`Exam is over. It ended at ${quiz.endTime}\`);
-                            } else {
-                                // Quiz is active - proceed to start
-                                window.location.href='/student/startquiz/${encodeURIComponent(quiz.name)}';
-                            }
-                        }
-                        
-                        function showModal(message) {
-                            const modal = document.getElementById('timeModal');
-                            document.getElementById('modalMessage').textContent = message;
-                            modal.style.display = 'flex';
-                        }
-                    </script>
                 </body>
                 </html>
             `);
-    } catch (err) {
-        console.error('Error processing quiz request:', err);
-        res.status(500).send(`
+        }
+
+        await client.close();
+
+        // If all validations pass, proceed with quiz start
+        res.send(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Error</title>
+                <title>${quiz.name} - Start Quiz</title>
                 <style>
+                    :root {
+                        --primary: #4e73df;
+                        --primary-dark: #3a5ec0;
+                        --secondary: #f8f9fc;
+                        --success: #1cc88a;
+                        --danger: #e74a3b;
+                        --warning: #f6c23e;
+                        --light: #f8f9fa;
+                        --dark: #5a5c69;
+                    }
                     body {
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        padding: 20px;
-                        background-color: #f8f9fa;
+                        font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        background-color: #f8f9fc;
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        color: #5a5c69;
+                    }
+                    .quiz-card {
+                        background: white;
+                        border-radius: 15px;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+                        width: 90%;
+                        max-width: 800px;
+                        overflow: hidden;
+                        margin: 30px 0;
+                    }
+                    .quiz-header {
+                        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+                        color: white;
+                        padding: 25px 30px;
                         text-align: center;
                     }
-                    .error-container {
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                        max-width: 500px;
-                        margin: 50px auto;
-                        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+                    .quiz-header h2 {
+                        margin: 0;
+                        font-size: 1.8rem;
+                        font-weight: 700;
                     }
-                    .back-btn {
+                    .class-badge {
                         display: inline-block;
-                        margin-top: 20px;
-                        padding: 10px 24px;
-                        background-color: #4e73df;
+                        background-color: rgba(255,255,255,0.2);
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 0.9rem;
+                        margin-left: 10px;
+                        font-weight: 600;
+                    }
+                    .quiz-body {
+                        padding: 30px;
+                    }
+                    .details-section {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                        gap: 20px;
+                        margin-bottom: 30px;
+                        background: var(--secondary);
+                        padding: 20px;
+                        border-radius: 10px;
+                    }
+                    .detail-item {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .detail-label {
+                        font-size: 0.85rem;
+                        color: var(--dark);
+                        font-weight: 600;
+                        margin-bottom: 5px;
+                        opacity: 0.8;
+                    }
+                    .detail-value {
+                        font-size: 1.1rem;
+                        font-weight: 700;
+                        color: var(--primary-dark);
+                    }
+                    .instructions-section {
+                        margin-bottom: 30px;
+                    }
+                    .instructions-section h3 {
+                        color: var(--primary);
+                        border-bottom: 2px solid var(--secondary);
+                        padding-bottom: 10px;
+                        margin-top: 0;
+                    }
+                    .instructions-list {
+                        padding-left: 20px;
+                    }
+                    .instructions-list li {
+                        margin-bottom: 12px;
+                        line-height: 1.5;
+                    }
+                    .attempted {
+                        color: var(--success);
+                        font-weight: bold;
+                    }
+                    .not-attempted {
+                        color: var(--danger);
+                        font-weight: bold;
+                    }
+                    .checkbox-container {
+                        display: flex;
+                        align-items: center;
+                        margin: 25px 0;
+                        padding: 15px;
+                        background: var(--secondary);
+                        border-radius: 8px;
+                    }
+                    .checkbox-container input {
+                        width: 20px;
+                        height: 20px;
+                        margin-right: 15px;
+                        accent-color: var(--primary);
+                    }
+                    .checkbox-container label {
+                        font-weight: 600;
+                        cursor: pointer;
+                    }
+                    .start-btn {
+                        display: block;
+                        width: 100%;
+                        padding: 14px;
+                        background-color: var(--primary);
                         color: white;
-                        text-decoration: none;
-                        border-radius: 6px;
-                        font-weight: 500;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 1.1rem;
+                        font-weight: 600;
+                        cursor: pointer;
                         transition: all 0.3s;
                     }
-                    .back-btn:hover {
-                        background-color: #3a5ec0;
+                    .start-btn:hover:not(:disabled) {
+                        background-color: var(--primary-dark);
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
+                    }
+                    .start-btn:disabled {
+                        background-color: #cccccc;
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+                    .modal {
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(0,0,0,0.5);
+                        z-index: 1000;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    .modal-content {
+                        background-color: white;
+                        padding: 30px;
+                        border-radius: 12px;
+                        max-width: 400px;
+                        text-align: center;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+                    }
+                    .modal h3 {
+                        color: var(--primary);
+                        margin-top: 0;
+                    }
+                    .modal-btn {
+                        padding: 10px 24px;
+                        background-color: var(--primary);
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                    }
+                    .modal-btn:hover {
+                        background-color: var(--primary-dark);
                         transform: translateY(-2px);
                         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                     }
+                    @media (max-width: 600px) {
+                        .quiz-body {
+                            padding: 20px;
+                        }
+                        .details-section {
+                            grid-template-columns: 1fr;
+                        }
+                    }
                 </style>
+                <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             </head>
             <body>
-                <div class="error-container">
-                    <h2 style="color: #4e73df; margin-bottom: 15px;">Error</h2>
-                    <p style="color: #6c757d;">There was a problem loading the quiz. Please try again later.</p>
-                    <a href="/student" class="back-btn">Back to Dashboard</a>
+                <div class="quiz-card">
+                    <div class="quiz-header">
+                        <h2>${quiz.name}</h2>
+                    </div>
+                    
+                    <div class="quiz-body">
+                        <div class="details-section">
+                            <div class="detail-item">
+                                <span class="detail-label">Start Time</span>
+                                <span class="detail-value">${quiz.startTime}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">End Time</span>
+                                <span class="detail-value">${quiz.endTime}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="instructions-section">
+                            <h3>Exam Instructions</h3>
+                            <ol class="instructions-list">
+                                <li>The quiz consists of multiple-choice questions.</li>
+                                <li>Use the <strong>Next</strong> and <strong>Previous</strong> buttons to navigate between questions.</li>
+                                <li>The side panel shows all questions - <span class="attempted">green</span> for attempted, <span class="not-attempted">red</span> for not attempted.</li>
+                                <li>You can click on any question number in the side panel to jump to that question.</li>
+                                <li>Do not switch tabs or windows during the exam - you have only <strong>2 tab changes</strong> allowed.</li>
+                                <li>After 2 tab changes, your exam will be automatically submitted.</li>
+                                <li>The exam will automatically submit when the time expires.</li>
+                                <li>Once submitted, you cannot retake the exam.</li>
+                                <li>Do not refresh the page during the exam.</li>
+                                <li>Make sure you have a stable internet connection before starting.</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="agreeCheckbox" onchange="toggleStartButton()">
+                            <label for="agreeCheckbox">I have read and understood all the instructions</label>
+                        </div>
+                        
+                        <button id="startButton" class="start-btn" onclick="checkQuizTime()" disabled>Next</button>
+                    </div>
                 </div>
+                
+                <!-- Modal for time validation messages -->
+                <div id="timeModal" class="modal">
+                    <div class="modal-content">
+                        <h3 id="modalMessage"></h3>
+                        <button class="modal-btn" onclick="document.getElementById('timeModal').style.display='none'">OK</button>
+                    </div>
+                </div>
+
+                <script>
+                    function toggleStartButton() {
+                        const checkbox = document.getElementById('agreeCheckbox');
+                        const startButton = document.getElementById('startButton');
+                        startButton.disabled = !checkbox.checked;
+                    }
+                    
+                    function checkQuizTime() {
+                        const now = new Date();
+                        const currentHours = now.getHours();
+                        const currentMinutes = now.getMinutes();
+                        
+                        const startTime = "${quiz.startTime}".split(':');
+                        const endTime = "${quiz.endTime}".split(':');
+                        
+                        const startHour = parseInt(startTime[0]);
+                        const startMinute = parseInt(startTime[1]);
+                        const endHour = parseInt(endTime[0]);
+                        const endMinute = parseInt(endTime[1]);
+                        
+                        // Create Date objects for comparison
+                        const quizStart = new Date();
+                        quizStart.setHours(startHour, startMinute, 0, 0);
+                        
+                        const quizEnd = new Date();
+                        quizEnd.setHours(endHour, endMinute, 0, 0);
+                        
+                        if (now < quizStart) {
+                            // Quiz hasn't started yet
+                            showModal(\`Exam will start at ${quiz.startTime}\`);
+                        } else if (now > quizEnd) {
+                            // Quiz has ended
+                            showModal(\`Exam is over. It ended at ${quiz.endTime}\`);
+                        } else {
+                            // Quiz is active - proceed to start
+                            window.location.href='/student/startquiz/${encodeURIComponent(quiz.name)}';
+                        }
+                    }
+                    
+                    function showModal(message) {
+                        const modal = document.getElementById('timeModal');
+                        document.getElementById('modalMessage').textContent = message;
+                        modal.style.display = 'flex';
+                    }
+                </script>
             </body>
             </html>
         `);
+    } catch (err) {
+        console.error('Error processing quiz request:', err);
+        res.status(500).send('Error loading quiz');
     }
 });
 

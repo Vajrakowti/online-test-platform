@@ -789,15 +789,19 @@
 
     // Load custom classes from localStorage
     function loadCustomClasses() {
-      const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-      customClasses.forEach(cls => {
-        if (!Array.from(studentClassSelect.options).some(opt => opt.value === cls)) {
-          const opt = document.createElement('option');
-          opt.value = cls;
-          opt.text = cls;
-          studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
-        }
-      });
+      try {
+        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+        customClasses.forEach(cls => {
+          if (!Array.from(studentClassSelect.options).some(opt => opt.value === cls)) {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.text = cls;
+            studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
+          }
+        });
+      } catch (error) {
+        console.error('Error loading custom classes:', error);
+      }
     }
     loadCustomClasses();
 
@@ -811,6 +815,7 @@
         customClassError.style.display = 'none';
       }
     });
+
     form.addEventListener('submit', function(e) {
       if (studentClassSelect.value === 'custom' && !customClassInput.value.trim()) {
         customClassError.style.display = 'block';
@@ -820,26 +825,40 @@
       } else {
         customClassError.style.display = 'none';
       }
+      
       // Before submit, if custom class is used, set its value to studentClass
       if (studentClassSelect.value === 'custom') {
         const customValue = customClassInput.value.trim();
         if (customValue) {
-          // Add to dropdown and localStorage if not already present
-          let exists = Array.from(studentClassSelect.options).some(opt => opt.value === customValue);
-          if (!exists) {
-            let opt = document.createElement('option');
-            opt.value = customValue;
-            opt.text = customValue;
-            opt.selected = true;
-            studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
-            // Save to localStorage
-            let customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-            if (!customClasses.includes(customValue)) {
-              customClasses.push(customValue);
-              localStorage.setItem('customClasses', JSON.stringify(customClasses));
+          try {
+            // Add to dropdown and localStorage if not already present
+            let exists = Array.from(studentClassSelect.options).some(opt => opt.value === customValue);
+            if (!exists) {
+              let opt = document.createElement('option');
+              opt.value = customValue;
+              opt.text = customValue;
+              opt.selected = true;
+              studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
+              
+              // Save to localStorage
+              let customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+              if (!customClasses.includes(customValue)) {
+                customClasses.push(customValue);
+                localStorage.setItem('customClasses', JSON.stringify(customClasses));
+                
+                // Trigger storage event for other pages
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: 'customClasses',
+                  newValue: JSON.stringify(customClasses),
+                  oldValue: localStorage.getItem('customClasses'),
+                  storageArea: localStorage
+                }));
+              }
             }
+            studentClassSelect.value = customValue;
+          } catch (error) {
+            console.error('Error saving custom class:', error);
           }
-          studentClassSelect.value = customValue;
         }
       }
     });

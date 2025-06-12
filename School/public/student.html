@@ -445,8 +445,9 @@
           <thead>
             <tr>
               <th>Quiz Name</th>
-              <th>Start Time</th>
-              <th>End Time</th>
+              <th>Exam Date</th>
+              <th>Test Duration</th>
+              <th>Start Time - End Time</th>
             </tr>
           </thead>
           <tbody>
@@ -535,7 +536,7 @@
 
           if (availableQuizzes.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="3" class="no-quizzes">No available quizzes found.</td>`;
+            row.innerHTML = `<td colspan="4" class="no-quizzes">No available quizzes found.</td>`;
             todayTbody.appendChild(row);
           } else {
             availableQuizzes.forEach(quiz => {
@@ -543,8 +544,9 @@
               row.classList.add("quiz-row");
               row.innerHTML = `
                 <td>${quiz.name}</td>
-                <td>${quiz.startTime}</td>
-                <td>${quiz.endTime}</td>
+                <td>${new Date(quiz.examDate).toLocaleDateString()}</td>
+                <td>${quiz.testDuration} mins</td>
+                <td>${quiz.startTime} - ${quiz.endTime}</td>
               `;
               row.addEventListener('click', () => {
                 const encodedName = encodeURIComponent(quiz.name);
@@ -563,7 +565,7 @@
           
           if (availableQuizzes.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="3" class="no-quizzes">No available quizzes found.</td>`;
+            row.innerHTML = `<td colspan="4" class="no-quizzes">No available quizzes found.</td>`;
             todayTbody.appendChild(row);
           } else {
             availableQuizzes.forEach(quiz => {
@@ -571,8 +573,9 @@
               row.classList.add("quiz-row");
               row.innerHTML = `
                 <td>${quiz.name}</td>
-                <td>${quiz.startTime}</td>
-                <td>${quiz.endTime}</td>
+                <td>${new Date(quiz.examDate).toLocaleDateString()}</td>
+                <td>${quiz.testDuration} mins</td>
+                <td>${quiz.startTime} - ${quiz.endTime}</td>
               `;
               row.addEventListener('click', () => {
                 const encodedName = encodeURIComponent(quiz.name);
@@ -621,7 +624,7 @@
     })
     .catch(err => {
       console.error('Error loading data:', err);
-      todayTbody.innerHTML = `<tr><td colspan="3" style="color: red;">Error loading quizzes</td></tr>`;
+      todayTbody.innerHTML = `<tr><td colspan="4" style="color: red;">Error loading quizzes</td></tr>`;
       attemptedTbody.innerHTML = `<tr><td colspan="1" style="color: red;">Error loading attempts</td></tr>`;
     });
 

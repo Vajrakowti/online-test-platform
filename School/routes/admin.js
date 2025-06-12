@@ -1874,9 +1874,11 @@ router.post('/create-quiz', async (req, res) => {
       // Create quiz object with sections
       const quiz = {
         name: quizName,
+        class: quizClass,
+        examDate: new Date(req.body.examDate),
+        testDuration: parseInt(req.body.testDuration),
         startTime: startTime,
         endTime: endTime,
-        class: quizClass,
         type: 'excel',
         sections: sectionNames.map((name, index) => ({
           name: name,
@@ -2009,8 +2011,10 @@ router.post('/create-quiz-manual', async (req, res) => {
       const quiz = {
         name: quizName,
         class: quizClass,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
+        examDate: new Date(req.body.examDate),
+        testDuration: parseInt(req.body.testDuration),
+        startTime: startTime,
+        endTime: endTime,
         type: 'manual',
         sections: [{
           name: 'Questions',
@@ -2361,8 +2365,9 @@ router.get('/total-quiz', async (req, res) => {
                                                   <td>${quiz.name}</td>
                                                   <td>Class ${quiz.class}</td>
                                                   <td class="time-cell">
-                                                      <span class="time-badge">Start: ${quiz.startTime}</span>
-                                                      <span class="time-badge">End: ${quiz.endTime}</span>
+                                                      <span class="time-badge">Date: ${new Date(quiz.examDate).toLocaleDateString()}</span>
+                                                      <span class="time-badge">Duration: ${quiz.testDuration} mins</span>
+                                                      <span class="time-badge">Available: ${quiz.startTime} - ${quiz.endTime}</span>
                                                   </td>
                                                   <td>
                                                       <span class="status-badge ${statusClass}">${statusText}</span>
