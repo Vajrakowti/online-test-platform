@@ -1079,7 +1079,14 @@
                 },
                 body: JSON.stringify({
                     quizName: quizDataGlobal.quizName,
-                    answers: finalAnswers
+                    answers: finalAnswers,
+                    // Include the shuffled questions data so backend can use the same order
+                    shuffledQuestions: allQuestionsFlat.map(q => ({ 
+                        question: q.question, 
+                        options: q.options, 
+                        correctAnswers: q.correctAnswers, 
+                        sectionName: q.sectionName 
+                    }))
                 })
             })
             .then(response => response.json())

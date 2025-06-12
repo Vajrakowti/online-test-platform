@@ -101,18 +101,25 @@ function loadQuizData(quiz) {
                     };
                 }).filter(Boolean); // Remove null entries
                 
+                const shuffledQuestions = shuffleArray(mappedRows);
                 sections.push({
                     name: section.name,
-                    questions: mappedRows
+                    questions: shuffledQuestions
                 });
                 console.log(`Successfully loaded ${mappedRows.length} questions for section: ${section.name}`);
+                console.log(`[Shuffle Debug] Shuffled questions for section '${section.name}':`, shuffledQuestions.map(q => q.question));
             } catch (error) {
                 console.error(`Error loading section ${section.name}:`, error);
                 throw new Error(`Error loading section ${section.name}: ${error.message}`);
             }
         }
         
-        return { sections: sections }; // Return an object with sections property
+        return { 
+            quizName: quiz.name,
+            negativeMarking: quiz.negativeMarking || 0,
+            questionMarks: quiz.questionMarks || 1,
+            sections: sections 
+        }; // Return an object with sections property
     } else if (quiz.type === 'manual') {
         // For manual quizzes, questions are stored directly in the quiz object
         if (!quiz.questions || !Array.isArray(quiz.questions)) {
@@ -128,12 +135,16 @@ function loadQuizData(quiz) {
             optionImages: q.optionImages || [null, null, null, null]
         }));
         
+        const shuffledFormattedQuestions = shuffleArray(formattedQuestions);
+        console.log(`[Shuffle Debug] Shuffled questions for manual quiz:`, shuffledFormattedQuestions.map(q => q.question));
+
         return {
             quizName: quiz.name,
             negativeMarking: quiz.negativeMarking || 0,
+            questionMarks: quiz.questionMarks || 1,
             sections: [{
                 name: 'Questions', // Default section name for manual quizzes
-                questions: shuffleArray(formattedQuestions)
+                questions: shuffledFormattedQuestions
             }]
         };
     }
@@ -383,7 +394,7 @@ router.post('/submit-quiz', async (req, res) => {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const { quizName, answers } = req.body;
+    const { quizName, answers, shuffledQuestions } = req.body;
     const studentUsername = req.session.username;
     let client;
     try {
@@ -409,8 +420,8 @@ router.post('/submit-quiz', async (req, res) => {
         //     return res.status(400).json({ success: false, message: 'Quiz already submitted.' });
         // }
 
-        // Load the full quiz data with questions and correct answers
-        const fullQuizData = loadQuizData(quizConfig); // This gets { sections: [...] }
+        // Use the shuffled questions sent from the frontend
+        const displayedQuestions = shuffledQuestions; // This is the exact order the student saw
 
         let score = 0;
         let totalMarks = 0; // Total possible marks
@@ -424,15 +435,13 @@ router.post('/submit-quiz', async (req, res) => {
         console.log(`Debug - quizConfig.questionMarks: ${quizConfig.questionMarks}`);
         console.log(`Debug - questionMarks (local variable): ${questionMarks}`);
         console.log('Debug - Student Answers:', answers);
+        console.log('Debug - Displayed Questions (from frontend):', displayedQuestions.map(q => q.question));
 
         const correctAnswersMap = new Map();
-        let globalIdxCounter = 0;
-        fullQuizData.sections.forEach(section => {
-            section.questions.forEach(q => {
-                correctAnswersMap.set(globalIdxCounter, q.correctAnswers);
-                totalMarks += questionMarks; // Add to total possible marks
-                globalIdxCounter++;
-            });
+        // Build correctAnswersMap and totalMarks based on the displayedQuestions
+        displayedQuestions.forEach((q, globalIdx) => {
+            correctAnswersMap.set(globalIdx, q.correctAnswers);
+            totalMarks += questionMarks; // Add to total possible marks
         });
 
         // Process each answer
@@ -469,7 +478,8 @@ router.post('/submit-quiz', async (req, res) => {
             answers: studentAnswers,
             negativeMarking: negativeMarking,
             questionMarks: questionMarks,
-            submittedAt: new Date()
+            submittedAt: new Date(),
+            shuffledQuestionsOrder: displayedQuestions.map(q => q.question) // Save the shuffled order for review
         });
 
         // Store quiz completion in session
