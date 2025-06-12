@@ -129,11 +129,11 @@
         }
 
         /* Updated Status Colors */
-        .status-0 { background-color: var(--light-grey); color: var(--text-color); } /* Not Visited */
-        .status-1 { background-color: var(--success-color); } /* Answered */
-        .status-2 { background-color: var(--warning-color); } /* Marked for Review */
-        .status-3 { background-color: var(--danger-color); } /* Not Answered */
-        .status-4 { background-color: var(--info-color); } /* Answered and Marked for Review */
+        .status-0 { background-color: white; color: var(--text-color); border: 1px solid var(--border-color); } /* Not Visited */
+        .status-1 { background-color: #1cc88a; color: white; } /* Answered */
+        .status-2 { background-color: #f6c23e; color: white; } /* Marked for Review */
+        .status-3 { background-color: #e74a3b; color: white; } /* Not Answered */
+        .status-4 { background-color: #36b9cc; color: white; } /* Answered and Marked for Review */
         
         .question-grid {
             display: grid;
@@ -142,8 +142,6 @@
         }
 
         .question-grid-item {
-            background-color: var(--light-grey);
-            border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 10px;
             text-align: center;
@@ -245,12 +243,18 @@
         .option input[type="radio"] {
             margin: 0;
             transform: scale(1.2);
+            cursor: pointer;
+        }
+        
+        .option label {
+            flex: 1;
+            cursor: pointer;
         }
         
         .quiz-navigation-buttons {
             display: flex;
             justify-content: space-between;
-            margin-top: auto; /* Pushes buttons to the bottom */
+            margin-top: auto;
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
             gap: 15px;
@@ -265,8 +269,8 @@
             font-size: 1rem;
             font-weight: 600;
             transition: background-color 0.2s, transform 0.2s;
-            flex: 1; /* Allow buttons to grow */
-            min-width: 150px; /* Minimum width for buttons */
+            flex: 1;
+            min-width: 150px;
         }
 
         .btn-prev {
@@ -302,6 +306,25 @@
         }
         .btn-submit-test:hover {
             background-color: #17a673;
+            transform: translateY(-2px);
+        }
+
+        /* Add new button styles */
+        .btn-mark-review {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        .btn-mark-review:hover {
+            background-color: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        .btn-answered-review {
+            background-color: var(--info-color);
+            color: white;
+        }
+        .btn-answered-review:hover {
+            background-color: #2c9faf;
             transform: translateY(-2px);
         }
         
@@ -393,10 +416,268 @@
             -ms-user-select: text;
             user-select: text;
         }
+
+        /* Add these new styles after the existing styles */
+        .fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+
+        .fullscreen-warning {
+            background-color: #2c3e50;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e74a3b;
+        }
+
+        .fullscreen-warning h2 {
+            color: #f1edec;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .fullscreen-warning p {
+            color: #f6f2f2;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .start-button {
+            background-color: #e74a3b;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .start-button:hover {
+            background-color: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .warning-count {
+            background-color: #e74a3b;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .devtools-warning {
+            background-color: #e74a3b;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            display: none;
+        }
+
+        #startFullscreenBtn {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+        }
+
+        #startFullscreenBtn:hover {
+            background-color: #3756a4;
+        }
+
+        /* Add these styles in the style section */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .modal-button {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .modal-button.yes {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .modal-button.no {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .modal-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Add styles for review buttons container */
+        .review-buttons-container {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: var(--light-grey);
+            border-radius: 6px;
+        }
+
+        .review-buttons-container button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        /* Add toast message styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 250px;
+            max-width: 350px;
+            animation: slideIn 0.3s ease-in-out;
+        }
+
+        .toast.error {
+            background-color: #e74a3b;
+        }
+
+        .toast.success {
+            background-color: #1cc88a;
+        }
+
+        .toast.warning {
+            background-color: #f6c23e;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .toast.hide {
+            animation: slideOut 0.3s ease-in-out forwards;
+        }
     </style>
 </head>
 <body>
-    <div class="top-bar">
+    <!-- Add toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+        <div class="fullscreen-warning" style="background-color: #f30a0a;">
+            <h2>Warning!</h2>
+            <p>This quiz must be taken in fullscreen mode.</p>
+            <p>Please click the button below to continue.</p>
+            <button id="startFullscreenBtn" class="start-button">Enter Fullscreen Mode</button>
+        </div>
+    </div>
+
+    <div id="exitFullscreenWarning" class="fullscreen-overlay" style="display: none;">
+        <div class="fullscreen-warning">
+            <h2>Warning!</h2>
+            <p>You have exited fullscreen mode or switched tabs.</p>
+            <p>Please return to fullscreen to continue the quiz.</p>
+            <div class="warning-count">Warning <span id="warningCount">1</span> of 2</div>
+            <button onclick="enterFullscreen()" class="start-button">Return to Fullscreen</button>
+        </div>
+    </div>
+
+    <div id="devtoolsWarning" class="devtools-warning">
+        <h2>Warning!</h2>
+        <p>Developer tools are not allowed during the quiz. The quiz will be submitted automatically.</p>
+    </div>
+
+    <div class="top-bar" style="display: none;">
         <h1 id="quizNameHeader">Quiz</h1>
         <div class="timer-container">
             <i class="far fa-clock"></i>
@@ -408,19 +689,24 @@
         </div>
     </div>
 
-    <div class="quiz-wrapper">
+    <div class="quiz-wrapper" style="display: none;">
         <div class="main-quiz-content">
             <div id="sectionNavigation" class="section-nav">
                 <!-- Section navigation (buttons) will be dynamically added here -->
             </div>
-            <h2 id="currentSectionTitle" class="current-section-title"></h2> <!-- To show current section name -->
+            <h2 id="currentSectionTitle" class="current-section-title"></h2>
+
+            <div class="review-buttons-container">
+                <button class="btn-mark-review" id="markReviewBtn">Mark for Review</button>
+                <button class="btn-answered-review" id="answeredReviewBtn">Answered & Mark for Review</button>
+            </div>
 
             <div id="questionsContainer">
                 <!-- Questions will be dynamically loaded here, one at a time -->
             </div>
 
             <div class="quiz-navigation-buttons">
-                <button class="btn-prev" id="prevQuestionBtn"><i class="fas fa-chevron-left"></i> Previous</button>
+                <button class="btn-prev" id="prevQuestionBtn" style="display: none;"><i class="fas fa-chevron-left"></i> Previous</button>
                 <button class="btn-clear" id="clearResponseBtn">Clear Response</button>
                 <button class="btn-save-next" id="saveNextBtn">Save & Next <i class="fas fa-chevron-right"></i></button>
                 <button class="btn-submit-test" id="submitQuizBtn">Submit Test</button>
@@ -442,6 +728,17 @@
         </div>
     </div>
 
+    <div id="submitModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Submit Quiz</h2>
+            <p>Are you sure you want to submit the quiz?</p>
+            <div class="modal-buttons">
+                <button class="modal-button yes" id="confirmSubmit">Yes, Submit</button>
+                <button class="modal-button no" id="cancelSubmit">No, Continue</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let quizDataGlobal = null;
         let allQuestionsFlat = []; // Stores all questions with global index and section info
@@ -455,6 +752,16 @@
         // 3: Not Answered (Red, when visited but no answer)
         // 4: Answered & Marked for Review (Blue/Info)
         let questionStatuses = []; 
+
+        // Add these new variables at the top of your script
+        let fullscreenWarnings = 0;
+        let isFullscreen = false;
+
+        // Add these variables at the top of your script
+        let lastActiveTime = Date.now();
+        let tabSwitchCount = 0;
+        let isQuizSubmitted = false;
+        let timerInterval = null;
 
         // Function to display the quiz content (questions, sections, options)
         function displayQuizContent() {
@@ -590,15 +897,21 @@
                     currentQuestionRadios.forEach(radio => radio.checked = false);
                 }
 
-                renderQuestionPanel(); // Update panel to reflect current question and status
+                // Setup radio button listeners for the current question
+                setupRadioButtonListeners();
+
+                // Update navigation buttons visibility
+                document.getElementById('prevQuestionBtn').style.display = currentQuestionIndex === 0 ? 'none' : 'block';
+                document.getElementById('saveNextBtn').style.display = currentQuestionIndex === allQuestionsFlat.length - 1 ? 'none' : 'block';
+
+                // Update question panel to reflect current status
+                renderQuestionPanel();
             } else {
                 // Handle navigation boundaries
                 if (index < 0) {
-                    alert("This is the first question.");
-                    // No change to currentQuestionIndex, remains at 0
+                    showToast("This is the first question.", "warning");
                 } else if (index >= allQuestionsFlat.length) {
-                    alert("This is the last question. Click Submit Test to finish.");
-                    // No change to currentQuestionIndex, remains at last question
+                    showToast("This is the last question. Click Submit Test to finish.", "warning");
                 }
             }
         }
@@ -618,13 +931,20 @@
             // Initial display
             timerSpan.textContent = formatTime(totalSeconds);
 
-            const timerInterval = setInterval(() => {
+            // Clear any existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            timerInterval = setInterval(() => {
                 totalSeconds--;
                 if (totalSeconds < 0) {
                     clearInterval(timerInterval);
                     timerSpan.textContent = "00:00:00";
-                    alert("Time's up! Your quiz will be submitted automatically.");
-                    submitQuiz(); // Auto-submit when timer runs out
+                    if (!isQuizSubmitted) {
+                        alert("Time's up! Your quiz will be submitted automatically.");
+                        submitQuiz();
+                    }
                 } else {
                     timerSpan.textContent = formatTime(totalSeconds);
                 }
@@ -636,7 +956,7 @@
             if (currentQuestionIndex < allQuestionsFlat.length - 1) {
                 showQuestion(currentQuestionIndex + 1);
             } else {
-                alert("You are at the last question.");
+                showToast("You are at the last question.", "warning");
             }
         }
 
@@ -645,7 +965,7 @@
             if (currentQuestionIndex > 0) {
                 showQuestion(currentQuestionIndex - 1);
             } else {
-                alert("You are at the first question.");
+                showToast("You are at the first question.", "warning");
             }
         }
 
@@ -659,22 +979,47 @@
                 };
                 // If the question was Not Visited (0) or Not Answered (3), change to Answered (1)
                 if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
-                    questionStatuses[currentQuestionIndex] = 1; 
+                    questionStatuses[currentQuestionIndex] = 1;
                 }
                 // If it was Marked for Review (2), now it's Answered & Marked for Review (4)
-                // This state isn't directly set by saveAnswer but could be combined if a "Mark for Review" button was pressed prior.
-                // For now, if "Mark for Review" is implemented, it will need to handle if an answer exists.
+                if (questionStatuses[currentQuestionIndex] === 2) {
+                    questionStatuses[currentQuestionIndex] = 4;
+                }
             } else {
                 // If no option selected (e.g., cleared response)
                 answers[currentQuestionIndex] = null;
                 // If it was Answered (1) or Answered & Marked for Review (4), change to Not Answered (3)
                 if (questionStatuses[currentQuestionIndex] === 1 || questionStatuses[currentQuestionIndex] === 4) {
-                    questionStatuses[currentQuestionIndex] = 3; 
+                    questionStatuses[currentQuestionIndex] = 3;
                 }
-                 // If it was Marked for Review (2) and now no answer, keep it as Marked for Review (2)
-                 // If it was Not Visited (0), keep it as Not Visited (0)
+                // If it was Marked for Review (2), keep it as Marked for Review (2)
+                // If it was Not Visited (0), keep it as Not Visited (0)
             }
             renderQuestionPanel(); // Update question panel status
+        }
+
+        // Add event listeners for radio buttons to update status immediately
+        function setupRadioButtonListeners() {
+            const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+            currentQuestionRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        answers[currentQuestionIndex] = {
+                            questionIndex: currentQuestionIndex,
+                            answer: this.value
+                        };
+                        // Update status to Answered (1) if it was Not Visited (0) or Not Answered (3)
+                        if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
+                            questionStatuses[currentQuestionIndex] = 1;
+                        }
+                        // If it was Marked for Review (2), now it's Answered & Marked for Review (4)
+                        if (questionStatuses[currentQuestionIndex] === 2) {
+                            questionStatuses[currentQuestionIndex] = 4;
+                        }
+                        renderQuestionPanel();
+                    }
+                });
+            });
         }
 
         function clearResponse() {
@@ -685,20 +1030,48 @@
             renderQuestionPanel();
         }
 
-        function submitQuiz() {
-            // Final save of current answer before submission
-            saveAnswer();
+        // Function to show submit confirmation modal
+        function showSubmitModal() {
+            document.getElementById('submitModal').style.display = 'flex';
+        }
 
-            // Prepare answers for submission (only submitted questions)
+        // Function to hide submit confirmation modal
+        function hideSubmitModal() {
+            document.getElementById('submitModal').style.display = 'none';
+        }
+
+        // Add event listeners for modal buttons
+        document.getElementById('confirmSubmit').addEventListener('click', function() {
+            hideSubmitModal();
+            submitQuiz();
+        });
+
+        document.getElementById('cancelSubmit').addEventListener('click', function() {
+            hideSubmitModal();
+        });
+
+        // Modify the submit button click handler
+        document.getElementById('submitQuizBtn').addEventListener('click', function() {
+            showSubmitModal();
+        });
+
+        function submitQuiz() {
+            if (isQuizSubmitted) return; // Prevent multiple submissions
+            isQuizSubmitted = true;
+            
+            // Clear the timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            saveAnswer();
             const finalAnswers = answers.map((answer, index) => {
-                // Only include answers for questions that were actually visited and potentially answered
                 if (answer !== null) {
                     return { questionIndex: index, answer: answer.answer };
                 }
                 return null;
-            }).filter(Boolean); // Remove null entries
+            }).filter(Boolean);
 
-            // Submit without showing popup
             fetch('/student/startquiz/submit-quiz', {
                 method: 'POST',
                 headers: {
@@ -706,22 +1079,25 @@
                 },
                 body: JSON.stringify({
                     quizName: quizDataGlobal.quizName,
-                    studentUsername: quizDataGlobal.studentUsername, // Assuming studentUsername is also available directly on quizDataGlobal, if not, it needs to be passed from the backend
                     answers: finalAnswers
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Redirect directly to results page without showing popup
-                    window.location.href = `/student/result/${encodeURIComponent(quizDataGlobal.quizName)}`;
+                    // Store in sessionStorage that quiz is completed
+                    sessionStorage.setItem(`quiz_completed_${quizDataGlobal.quizName}`, 'true');
+                    // Redirect to completion page
+                    window.location.href = `/student/quiz-completion/${encodeURIComponent(quizDataGlobal.quizName)}`;
                 } else {
                     alert('Quiz submission failed: ' + data.message);
+                    isQuizSubmitted = false; // Reset submission flag if failed
                 }
             })
             .catch(error => {
                 console.error('Error submitting quiz:', error);
                 alert('Error submitting quiz. Please try again.');
+                isQuizSubmitted = false; // Reset submission flag if failed
             });
         }
 
@@ -731,7 +1107,6 @@
             questionGrid.innerHTML = '';
             questionStatuses.forEach((status, index) => {
                 const item = document.createElement('div');
-                // `status` directly maps to the CSS class suffix (0-4)
                 item.className = `question-grid-item status-${status} ${index === currentQuestionIndex ? 'current' : ''}`;
                 item.textContent = index + 1;
                 item.onclick = () => showQuestion(index);
@@ -757,29 +1132,80 @@
         document.getElementById('prevQuestionBtn').addEventListener('click', prevQuestion);
         document.getElementById('saveNextBtn').addEventListener('click', nextQuestion);
         document.getElementById('clearResponseBtn').addEventListener('click', clearResponse);
-        document.getElementById('submitQuizBtn').addEventListener('click', submitQuiz);
+        document.getElementById('submitQuizBtn').addEventListener('click', function() {
+            showSubmitModal();
+        });
+
+        // Add event listeners for the new review buttons
+        document.getElementById('markReviewBtn').addEventListener('click', function() {
+            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOption) {
+                // If answered, mark as Answered & Marked for Review (4)
+                questionStatuses[currentQuestionIndex] = 4;
+            } else {
+                // If not answered, mark as Marked for Review (2)
+                questionStatuses[currentQuestionIndex] = 2;
+            }
+            renderQuestionPanel();
+        });
+
+        document.getElementById('answeredReviewBtn').addEventListener('click', function() {
+            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOption) {
+                // Only mark as Answered & Marked for Review (4) if there's an answer
+                questionStatuses[currentQuestionIndex] = 4;
+                renderQuestionPanel();
+            } else {
+                showToast("Please select an answer before marking for review.");
+            }
+        });
 
         // Function to enter fullscreen mode
-        function enterFullscreen() {
-            document.body.classList.add('fullscreen-mode');
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.documentElement.webkitRequestFullscreen) {
-                document.documentElement.webkitRequestFullscreen();
-            } else if (document.documentElement.msRequestFullscreen) {
-                document.documentElement.msRequestFullscreen();
+        async function enterFullscreen() {
+            const element = document.documentElement;
+            try {
+                if (element.requestFullscreen) {
+                    await element.requestFullscreen();
+                } else if (element.webkitRequestFullscreen) {
+                    await element.webkitRequestFullscreen();
+                } else if (element.mozRequestFullScreen) {
+                    await element.mozRequestFullScreen();
+                } else if (element.msRequestFullscreen) {
+                    await element.msRequestFullscreen();
+                }
+                isFullscreen = true;
+                // Hide all overlays and show the quiz content
+                document.getElementById('fullscreenOverlay').style.display = 'none';
+                document.getElementById('exitFullscreenWarning').style.display = 'none';
+                document.querySelector('.top-bar').style.display = 'flex';
+                document.querySelector('.quiz-wrapper').style.display = 'flex';
+            } catch (error) {
+                console.error('Error entering fullscreen:', error);
+                alert('Please allow fullscreen mode to continue with the quiz.');
             }
         }
 
-        // Function to exit fullscreen mode
-        function exitFullscreen() {
-            document.body.classList.remove('fullscreen-mode');
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
+        // Handle fullscreen changes
+        function handleFullscreenChange() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && !document.msFullscreenElement) {
+                if (isFullscreen) {
+                    fullscreenWarnings++;
+                    if (fullscreenWarnings >= 3) {
+                        submitQuiz();
+                    } else {
+                        document.getElementById('warningCount').textContent = fullscreenWarnings;
+                        document.getElementById('exitFullscreenWarning').style.display = 'flex';
+                        document.querySelector('.top-bar').style.display = 'none';
+                        document.querySelector('.quiz-wrapper').style.display = 'none';
+                    }
+                }
+            } else {
+                isFullscreen = true;
+                document.getElementById('fullscreenOverlay').style.display = 'none';
+                document.getElementById('exitFullscreenWarning').style.display = 'none';
+                document.querySelector('.top-bar').style.display = 'flex';
+                document.querySelector('.quiz-wrapper').style.display = 'flex';
             }
         }
 
@@ -789,56 +1215,83 @@
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
         document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-        function handleFullscreenChange() {
-            if (!document.fullscreenElement && 
-                !document.webkitFullscreenElement && 
-                !document.mozFullScreenElement && 
-                !document.msFullscreenElement) {
-                // User exited fullscreen, prevent it
-                enterFullscreen();
-            }
+        // Add event listener for the fullscreen button
+        document.getElementById('startFullscreenBtn').addEventListener('click', enterFullscreen);
+
+        // Developer Tools Detection
+        let devtools = function() {};
+        devtools.toString = function() {
+            document.getElementById('devtoolsWarning').style.display = 'flex';
+            setTimeout(() => {
+                submitQuiz();
+            }, 2000);
+            return '';
         }
 
-        // Prevent right-click
+        // Block right-click
         document.addEventListener('contextmenu', function(e) {
-            if (document.body.classList.contains('fullscreen-mode')) {
+            e.preventDefault();
+            return false;
+        });
+
+        // Block keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || // Ctrl+Shift+I or Ctrl+Shift+J
+                (e.ctrlKey && e.keyCode === 85) || // Ctrl+U
+                (e.keyCode === 123) // F12
+            ) {
                 e.preventDefault();
                 return false;
             }
         });
 
-        // Prevent keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (document.body.classList.contains('fullscreen-mode')) {
-                // Prevent common keyboard shortcuts
-                if ((e.ctrlKey || e.metaKey) && (
-                    e.key === 'c' || // Copy
-                    e.key === 'v' || // Paste
-                    e.key === 'a' || // Select all
-                    e.key === 'p' || // Print
-                    e.key === 's' || // Save
-                    e.key === 'u' || // View source
-                    e.key === 'i' || // Inspect
-                    e.key === 'j' || // Console
-                    e.key === 'k' || // Search
-                    e.key === 'r' || // Reload
-                    e.key === 'f'    // Find
-                )) {
-                    e.preventDefault();
-                    return false;
+        // Add this function to detect tab switching
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                if (isFullscreen) {
+                    tabSwitchCount++;
+                    if (tabSwitchCount >= 3) {
+                        submitQuiz();
+                    } else {
+                        document.getElementById('warningCount').textContent = tabSwitchCount;
+                        document.getElementById('exitFullscreenWarning').style.display = 'flex';
+                        document.querySelector('.top-bar').style.display = 'none';
+                        document.querySelector('.quiz-wrapper').style.display = 'none';
+                    }
                 }
+            } else {
+                lastActiveTime = Date.now();
             }
-        });
+        }
 
-        // Enter fullscreen mode when quiz starts
-        window.addEventListener('load', function() {
-            enterFullscreen();
-        });
+        // Add visibility change event listener
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Fetch quiz data on page load
+        // Modify the DOMContentLoaded event listener
         document.addEventListener('DOMContentLoaded', function() {
             const pathParts = window.location.pathname.split('/');
-            const quizName = pathParts[pathParts.length - 1]; // e.g., "demo112233"
+            const quizName = pathParts[pathParts.length - 1];
+
+            // Check if quiz is already completed
+            if (sessionStorage.getItem(`quiz_completed_${quizName}`) === 'true') {
+                window.location.replace('/student');
+                return;
+            }
+
+            // Prevent going back to quiz-start page
+            window.history.pushState(null, '', window.location.href);
+            window.onpopstate = function() {
+                window.history.pushState(null, '', window.location.href);
+                // Force redirect to dashboard if user tries to go back
+                window.location.replace('/student');
+            };
+
+            // Show the fullscreen overlay initially
+            document.getElementById('fullscreenOverlay').style.display = 'flex';
+            document.getElementById('exitFullscreenWarning').style.display = 'none';
+            document.querySelector('.top-bar').style.display = 'none';
+            document.querySelector('.quiz-wrapper').style.display = 'none';
 
             console.log(`Attempting to fetch quiz data for quiz: ${quizName}`);
 
@@ -847,7 +1300,7 @@
                     console.log('Raw response from quiz data API:', response);
                     if (!response.ok) {
                         if (response.status === 401) {
-                            window.location.href = '/login'; // Redirect to login if unauthorized
+                            window.location.href = '/login';
                             return null;
                         }
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -876,6 +1329,24 @@
                     `;
                 });
         });
+
+        // Add toast message function
+        function showToast(message, type = 'error') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            toastContainer.appendChild(toast);
+            
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('hide');
+                setTimeout(() => {
+                    toastContainer.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
     </script>
 </body>
 </html>

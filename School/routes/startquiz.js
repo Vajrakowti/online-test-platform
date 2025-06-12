@@ -135,7 +135,7 @@ function loadQuizData(quiz) {
                 name: 'Questions', // Default section name for manual quizzes
                 questions: shuffleArray(formattedQuestions)
             }]
-        }; // Return an object with sections property
+        };
     }
     throw new Error('Invalid quiz type');
 }
@@ -250,17 +250,13 @@ router.get('/:quizName', async (req, res) => {
         const now = getISTNow();
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         
-        // Ensure the quiz time is valid before attempting to parse
         if (!quiz.startTime || !quiz.endTime) {
             throw new Error("Quiz start or end time is not defined.");
         }
 
-        let durationFormatted = "";
-        let totalQuestions = 0; // Initialize total questions
-
         if (quiz.startTime <= currentTime) {
             try {
-                durationFormatted = calculateDuration(quiz);
+                calculateDuration(quiz);
             } catch (err) {
                 await client.close();
                 return res.status(400).send(err.message);
@@ -270,18 +266,46 @@ router.get('/:quizName', async (req, res) => {
             return res.status(400).send("This quiz has not started yet.");
         }
 
-        const processedQuizData = loadQuizData(quiz); // This will now always return { sections: [...] }
-
-        // Calculate total questions from processed sections
-        if (processedQuizData.sections) {
-            totalQuestions = processedQuizData.sections.reduce((sum, section) => sum + section.questions.length, 0);
-        }
-
         await client.close();
-        res.sendFile(path.join(__dirname, "../public/quiz.html"));
+        res.sendFile(path.join(__dirname, "../public/quiz-start.html"));
     } catch (error) {
         console.error('Error loading quiz for student:', error);
         res.status(500).send('Error loading quiz: ' + error.message);
+    }
+});
+
+// Add new route for the actual quiz page
+router.get('/quiz/:quizName', async (req, res) => {
+    const quizName = req.params.quizName;
+    try {
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.redirect('/login');
+        }
+        
+        res.sendFile(path.join(__dirname, "../public/quiz.html"));
+    } catch (error) {
+        console.error('Error loading quiz page:', error);
+        res.status(500).send('Error loading quiz page: ' + error.message);
+    }
+});
+
+// Add new route for quiz results
+router.get('/results/:quizName', async (req, res) => {
+    const quizName = req.params.quizName;
+    try {
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.redirect('/login');
+        }
+
+        // Check if quiz was completed in this session
+        if (!req.session.completedQuizzes || !req.session.completedQuizzes[quizName]) {
+            return res.redirect('/student');
+        }
+        
+        res.sendFile(path.join(__dirname, "../public/quiz-results.html"));
+    } catch (error) {
+        console.error('Error loading results page:', error);
+        res.status(500).send('Error loading results page: ' + error.message);
     }
 });
 
@@ -401,8 +425,7 @@ router.post('/submit-quiz', async (req, res) => {
         console.log(`Debug - questionMarks (local variable): ${questionMarks}`);
         console.log('Debug - Student Answers:', answers);
 
-        // Flatten all correct answers for easy lookup
-        const correctAnswersMap = new Map(); // Map globalIndex to correctAnswers array
+        const correctAnswersMap = new Map();
         let globalIdxCounter = 0;
         fullQuizData.sections.forEach(section => {
             section.questions.forEach(q => {
@@ -449,13 +472,15 @@ router.post('/submit-quiz', async (req, res) => {
             submittedAt: new Date()
         });
 
+        // Store quiz completion in session
+        req.session.completedQuizzes = req.session.completedQuizzes || {};
+        req.session.completedQuizzes[quizName] = true;
+
         await client.close();
+
         res.json({ 
             success: true, 
-            score: score,
-            totalMarks: totalMarks,
-            negativeMarking: negativeMarking,
-            questionMarks: questionMarks
+            message: 'Quiz submitted successfully'
         });
 
     } catch (error) {
