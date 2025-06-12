@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Quiz</title>
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #f8f9fc;
+            --text-color: #5a5c69;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            background-color: var(--secondary-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .start-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .start-header {
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+
+        .start-button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .start-button:hover {
+            background-color: #3756a4;
+        }
+
+        .instructions {
+            color: var(--text-color);
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="start-container">
+        <h1 class="start-header">Start Quiz</h1>
+        <div class="instructions">
+            <p>Please click the button below to start the quiz.</p>
+            <p>Note: The quiz will start in fullscreen mode.</p>
+        </div>
+        <button class="start-button" id="startQuizBtn">Start Quiz</button>
+    </div>
+
+    <script>
+        document.getElementById('startQuizBtn').addEventListener('click', function() {
+            // Get the quiz name from URL
+            const pathParts = window.location.pathname.split('/');
+            const quizName = pathParts[pathParts.length - 1];
+            
+            // Redirect to the quiz page
+            window.location.href = `/student/startquiz/quiz/${quizName}`;
+        });
+    </script>
+</body>
+</html> 

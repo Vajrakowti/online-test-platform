@@ -248,17 +248,13 @@ router.get('/:quizName', async (req, res) => {
         const now = getISTNow();
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         
-        // Ensure the quiz time is valid before attempting to parse
         if (!quiz.startTime || !quiz.endTime) {
             throw new Error("Quiz start or end time is not defined.");
         }
 
-        let durationFormatted = "";
-        let totalQuestions = 0; // Initialize total questions
-
         if (quiz.startTime <= currentTime) {
             try {
-                durationFormatted = calculateDuration(quiz);
+                calculateDuration(quiz);
             } catch (err) {
                 await client.close();
                 return res.status(400).send(err.message);
@@ -268,18 +264,46 @@ router.get('/:quizName', async (req, res) => {
             return res.status(400).send("This quiz has not started yet.");
         }
 
-        const processedQuizData = loadQuizData(quiz); // This will now always return { sections: [...] }
-
-        // Calculate total questions from processed sections
-        if (processedQuizData.sections) {
-            totalQuestions = processedQuizData.sections.reduce((sum, section) => sum + section.questions.length, 0);
-        }
-
         await client.close();
-        res.sendFile(path.join(__dirname, "../public/quiz.html"));
+        res.sendFile(path.join(__dirname, "../public/quiz-start.html"));
     } catch (error) {
         console.error('Error loading quiz for student:', error);
         res.status(500).send('Error loading quiz: ' + error.message);
+    }
+});
+
+// Add new route for the actual quiz page
+router.get('/quiz/:quizName', async (req, res) => {
+    const quizName = req.params.quizName;
+    try {
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.redirect('/login');
+        }
+        
+        res.sendFile(path.join(__dirname, "../public/quiz.html"));
+    } catch (error) {
+        console.error('Error loading quiz page:', error);
+        res.status(500).send('Error loading quiz page: ' + error.message);
+    }
+});
+
+// Add new route for quiz results
+router.get('/results/:quizName', async (req, res) => {
+    const quizName = req.params.quizName;
+    try {
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.redirect('/login');
+        }
+
+        // Check if quiz was completed in this session
+        if (!req.session.completedQuizzes || !req.session.completedQuizzes[quizName]) {
+            return res.redirect('/student');
+        }
+        
+        res.sendFile(path.join(__dirname, "../public/quiz-results.html"));
+    } catch (error) {
+        console.error('Error loading results page:', error);
+        res.status(500).send('Error loading results page: ' + error.message);
     }
 });
 
@@ -367,21 +391,13 @@ router.post('/submit-quiz', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Quiz not found.' });
         }
 
-        // Check if the quiz has already been attempted by this student
-        // const existingAttempt = await attemptsCollection.findOne({ studentId: studentUsername, quizName: quizName });
-        // if (existingAttempt) {
-        //     return res.status(400).json({ success: false, message: 'Quiz already submitted.' });
-        // }
-
-        // Load the full quiz data with questions and correct answers
-        const fullQuizData = loadQuizData(quizConfig); // This gets { sections: [...] }
+        const fullQuizData = loadQuizData(quizConfig);
 
         let score = 0;
         let totalQuestions = 0;
         const studentAnswers = [];
 
-        // Flatten all correct answers for easy lookup
-        const correctAnswersMap = new Map(); // Map globalIndex to correctAnswers array
+        const correctAnswersMap = new Map();
         let globalIdxCounter = 0;
         fullQuizData.sections.forEach(section => {
             section.questions.forEach(q => {
@@ -391,7 +407,6 @@ router.post('/submit-quiz', async (req, res) => {
             });
         });
 
-        // Calculate score based on submitted answers
         answers.forEach(submittedAnswer => {
             const questionGlobalIndex = submittedAnswer.questionIndex;
             const submittedOption = submittedAnswer.answer;
@@ -407,7 +422,6 @@ router.post('/submit-quiz', async (req, res) => {
             });
         });
 
-        // Save the attempt details
         const attempt = {
             quizName: quizName,
             studentId: studentUsername,
@@ -419,7 +433,16 @@ router.post('/submit-quiz', async (req, res) => {
 
         await attemptsCollection.insertOne(attempt);
 
-        res.json({ success: true, message: 'Quiz submitted successfully', score: score, totalQuestions: totalQuestions });
+        // Store quiz completion in session
+        req.session.completedQuizzes = req.session.completedQuizzes || {};
+        req.session.completedQuizzes[quizName] = true;
+
+        // Return success response with redirect URL
+        res.json({ 
+            success: true, 
+            message: 'Quiz submitted successfully',
+            redirectUrl: `/student/startquiz/results/${quizName}?score=${score}&total=${totalQuestions}&quizName=${encodeURIComponent(quizName)}`
+        });
 
     } catch (error) {
         console.error('Error during quiz submission:', error);

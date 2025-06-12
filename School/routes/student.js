@@ -753,7 +753,7 @@ router.get('/quiz/:quizName', async (req, res) => {
                                 <label for="agreeCheckbox">I have read and understood all the instructions</label>
                             </div>
                             
-                            <button id="startButton" class="start-btn" onclick="checkQuizTime()" disabled>Start Quiz</button>
+                            <button id="startButton" class="start-btn" onclick="checkQuizTime()" disabled>Next</button>
                         </div>
                     </div>
                     
@@ -1183,8 +1183,7 @@ router.get('/check-completed-quizzes', (req, res) => {
     }
     
     // Return completed quizzes from session if available
-    const completedQuizzes = (req.session.completedQuizzes || [])
-        .map(quiz => quiz.quizName);
+    const completedQuizzes = Object.keys(req.session.completedQuizzes || {});
     
     res.json(completedQuizzes);
 });
@@ -1421,6 +1420,180 @@ router.get('/api/result-data/:quizName', async (req, res) => {
             await client.close();
         }
     }
+});
+
+// Find and fix the route around line 1185
+router.get('/completed-quizzes', (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Convert completedQuizzes object to array of quiz names
+    const completedQuizzes = req.session.completedQuizzes || {};
+    const completedQuizNames = Object.keys(completedQuizzes).filter(quizName => completedQuizzes[quizName]);
+    
+    res.json(completedQuizNames);
+});
+
+// Update the dashboard route
+router.get('/dashboard', async (req, res) => {
+    try {
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.redirect('/login');
+        }
+
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Get all quizzes
+        const quizzes = await db.collection('quizzes').find({}).toArray();
+        
+        // Get completed quizzes from session
+        const completedQuizzes = req.session.completedQuizzes || {};
+        
+        // Process quizzes to add completion status
+        const processedQuizzes = quizzes.map(quiz => ({
+            ...quiz,
+            isCompleted: !!completedQuizzes[quiz.name]
+        }));
+
+        // Get student's attempts
+        const attempts = await db.collection('attempts')
+            .find({ studentId: req.session.username })
+            .toArray();
+
+        // Create a map of quiz attempts
+        const attemptMap = {};
+        attempts.forEach(attempt => {
+            attemptMap[attempt.quizName] = {
+                score: attempt.score,
+                totalQuestions: attempt.totalQuestions,
+                submittedAt: attempt.submittedAt
+            };
+        });
+
+        // Add attempt information to quizzes
+        const quizzesWithAttempts = processedQuizzes.map(quiz => ({
+            ...quiz,
+            attempt: attemptMap[quiz.name] || null
+        }));
+
+        await client.close();
+
+        res.render('student/dashboard', {
+            username: req.session.username,
+            quizzes: quizzesWithAttempts
+        });
+    } catch (error) {
+        console.error('Error loading student dashboard:', error);
+        res.status(500).send('Error loading dashboard: ' + error.message);
+    }
+});
+
+// Add new route for quiz completion page
+router.get('/quiz-completion/:quizName', (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.redirect('/login');
+    }
+
+    const quizName = req.params.quizName;
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Quiz Completed</title>
+            <style>
+                body {
+                    font-family: 'Nunito', sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    background-color: #f8f9fc;
+                }
+                .completion-card {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+                    text-align: center;
+                    max-width: 500px;
+                    width: 90%;
+                }
+                .completion-icon {
+                    font-size: 64px;
+                    color: #1cc88a;
+                    margin-bottom: 20px;
+                }
+                h1 {
+                    color: #4e73df;
+                    margin-bottom: 20px;
+                    font-size: 28px;
+                }
+                p {
+                    color: #5a5c69;
+                    margin-bottom: 30px;
+                    font-size: 16px;
+                    line-height: 1.6;
+                }
+                .button-container {
+                    display: flex;
+                    gap: 15px;
+                    justify-content: center;
+                }
+                .btn {
+                    padding: 12px 25px;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    text-decoration: none;
+                }
+                .btn-primary {
+                    background-color: #4e73df;
+                    color: white;
+                }
+                .btn-secondary {
+                    background-color: #858796;
+                    color: white;
+                }
+                .btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                }
+            </style>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        </head>
+        <body>
+            <div class="completion-card">
+                <div class="completion-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1>Quiz Completed Successfully!</h1>
+                <p>Thank you for completing the quiz. Your answers have been submitted successfully. You can now view your results in the dashboard.</p>
+                <div class="button-container">
+                    <a href="/student" class="btn btn-primary">Go to Dashboard</a>
+                    <a href="/student/result/${encodeURIComponent(quizName)}" class="btn btn-secondary">View Results</a>
+                </div>
+            </div>
+            <script>
+                // Prevent going back to quiz
+                window.history.pushState(null, '', window.location.href);
+                window.onpopstate = function() {
+                    window.history.pushState(null, '', window.location.href);
+                    window.location.replace('/student');
+                };
+            </script>
+        </body>
+        </html>
+    `);
 });
 
 module.exports = router;
