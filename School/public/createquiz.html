@@ -632,6 +632,42 @@
       opacity: 1 !important;
       pointer-events: auto !important;
     }
+
+    .form-group input[type="time"] {
+      width: 200px;
+    }
+
+    .negative-marking-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .negative-marking-container input[type="number"] {
+      width: 100px;
+    }
+
+    .negative-marking-info {
+      font-size: 0.85rem;
+      color: var(--text-color);
+      margin-top: 5px;
+    }
+
+    .question-marks-container {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .question-marks-info {
+      font-size: 0.85rem;
+      color: var(--text-color);
+      margin-top: 5px;
+    }
+
+    .form-group input[type="file"] {
+      padding: 11px;
+    }
   </style>
 </head>
 <body>
@@ -733,6 +769,22 @@
       </div>
       
       <div class="form-group">
+        <label class="required">Negative Marking:</label>
+        <div class="negative-marking-container">
+          <input type="number" name="negativeMarking" id="negativeMarking" min="0" max="1" step="0.25" value="0" required>
+          <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label class="required">Question Marks:</label>
+        <div class="question-marks-container">
+          <input type="number" name="questionMarks" id="questionMarks" min="1" value="1" required>
+          <span class="question-marks-info">(Enter marks for each question, default is 1)</span>
+        </div>
+      </div>
+      
+      <div class="form-group">
         <label>Quiz Sections:</label>
         <div id="sectionsContainer">
           <div class="section-item">
@@ -746,7 +798,7 @@
           </div>
         </div>
         <button type="button" class="btn btn-submit" onclick="addSection()">
-          <i class="fas fa-plus"></i> Add Section
+image.png          <i class="fas fa-plus"></i> Add Section
         </button>
       </div>
       
@@ -787,6 +839,22 @@
       <div class="form-group">
         <label class="required">End Time:</label>
         <input type="time" name="endTime" required>
+      </div>
+
+      <div class="form-group">
+        <label class="required">Negative Marking:</label>
+        <div class="negative-marking-container">
+          <input type="number" name="negativeMarking" min="0" max="1" step="0.25" value="0" required>
+          <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="required">Question Marks:</label>
+        <div class="question-marks-container">
+          <input type="number" name="questionMarks" min="1" value="1" required>
+          <span class="question-marks-info">(Enter marks for each question, default is 1)</span>
+        </div>
       </div>
 
       <button type="button" class="btn add-question-btn" onclick="addQuestion()">

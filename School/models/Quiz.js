@@ -91,6 +91,19 @@ const quizSchema = new mongoose.Schema({
     allowedStudents: {
         type: [String],
         default: []
+    },
+    negativeMarking: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 1,
+        default: 0
+    },
+    questionMarks: {
+        type: Number,
+        required: true,
+        min: 1,
+        default: 1
     }
 }, {
     timestamps: true

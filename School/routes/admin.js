@@ -1851,6 +1851,18 @@ router.post('/create-quiz', async (req, res) => {
       const sectionNames = Array.isArray(req.body.sectionNames) ? req.body.sectionNames : [req.body.sectionNames];
       const sectionFiles = req.files || [];
 
+      // Get negative marking value, default to 0 if not provided
+      const negativeMarking = parseFloat(req.body.negativeMarking) || 0;
+      if (negativeMarking < 0 || negativeMarking > 1) {
+        throw new Error('Negative marking must be between 0 and 1');
+      }
+
+      // Get question marks value, default to 1 if not provided
+      const questionMarks = parseInt(req.body.questionMarks) || 1;
+      if (questionMarks < 1) {
+        throw new Error('Question marks must be at least 1');
+      }
+
       if (!sectionFiles || sectionFiles.length === 0) {
         throw new Error('No Excel files uploaded');
       }
@@ -1870,6 +1882,8 @@ router.post('/create-quiz', async (req, res) => {
           name: name,
           file: sectionFiles[index].filename
         })),
+        negativeMarking: negativeMarking,
+        questionMarks: questionMarks,
         createdAt: new Date()
       };
 
@@ -1931,6 +1945,18 @@ router.post('/create-quiz-manual', async (req, res) => {
       if (!quizName || !quizClass || !startTime || !endTime) {
         throw new Error('Missing required quiz information');
       }
+
+      // Get negative marking value, default to 0 if not provided
+      const negativeMarking = parseFloat(req.body.negativeMarking) || 0;
+      if (negativeMarking < 0 || negativeMarking > 1) {
+        throw new Error('Negative marking must be between 0 and 1');
+      }
+      
+      // Get question marks value, default to 1 if not provided
+      const questionMarks = parseInt(req.body.questionMarks) || 1;
+      if (questionMarks < 1) {
+        throw new Error('Question marks must be at least 1');
+      }
       
       // Process questions using new field format
       const questions = [];
@@ -1982,11 +2008,18 @@ router.post('/create-quiz-manual', async (req, res) => {
       // Create quiz object
       const quiz = {
         name: quizName,
-        startTime: startTime,
-        endTime: endTime,
         class: quizClass,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
         type: 'manual',
-        questions: questions
+        sections: [{
+          name: 'Questions',
+          description: 'Quiz Questions',
+          file: '',
+          questions: questions
+        }],
+        negativeMarking: negativeMarking,
+        questionMarks: questionMarks
       };
 
       // Store in MongoDB

@@ -868,187 +868,155 @@ router.get('/quiz/:quizName', async (req, res) => {
 
 // Attempt Result Page
 router.get('/result/:quizName', async (req, res) => {
-    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
+    if (!req.session.username || req.session.role !== 'student') {
         return res.redirect('/login');
     }
 
     const quizName = decodeURIComponent(req.params.quizName);
     const studentUsername = req.session.username;
 
+    let client;
     try {
-        // Connect to MongoDB using admin-specific database
-        const client = new MongoClient(url);
+        client = new MongoClient(url);
         await client.connect();
         const db = client.db(req.session.adminDb);
-        const attemptsCollection = db.collection('attempts');
-        
-        // Get the latest attempt for this quiz
-        const attempt = await attemptsCollection.findOne(
-            { 
-                studentId: studentUsername,
-                quizName: quizName
-            },
-            { sort: { attemptedAt: -1 } }
-        );
 
-        await client.close();
-        
+        const attempt = await db.collection('attempts').findOne({
+            studentId: studentUsername,
+            quizName: quizName
+        });
+
         if (!attempt) {
-            return res.status(404).send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>No Attempts Found</title>
-                    <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                            padding: 20px;
-                            background-color: #f4f4f4;
-                            text-align: center;
-                        }
-                        .error-container {
-                            background: white;
-                            padding: 30px;
-                            border-radius: 8px;
-                            max-width: 500px;
-                            margin: 50px auto;
-                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                        }
-                        .back-btn {
-                            display: inline-block;
-                            margin-top: 20px;
-                            padding: 10px 20px;
-                            background-color: #6c757d;
-                            color: white;
-                            text-decoration: none;
-                            border-radius: 4px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="error-container">
-                        <h2>No Attempt Found</h2>
-                        <p>No quiz attempts were found for your account.</p>
-                        <a href="/student" class="back-btn">Back to Dashboard</a>
-                    </div>
-                </body>
-                </html>
-            `);
+            await client.close();
+            return res.status(404).send('Quiz attempt not found.');
         }
 
-        const percentage = Math.round((attempt.score / attempt.totalQuestions) * 100);
-        
+        const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
+
+        if (!quizConfig) {
+            await client.close();
+            return res.status(404).send('Quiz configuration not found.');
+        }
+
+        // Calculate percentage using totalMarks instead of totalQuestions
+        const percentage = (attempt.totalMarks > 0) 
+                           ? ((attempt.score / attempt.totalMarks) * 100).toFixed(2)
+                           : 0; // Handle division by zero
+
+        await client.close();
+
+        // Render the result page with dynamic data
         res.send(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Quiz Result - ${quizName}</title>
+                <title>Quiz Result</title>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
                 <style>
                     body {
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        padding: 20px;
-                        background-color: #f8f9fa;
+                        font-family: 'Nunito', sans-serif;
                         margin: 0;
-                        color: #333;
+                        background-color: #f0f2f5;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
                     }
                     .container {
-                        max-width: 800px;
-                        margin: 40px auto;
-                        padding: 0 20px;
+                        width: 100%;
+                        max-width: 900px;
+                        padding: 20px;
                     }
                     .card {
-                        background: white;
+                        background-color: white;
                         border-radius: 12px;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-                        overflow: hidden;
+                        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
                         display: flex;
+                        flex-wrap: wrap; /* Allow wrapping on smaller screens */
+                        overflow: hidden;
                     }
                     .card-left {
-                        flex: 1;
+                        flex: 1; /* Take available space */
                         padding: 40px;
-                        border-right: 1px solid #eee;
-                    }
-                    .card-right {
-                        width: 250px;
-                        padding: 40px;
-                        background: #f9f9f9;
                         display: flex;
                         flex-direction: column;
-                        align-items: center;
                         justify-content: center;
+                        align-items: flex-start;
+                        min-width: 300px; /* Ensure a minimum width */
                     }
-                    .result-header {
-                        margin-bottom: 30px;
+                    .card-right {
+                        flex: 1; /* Take available space */
+                        padding: 40px;
+                        background-color: #f8f9fc;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        min-width: 300px; /* Ensure a minimum width */
                     }
                     .result-header h2 {
-                        font-size: 18px;
-                        color: #666;
-                        margin: 0;
-                        font-weight: 500;
+                        color: #4e73df;
+                        font-size: 1.8rem;
+                        margin-bottom: 10px;
                     }
                     .result-header h1 {
-                        font-size: 28px;
-                        margin: 5px 0 0;
-                        color: #2c3e50;
+                        color: #5a5c69;
+                        font-size: 2.5rem;
+                        margin-bottom: 20px;
+                        line-height: 1.2;
                     }
                     .divider {
-                        height: 1px;
-                        background: linear-gradient(to right,rgb(0, 0, 0),rgb(0, 0, 0));
-                        margin: 20px 0;
-                        border-radius: 3px;
+                        width: 80px;
+                        height: 4px;
+                        background-color: #4e73df;
+                        margin-bottom: 25px;
+                        border-radius: 2px;
                     }
                     .progress-container {
                         position: relative;
-                        width: 150px;
-                        height: 150px;
-                        margin: 20px 0;
+                        width: 160px;
+                        height: 160px;
+                        margin-bottom: 30px;
                     }
                     .progress-circle {
-                        width: 100%;
-                        height: 100%;
+                        transform: rotate(-90deg);
                     }
                     .progress-circle-bg {
+                        stroke: #e6e6e6;
+                        stroke-width: 10;
                         fill: none;
-                        stroke: #eee;
-                        stroke-width: 8;
                     }
                     .progress-circle-fill {
-                        fill: none;
-                        stroke: #4CAF50;
-                        stroke-width: 8;
+                        stroke: #1cc88a;
+                        stroke-width: 10;
                         stroke-linecap: round;
-                        stroke-dasharray: 440;
+                        fill: none;
+                        transition: stroke-dashoffset 0.5s ease-out;
+                        stroke-dasharray: 440; /* 2 * PI * 70 (radius) */
                         stroke-dashoffset: calc(440 - (440 * ${percentage}) / 100);
-                        transform: rotate(-90deg);
-                        transform-origin: 50% 50%;
-                        animation: progress 1.5s ease-out forwards;
                     }
                     .progress-text {
                         position: absolute;
                         top: 50%;
                         left: 50%;
                         transform: translate(-50%, -50%);
-                        font-size: 28px;
-                        font-weight: bold;
-                        color: #4CAF50;
+                        font-size: 2.5rem;
+                        font-weight: 700;
+                        color: #1cc88a;
                     }
                     .marks-container {
                         text-align: center;
-                        margin-top: 10px;
+                        margin-bottom: 20px;
                     }
                     .marks-title {
-                        font-size: 20px;
+                        font-size: 1.2rem;
                         color: #666;
-                        margin-bottom: 5px;
-                        font-weight : bold;
+                        margin-bottom: 10px;
                     }
                     .marks-value {
-                        font-size: 22px;
-                        font-weight: bold;
-                    }
-                    .marks-value span:first-child {
-                        color: #4CAF50;
-                        font-size: 50px;
+                        font-size: 3.5rem;
+                        font-weight: 700;
+                        color: #1cc88a;
                     }
                     .marks-value span:last-child {
                         color: #666;
@@ -1112,11 +1080,11 @@ router.get('/result/:quizName', async (req, res) => {
                                 <div class="marks-title">Marks</div>
                                 <div class="marks-value">
                                     <span>${attempt.score}</span>
-                                    <span> / ${attempt.totalQuestions}</span>
+                                    <span> / ${attempt.totalMarks}</span>
                                 </div>
                             </div>
                             <div class="completed-date">
-                                Completed on ${new Date(attempt.attemptedAt).toLocaleDateString('en-US', { 
+                                Completed on ${new Date(attempt.submittedAt).toLocaleDateString('en-US', { 
                                     year: 'numeric', 
                                     month: 'long', 
                                     day: 'numeric',

@@ -129,6 +129,8 @@ function loadQuizData(quiz) {
         }));
         
         return {
+            quizName: quiz.name,
+            negativeMarking: quiz.negativeMarking || 0,
             sections: [{
                 name: 'Questions', // Default section name for manual quizzes
                 questions: shuffleArray(formattedQuestions)
@@ -304,6 +306,10 @@ router.get('/api/quiz-data/:quizName', async (req, res) => {
             return res.status(404).json({ error: 'Quiz not found.' });
         }
 
+        console.log(`[API Endpoint] Fetched quiz config: ${JSON.stringify(quiz)}`);
+        console.log(`[API Endpoint] quiz.negativeMarking: ${quiz.negativeMarking}`);
+        console.log(`[API Endpoint] quiz.questionMarks: ${quiz.questionMarks}`);
+
         const now = getISTNow();
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         
@@ -334,10 +340,12 @@ router.get('/api/quiz-data/:quizName', async (req, res) => {
         await client.close();
 
         res.json({
-            quiz: quiz,
-            quizData: processedQuizData,
-            duration: durationFormatted,
-            totalQuestions: totalQuestions
+            quizName: quiz.name,
+            negativeMarking: quiz.negativeMarking || 0,
+            questionMarks: quiz.questionMarks || 1,
+            sections: processedQuizData.sections,
+            totalQuestions: totalQuestions,
+            duration: durationFormatted
         });
 
     } catch (error) {
@@ -367,6 +375,10 @@ router.post('/submit-quiz', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Quiz not found.' });
         }
 
+        console.log(`[Submit Quiz] Fetched quizConfig from DB: ${JSON.stringify(quizConfig)}`);
+        console.log(`[Submit Quiz] quizConfig.negativeMarking: ${quizConfig.negativeMarking}`);
+        console.log(`[Submit Quiz] quizConfig.questionMarks: ${quizConfig.questionMarks}`);
+
         // Check if the quiz has already been attempted by this student
         // const existingAttempt = await attemptsCollection.findOne({ studentId: studentUsername, quizName: quizName });
         // if (existingAttempt) {
@@ -377,8 +389,17 @@ router.post('/submit-quiz', async (req, res) => {
         const fullQuizData = loadQuizData(quizConfig); // This gets { sections: [...] }
 
         let score = 0;
-        let totalQuestions = 0;
+        let totalMarks = 0; // Total possible marks
         const studentAnswers = [];
+        const negativeMarking = quizConfig.negativeMarking || 0;
+        const questionMarks = quizConfig.questionMarks || 1;
+
+        console.log(`Debug - Quiz Name: ${quizName}`);
+        console.log(`Debug - quizConfig.negativeMarking: ${quizConfig.negativeMarking}`);
+        console.log(`Debug - negativeMarking (local variable): ${negativeMarking}`);
+        console.log(`Debug - quizConfig.questionMarks: ${quizConfig.questionMarks}`);
+        console.log(`Debug - questionMarks (local variable): ${questionMarks}`);
+        console.log('Debug - Student Answers:', answers);
 
         // Flatten all correct answers for easy lookup
         const correctAnswersMap = new Map(); // Map globalIndex to correctAnswers array
@@ -386,40 +407,56 @@ router.post('/submit-quiz', async (req, res) => {
         fullQuizData.sections.forEach(section => {
             section.questions.forEach(q => {
                 correctAnswersMap.set(globalIdxCounter, q.correctAnswers);
-                totalQuestions++;
+                totalMarks += questionMarks; // Add to total possible marks
                 globalIdxCounter++;
             });
         });
 
-        // Calculate score based on submitted answers
-        answers.forEach(submittedAnswer => {
-            const questionGlobalIndex = submittedAnswer.questionIndex;
-            const submittedOption = submittedAnswer.answer;
-            const correctOptions = correctAnswersMap.get(questionGlobalIndex);
-
-            if (correctOptions && correctOptions.includes(submittedOption)) {
-                score++;
+        // Process each answer
+        answers.forEach(answer => {
+            const { questionIndex, answer: studentAnswer } = answer;
+            const correctAnswers = correctAnswersMap.get(questionIndex);
+            
+            if (correctAnswers) {
+                if (correctAnswers.includes(studentAnswer)) {
+                    score += questionMarks; // Correct answer with question marks
+                } else if (studentAnswer !== null) {
+                    // Calculate negative marks based on the question marks
+                    const negativeMarks = questionMarks * negativeMarking;
+                    score -= negativeMarks; // Wrong answer with negative marking
+                    console.log(`Debug - Question Index: ${questionIndex}, Student Answer: ${studentAnswer}, Correct Answers: ${correctAnswers}, Marks Deducted: ${negativeMarks}, Current Score: ${score}`);
+                }
             }
+            
             studentAnswers.push({
-                questionIndex: questionGlobalIndex,
-                submittedAnswer: submittedOption,
-                isCorrect: correctOptions && correctOptions.includes(submittedOption)
+                questionIndex,
+                answer: studentAnswer,
+                isCorrect: correctAnswers ? correctAnswers.includes(studentAnswer) : false,
+                marks: correctAnswers && correctAnswers.includes(studentAnswer) ? questionMarks : 
+                       (studentAnswer !== null ? -(questionMarks * negativeMarking) : 0)
             });
         });
 
-        // Save the attempt details
-        const attempt = {
-            quizName: quizName,
+        // Save the attempt
+        await attemptsCollection.insertOne({
             studentId: studentUsername,
+            quizName: quizName,
             score: score,
-            totalQuestions: totalQuestions,
+            totalMarks: totalMarks,
             answers: studentAnswers,
-            submittedAt: getISTNow()
-        };
+            negativeMarking: negativeMarking,
+            questionMarks: questionMarks,
+            submittedAt: new Date()
+        });
 
-        await attemptsCollection.insertOne(attempt);
-
-        res.json({ success: true, message: 'Quiz submitted successfully', score: score, totalQuestions: totalQuestions });
+        await client.close();
+        res.json({ 
+            success: true, 
+            score: score,
+            totalMarks: totalMarks,
+            negativeMarking: negativeMarking,
+            questionMarks: questionMarks
+        });
 
     } catch (error) {
         console.error('Error during quiz submission:', error);

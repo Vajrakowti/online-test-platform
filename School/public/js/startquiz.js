@@ -56,46 +56,48 @@ function startTimer(duration) {
 
 // Function to submit the quiz
 async function submitQuiz() {
-    if (!currentQuiz) return;
-    
-    const answers = [];
-    let score = 0;
-    
-    currentQuiz.forEach((question, index) => {
-        const selectedOption = document.querySelector(`input[name="q${index}"]:checked`);
-        const answer = selectedOption ? selectedOption.value : null;
-        answers.push(answer);
-        
-        // Check if the answer is correct
-        const [_, __, ___, ____, _____, correctAnswers] = question;
-        if (correctAnswers.includes(answer)) {
-            score++;
+    if (!quizDataGlobal || !allQuestionsFlat || allQuestionsFlat.length === 0) {
+        console.error("Quiz data not loaded or invalid for submission.");
+        return;
+    }
+
+    const studentAnswers = [];
+    answers.forEach(answer => {
+        if (answer) { // Only push if an answer exists (not null from clear response)
+            studentAnswers.push(answer);
         }
     });
-    
+
+    const quizName = quizDataGlobal.quiz.name; // Get quizName from the global data
+
+    let client;
     try {
-        const response = await fetch('/student/save-attempt', {
+        // The /submit-quiz endpoint is in startquiz.js on the server side
+        const response = await fetch('/student/submit-quiz', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 quizName,
-                score,
-                totalQuestions: currentQuiz.length,
-                answers
+                answers: studentAnswers // Send the collected answers
             })
         });
-        
+
         if (!response.ok) {
-            throw new Error('Failed to save attempt');
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to submit quiz');
         }
-        
+
         // Redirect to results page
         window.location.href = `/student/result/${encodeURIComponent(quizName)}`;
     } catch (err) {
         console.error('Error submitting quiz:', err);
-        alert('Failed to save your quiz attempt. Please try again.');
+        alert('Failed to submit your quiz attempt. Please try again: ' + err.message);
+    } finally {
+        if (client) {
+            // client.close(); // Client is not used here, only on server-side
+        }
     }
 }
 

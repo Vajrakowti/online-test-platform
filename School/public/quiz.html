@@ -45,11 +45,26 @@
         }
 
         .timer-container {
-            font-size: 1.2rem;
-            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            font-size: 1.2em;
+            color: var(--text-color);
+        }
+
+        .negative-marking-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1em;
+            color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        .negative-marking-info i {
+            color: #e74c3c;
         }
 
         .quiz-wrapper {
@@ -315,6 +330,69 @@
                 padding: 20px;
             }
         }
+
+        /* Full screen mode styles */
+        body.fullscreen-mode {
+            overflow: hidden;
+        }
+
+        body.fullscreen-mode .top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: var(--bg-color);
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        body.fullscreen-mode .quiz-wrapper {
+            margin-top: 80px;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+        }
+
+        body.fullscreen-mode .main-quiz-content {
+            max-width: 100%;
+            padding: 20px;
+        }
+
+        /* Prevent exiting fullscreen */
+        body.fullscreen-mode::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.1);
+            z-index: -1;
+        }
+
+        /* Disable right-click and other browser controls */
+        body.fullscreen-mode {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        body.fullscreen-mode * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Allow text selection in question text and options */
+        body.fullscreen-mode .question-text,
+        body.fullscreen-mode .option label {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
     </style>
 </head>
 <body>
@@ -323,6 +401,10 @@
         <div class="timer-container">
             <i class="far fa-clock"></i>
             <span id="timer">00:00:00</span>
+        </div>
+        <div class="negative-marking-info" id="negativeMarkingInfo" style="display: none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>Negative Marking: <span id="negativeMarkingValue">0</span></span>
         </div>
     </div>
 
@@ -376,18 +458,18 @@
 
         // Function to display the quiz content (questions, sections, options)
         function displayQuizContent() {
-            if (!quizDataGlobal || !quizDataGlobal.quizData || !quizDataGlobal.quizData.sections) {
+            if (!quizDataGlobal || !quizDataGlobal.sections) {
                 console.error("Quiz data not loaded or invalid.");
                 return;
             }
 
-            document.getElementById('quizNameHeader').textContent = quizDataGlobal.quiz.name;
+            document.getElementById('quizNameHeader').textContent = quizDataGlobal.quizName;
             updateTimer(quizDataGlobal.duration);
 
             // Flatten all questions and store their section context
             allQuestionsFlat = [];
             let globalIdxCounter = 0;
-            quizDataGlobal.quizData.sections.forEach((section, sectionIdx) => {
+            quizDataGlobal.sections.forEach((section, sectionIdx) => {
                 section.questions.forEach((question, qIdx) => {
                     allQuestionsFlat.push({
                         question: question.question,
@@ -446,10 +528,10 @@
             const sectionNavContainer = document.getElementById('sectionNavigation');
             sectionNavContainer.innerHTML = ''; // Clear existing
             
-            // Use a Set to get unique section names while preserving order from quizDataGlobal.quizData.sections
+            // Use a Set to get unique section names while preserving order from quizDataGlobal.sections
             const uniqueSectionNames = [];
             const seenSectionNames = new Set();
-            quizDataGlobal.quizData.sections.forEach(section => {
+            quizDataGlobal.sections.forEach(section => {
                 if (!seenSectionNames.has(section.name)) {
                     uniqueSectionNames.push(section.name);
                     seenSectionNames.add(section.name);
@@ -616,24 +698,23 @@
                 return null;
             }).filter(Boolean); // Remove null entries
 
-            console.log('Submitting answers:', finalAnswers);
-            // Example submission (replace with your actual submission endpoint)
-            fetch('/student/startquiz/submit-quiz', { // Assuming a /student/submit-quiz endpoint
+            // Submit without showing popup
+            fetch('/student/startquiz/submit-quiz', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    quizName: quizDataGlobal.quiz.name,
-                    studentUsername: quizDataGlobal.quiz.studentUsername, // You might need to get this from session
+                    quizName: quizDataGlobal.quizName,
+                    studentUsername: quizDataGlobal.studentUsername, // Assuming studentUsername is also available directly on quizDataGlobal, if not, it needs to be passed from the backend
                     answers: finalAnswers
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Quiz submitted successfully! Score: ' + data.score);
-                    window.location.href = `/student/result/${encodeURIComponent(quizDataGlobal.quiz.name)}`; // Redirect to results page
+                    // Redirect directly to results page without showing popup
+                    window.location.href = `/student/result/${encodeURIComponent(quizDataGlobal.quizName)}`;
                 } else {
                     alert('Quiz submission failed: ' + data.message);
                 }
@@ -672,21 +753,98 @@
             document.querySelector('.status-4').textContent = counts[4]; // Answered and Marked for Review
         }
 
-
         // Event Listeners for navigation buttons
         document.getElementById('prevQuestionBtn').addEventListener('click', prevQuestion);
         document.getElementById('saveNextBtn').addEventListener('click', nextQuestion);
         document.getElementById('clearResponseBtn').addEventListener('click', clearResponse);
         document.getElementById('submitQuizBtn').addEventListener('click', submitQuiz);
 
+        // Function to enter fullscreen mode
+        function enterFullscreen() {
+            document.body.classList.add('fullscreen-mode');
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) {
+                document.documentElement.msRequestFullscreen();
+            }
+        }
+
+        // Function to exit fullscreen mode
+        function exitFullscreen() {
+            document.body.classList.remove('fullscreen-mode');
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+
+        // Add event listeners for fullscreen changes
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        function handleFullscreenChange() {
+            if (!document.fullscreenElement && 
+                !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && 
+                !document.msFullscreenElement) {
+                // User exited fullscreen, prevent it
+                enterFullscreen();
+            }
+        }
+
+        // Prevent right-click
+        document.addEventListener('contextmenu', function(e) {
+            if (document.body.classList.contains('fullscreen-mode')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Prevent keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (document.body.classList.contains('fullscreen-mode')) {
+                // Prevent common keyboard shortcuts
+                if ((e.ctrlKey || e.metaKey) && (
+                    e.key === 'c' || // Copy
+                    e.key === 'v' || // Paste
+                    e.key === 'a' || // Select all
+                    e.key === 'p' || // Print
+                    e.key === 's' || // Save
+                    e.key === 'u' || // View source
+                    e.key === 'i' || // Inspect
+                    e.key === 'j' || // Console
+                    e.key === 'k' || // Search
+                    e.key === 'r' || // Reload
+                    e.key === 'f'    // Find
+                )) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
+
+        // Enter fullscreen mode when quiz starts
+        window.addEventListener('load', function() {
+            enterFullscreen();
+        });
 
         // Fetch quiz data on page load
         document.addEventListener('DOMContentLoaded', function() {
             const pathParts = window.location.pathname.split('/');
             const quizName = pathParts[pathParts.length - 1]; // e.g., "demo112233"
 
+            console.log(`Attempting to fetch quiz data for quiz: ${quizName}`);
+
             fetch(`/student/startquiz/api/quiz-data/${quizName}`)
                 .then(response => {
+                    console.log('Raw response from quiz data API:', response);
                     if (!response.ok) {
                         if (response.status === 401) {
                             window.location.href = '/login'; // Redirect to login if unauthorized
@@ -698,9 +856,12 @@
                 })
                 .then(data => {
                     if (data) {
-                        console.log('Fetched quiz data:', data);
+                        console.log('Fetched and parsed quiz data:', data);
                         quizDataGlobal = data; // Store data globally
+                        console.log('quizDataGlobal after assignment:', quizDataGlobal);
+                        console.log('Calling displayQuizContent()...');
                         displayQuizContent(); // Call display function to render UI
+                        console.log('displayQuizContent() called.');
                     }
                 })
                 .catch(error => {
