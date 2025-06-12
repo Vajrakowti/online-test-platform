@@ -114,7 +114,7 @@
         }
 
         /* Updated Status Colors */
-        .status-0 { background-color: #e3e6f0; color: var(--text-color); } /* Not Visited */
+        .status-0 { background-color: white; color: var(--text-color); border: 1px solid var(--border-color); } /* Not Visited */
         .status-1 { background-color: #1cc88a; color: white; } /* Answered */
         .status-2 { background-color: #f6c23e; color: white; } /* Marked for Review */
         .status-3 { background-color: #e74a3b; color: white; } /* Not Answered */
@@ -127,8 +127,6 @@
         }
 
         .question-grid-item {
-            background-color: var(--light-grey);
-            border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 10px;
             text-align: center;
@@ -367,13 +365,13 @@
         }
 
         .fullscreen-warning h2 {
-            color: #e74a3b;
+            color: #f1edec;
             font-size: 24px;
             margin-bottom: 20px;
         }
 
         .fullscreen-warning p {
-            color: #ecf0f1;
+            color: #f6f2f2;
             font-size: 16px;
             line-height: 1.6;
             margin-bottom: 15px;
@@ -510,11 +508,75 @@
             font-weight: 600;
             transition: all 0.2s;
         }
+
+        /* Add toast message styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 250px;
+            max-width: 350px;
+            animation: slideIn 0.3s ease-in-out;
+        }
+
+        .toast.error {
+            background-color: #e74a3b;
+        }
+
+        .toast.success {
+            background-color: #1cc88a;
+        }
+
+        .toast.warning {
+            background-color: #f6c23e;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .toast.hide {
+            animation: slideOut 0.3s ease-in-out forwards;
+        }
     </style>
 </head>
 <body>
+    <!-- Add toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <div id="fullscreenOverlay" class="fullscreen-overlay">
-        <div class="fullscreen-warning" style="background-color: #e74a3b;">
+        <div class="fullscreen-warning" style="background-color: #f30a0a;">
             <h2>Warning!</h2>
             <p>This quiz must be taken in fullscreen mode.</p>
             <p>Please click the button below to continue.</p>
@@ -753,6 +815,9 @@
                     currentQuestionRadios.forEach(radio => radio.checked = false);
                 }
 
+                // Setup radio button listeners for the current question
+                setupRadioButtonListeners();
+
                 // Update navigation buttons visibility
                 document.getElementById('prevQuestionBtn').style.display = currentQuestionIndex === 0 ? 'none' : 'block';
                 document.getElementById('saveNextBtn').style.display = currentQuestionIndex === allQuestionsFlat.length - 1 ? 'none' : 'block';
@@ -762,9 +827,9 @@
             } else {
                 // Handle navigation boundaries
                 if (index < 0) {
-                    alert("This is the first question.");
+                    showToast("This is the first question.", "warning");
                 } else if (index >= allQuestionsFlat.length) {
-                    alert("This is the last question. Click Submit Test to finish.");
+                    showToast("This is the last question. Click Submit Test to finish.", "warning");
                 }
             }
         }
@@ -809,7 +874,7 @@
             if (currentQuestionIndex < allQuestionsFlat.length - 1) {
                 showQuestion(currentQuestionIndex + 1);
             } else {
-                alert("You are at the last question.");
+                showToast("You are at the last question.", "warning");
             }
         }
 
@@ -818,7 +883,7 @@
             if (currentQuestionIndex > 0) {
                 showQuestion(currentQuestionIndex - 1);
             } else {
-                alert("You are at the first question.");
+                showToast("You are at the first question.", "warning");
             }
         }
 
@@ -849,6 +914,30 @@
                 // If it was Not Visited (0), keep it as Not Visited (0)
             }
             renderQuestionPanel(); // Update question panel status
+        }
+
+        // Add event listeners for radio buttons to update status immediately
+        function setupRadioButtonListeners() {
+            const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+            currentQuestionRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        answers[currentQuestionIndex] = {
+                            questionIndex: currentQuestionIndex,
+                            answer: this.value
+                        };
+                        // Update status to Answered (1) if it was Not Visited (0) or Not Answered (3)
+                        if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
+                            questionStatuses[currentQuestionIndex] = 1;
+                        }
+                        // If it was Marked for Review (2), now it's Answered & Marked for Review (4)
+                        if (questionStatuses[currentQuestionIndex] === 2) {
+                            questionStatuses[currentQuestionIndex] = 4;
+                        }
+                        renderQuestionPanel();
+                    }
+                });
+            });
         }
 
         function clearResponse() {
@@ -985,7 +1074,7 @@
                 questionStatuses[currentQuestionIndex] = 4;
                 renderQuestionPanel();
             } else {
-                alert("Please select an answer before marking for review.");
+                showToast("Please select an answer before marking for review.");
             }
         });
 
@@ -1152,6 +1241,24 @@
                     `;
                 });
         });
+
+        // Add toast message function
+        function showToast(message, type = 'error') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            toastContainer.appendChild(toast);
+            
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('hide');
+                setTimeout(() => {
+                    toastContainer.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
     </script>
 </body>
 </html>
