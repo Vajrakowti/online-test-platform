@@ -848,6 +848,19 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
             return res.status(404).json({ error: 'Quiz or attempt not found' });
         }
 
+        // Check if current time is after quiz end time (IST)
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const examDate = new Date(quiz.examDate);
+        const [endHour, endMinute] = quiz.endTime.split(':').map(Number);
+        examDate.setHours(endHour, endMinute, 0, 0);
+        if (now < examDate) {
+            return res.json({
+                resultAvailable: false,
+                endTime: quiz.endTime,
+                examDate: quiz.examDate
+            });
+        }
+
         // Use loadQuizData to ensure quiz.sections includes questions for Excel-based quizzes
         let processedQuiz;
         try {
@@ -861,7 +874,7 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
         quiz.sections = processedQuiz.sections;
 
         console.log('[DEBUG] Sending quiz and attempt data:', { quiz: quiz.name, attempt: attempt.quizName, score: attempt.score });
-        res.json({ quiz, attempt });
+        res.json({ resultAvailable: true, quiz, attempt });
 
     } catch (err) {
         console.error('Error fetching quiz result API:', err);

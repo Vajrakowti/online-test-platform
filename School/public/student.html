@@ -843,6 +843,18 @@
             }
             const data = await response.json();
 
+            if (data.resultAvailable === false) {
+                modalQuizName.textContent = `Result Not Available`;
+                modalQuizSummary.innerHTML = '';
+                modalQuestionsSection.innerHTML = `
+                    <div style="text-align:center; color:#f39c12; font-size:1.1em; padding: 30px 0;">
+                        <i class="fas fa-clock" style="font-size:2em; margin-bottom:10px;"></i><br>
+                        Results will be available after the test ends at <b>${data.endTime}</b> on <b>${new Date(data.examDate).toLocaleDateString()}</b>.
+                    </div>
+                `;
+                return;
+            }
+
             if (data.quiz && data.attempt) {
                 const { quiz, attempt } = data;
 
