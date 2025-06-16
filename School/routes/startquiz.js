@@ -461,7 +461,7 @@ router.post('/submit-quiz', async (req, res) => {
             negativeMarking: negativeMarking,
             questionMarks: questionMarks,
             submittedAt: new Date(),
-            shuffledQuestionsOrder: displayedQuestions.map(q => q.question) // Save the shuffled order for review
+            shuffledQuestions: displayedQuestions // Save the full question objects for accurate result mapping
         });
 
         // Store quiz completion in session

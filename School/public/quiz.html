@@ -1067,7 +1067,11 @@
             saveAnswer();
             const finalAnswers = answers.map((answer, index) => {
                 if (answer !== null) {
-                    return { questionIndex: index, answer: answer.answer };
+                    return {
+                        questionIndex: index,
+                        answer: answer.answer,
+                        questionText: allQuestionsFlat[index].question
+                    };
                 }
                 return null;
             }).filter(Boolean);

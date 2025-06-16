@@ -846,16 +846,23 @@
             if (data.quiz && data.attempt) {
                 const { quiz, attempt } = data;
 
-                // Extract all questions from sections
-                const allQuestions = quiz.sections.flatMap(section => section.questions);
+                // Extract all questions from the student's shuffled order if available
+                const allQuestions = attempt.shuffledQuestions || quiz.sections.flatMap(section => section.questions);
 
-                modalQuizName.textContent = `Quiz Result: ${quiz.name}`;
+                // Add a progress bar for the score
+                const scorePercent = Math.round((attempt.score / (allQuestions.length * (quiz.questionMarks || 1))) * 100);
                 modalQuizSummary.innerHTML = `
-                    <p>Score: ${attempt.score} / ${allQuestions.length}</p>
-                    <p>Total Questions: ${allQuestions.length}</p>
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-size: 1.2em; margin-bottom: 8px;"><b>Score:</b> ${attempt.score} / ${allQuestions.length * (quiz.questionMarks || 1)}</div>
+                        <div style="font-size: 1em; margin-bottom: 8px;"><b>Total Questions:</b> ${allQuestions.length}</div>
+                        <div style="background: #e9ecef; border-radius: 8px; height: 18px; width: 100%; margin-top: 8px;">
+                            <div style="background: linear-gradient(90deg, #4caf50, #2196f3); height: 100%; border-radius: 8px; width: ${scorePercent}%; transition: width 0.5s;"></div>
+                        </div>
+                        <div style="font-size: 0.95em; color: #555; margin-top: 4px;">${scorePercent}%</div>
+                    </div>
                 `;
 
-                let questionsHtml = '<h2>Questions & Answers</h2>';
+                let questionsHtml = '<h2 style="margin-bottom: 18px;">Questions & Answers</h2>';
                 allQuestions.forEach((question, index) => {
                     // Defensive: skip undefined or malformed questions
                     if (!question || typeof question !== 'object' || !question.question || !Array.isArray(question.options)) {
@@ -863,47 +870,50 @@
                         return; // Skip this question
                     }
 
-                    // Safely find the student's answer for this specific question
+                    // Robustly find the student's answer for this specific question
                     const studentAnswer = Array.isArray(attempt.answers) ? attempt.answers.find(ans => {
-                        if (!ans || typeof ans !== 'object') {
-                            console.warn('[DEBUG] Skipping invalid answer entry:', ans);
-                            return false;
-                        }
-                        if (ans.questionText && ans.questionText === question.question) {
+                        if (ans && ans.questionText && ans.questionText.trim() === question.question.trim()) {
                             return true;
                         }
-                        if (ans.questionIndex !== undefined && ans.questionIndex === index) {
+                        if (ans && question.options && question.options.includes(ans.answer)) {
+                            return true;
+                        }
+                        if (ans && ans.questionIndex !== undefined && ans.questionIndex === index) {
                             return true;
                         }
                         return false;
                     }) : undefined;
-
                     const studentChoice = studentAnswer?.chosenAnswer || studentAnswer?.answer || 'N/A';
-                    
+                    const isCorrect = question.correctAnswers && question.correctAnswers.includes(studentChoice);
+
                     questionsHtml += `
-                        <div class="question-item">
-                            <p class="question-text">${index + 1}. ${question.question}</p>
-                            <ul class="options-list">
+                        <div style="background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); padding: 18px 20px 14px 20px; margin-bottom: 22px; border-left: 6px solid ${isCorrect ? '#4caf50' : '#f44336'};">
+                            <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 10px; display: flex; align-items: center;">
+                                <span style="margin-right: 10px; font-size: 1.2em;">${isCorrect ? '<i class=\"fas fa-check-circle\" style=\"color:#4caf50\"></i>' : '<i class=\"fas fa-times-circle\" style=\"color:#f44336\"></i>'}</span>
+                                ${index + 1}. ${question.question}
+                            </div>
+                            <ul class="options-list" style="margin-bottom: 10px;">
                     `;
 
                     question.options.forEach(option => {
                         let optionClass = '';
                         let icon = '';
-
-                        // Use correctAnswers array for highlighting
+                        let style = '';
                         if (question.correctAnswers && question.correctAnswers.includes(option)) {
                             optionClass = 'correct';
-                            icon = '<i class="fas fa-check-circle"></i>';
+                            icon = '<i class=\"fas fa-check\" style=\"color:#388e3c;\"></i>';
                         }
                         if (option === studentChoice && (!question.correctAnswers || !question.correctAnswers.includes(option))) {
                             optionClass = 'incorrect';
-                            icon = '<i class="fas fa-times-circle"></i>';
+                            icon = '<i class=\"fas fa-times\" style=\"color:#d32f2f;\"></i>';
                         } else if (option === studentChoice && question.correctAnswers && question.correctAnswers.includes(option)) {
-                            icon = '<i class="fas fa-check-circle"></i>'; // Already correct, so no extra icon
+                            icon = '<i class=\"fas fa-check\" style=\"color:#388e3c;\"></i>';
                         }
-
+                        if (option === studentChoice) {
+                            style = 'font-weight:bold; border:2px solid #2196f3; background:#e3f2fd;';
+                        }
                         questionsHtml += `
-                            <li class="${optionClass} ${option === studentChoice ? 'marked' : ''}">
+                            <li class="${optionClass}" style="display:flex;align-items:center;gap:8px; margin-bottom:6px; padding:8px 12px; border-radius:5px; ${style}">
                                 ${icon} ${option}
                             </li>
                         `;
@@ -911,8 +921,11 @@
 
                     questionsHtml += `
                             </ul>
-                            <p style="margin-top: 10px;"><b>Correct Answer:</b> ${question.correctAnswers ? question.correctAnswers.join(', ') : 'N/A'}</p>
-                            <p><b>Your Answer:</b> ${studentChoice}</p>
+                            <div style="margin-top: 8px; font-size: 1em;">
+                                <span style="font-weight:600;">Correct Answer:</span> <span style="color:#388e3c;">${question.correctAnswers ? question.correctAnswers.join(', ') : 'N/A'}</span><br>
+                                <span style="font-weight:600;">Your Answer:</span> <span style="color:${isCorrect ? '#388e3c' : '#d32f2f'}; font-weight:600;">${studentChoice}</span>
+                                ${isCorrect ? '<span style="margin-left:10px; color:#4caf50; font-weight:600;">✔ Correct</span>' : '<span style="margin-left:10px; color:#f44336; font-weight:600;">✘ Incorrect</span>'}
+                            </div>
                         </div>
                     `;
                 });
