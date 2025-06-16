@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Detailed Test Result</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: #4f6ef2;
+            --primary-gradient: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+            --secondary-color: #f6f8fd;
+            --accent-color: #00b4d8;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --text-color: #2d3748;
+            --text-light: #718096;
+            --border-color: #e2e8f0;
+            --border-radius: 12px;
+            --shadow-sm: 0 2px 8px rgba(67, 97, 238, 0.07);
+            --shadow-md: 0 4px 12px rgba(67, 97, 238, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f6f8fd 0%, #ffffff 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .result-header {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-md);
+            text-align: center;
+        }
+
+        .result-header h1 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .score-summary {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .score-item {
+            background: var(--secondary-color);
+            padding: 1rem 2rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+        }
+
+        .score-item h3 {
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .score-item p {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .questions-container {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .question-item {
+            background: var(--secondary-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .question-text {
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .options-list {
+            list-style: none;
+        }
+
+        .option {
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .option.correct {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success-color);
+        }
+
+        .option.incorrect {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error-color);
+        }
+
+        .option.marked {
+            border: 2px solid var(--primary-color);
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.8rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-decoration: none;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+
+        .back-btn i {
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/student" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        
+        <div class="result-header">
+            <h1 id="quizName">Test Result</h1>
+            <div class="score-summary">
+                <div class="score-item">
+                    <h3>Score</h3>
+                    <p id="score">0/0</p>
+                </div>
+                <div class="score-item">
+                    <h3>Percentage</h3>
+                    <p id="percentage">0%</p>
+                </div>
+                <div class="score-item">
+                    <h3>Total Questions</h3>
+                    <p id="totalQuestions">0</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="questions-container" id="questionsContainer">
+            <!-- Questions will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const quizName = decodeURIComponent(window.location.pathname.split('/').pop());
+            
+            try {
+                const response = await fetch(`/student/api/result-data/${quizName}`);
+                if (!response.ok) throw new Error('Failed to fetch result data');
+                
+                const data = await response.json();
+                
+                // Update header information
+                document.getElementById('quizName').textContent = data.quizName;
+                document.getElementById('score').textContent = `${data.score}/${data.totalQuestions}`;
+                document.getElementById('percentage').textContent = 
+                    `${Math.round((data.score / data.totalQuestions) * 100)}%`;
+                document.getElementById('totalQuestions').textContent = data.totalQuestions;
+
+                // Group questions by section
+                const questionsBySection = data.questionsWithResults.reduce((acc, q) => {
+                    if (!acc[q.sectionName]) {
+                        acc[q.sectionName] = [];
+                    }
+                    acc[q.sectionName].push(q);
+                    return acc;
+                }, {});
+
+                // Render questions by section
+                const container = document.getElementById('questionsContainer');
+                Object.entries(questionsBySection).forEach(([sectionName, questions]) => {
+                    const sectionDiv = document.createElement('div');
+                    sectionDiv.className = 'section';
+                    sectionDiv.innerHTML = `
+                        <h2 class="section-title">${sectionName}</h2>
+                    `;
+
+                    questions.forEach((q, index) => {
+                        const questionDiv = document.createElement('div');
+                        questionDiv.className = 'question-item';
+                        
+                        let optionsHtml = '';
+                        q.options.forEach(option => {
+                            let optionClass = '';
+                            let icon = '';
+                            
+                            if (option === q.correctAnswers) {
+                                optionClass = 'correct';
+                                icon = '<i class="fas fa-check-circle" style="color: var(--success-color);"></i>';
+                            }
+                            if (option === q.studentAnswer && option !== q.correctAnswers) {
+                                optionClass = 'incorrect';
+                                icon = '<i class="fas fa-times-circle" style="color: var(--error-color);"></i>';
+                            }
+                            
+                            const isMarked = option === q.studentAnswer;
+                            optionsHtml += `
+                                <li class="option ${optionClass} ${isMarked ? 'marked' : ''}">
+                                    ${icon} ${option}
+                                </li>
+                            `;
+                        });
+
+                        questionDiv.innerHTML = `
+                            <p class="question-text">${index + 1}. ${q.question}</p>
+                            <ul class="options-list">
+                                ${optionsHtml}
+                            </ul>
+                        `;
+                        
+                        sectionDiv.appendChild(questionDiv);
+                    });
+
+                    container.appendChild(sectionDiv);
+                });
+
+            } catch (error) {
+                console.error('Error loading result data:', error);
+                alert('Failed to load test results. Please try again later.');
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Details</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: var(--container-bg-color);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--input-bg-color);
+        }
+        .summary-item {
+            text-align: center;
+            margin: 10px;
+        }
+        .summary-item h3 {
+            margin: 0;
+            color: var(--text-color-dark);
+            font-size: 1.2em;
+        }
+        .summary-item p {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 5px 0 0;
+        }
+        .question-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--input-bg-color);
+        }
+        .question-section h3 {
+            margin-top: 0;
+            color: var(--text-color-dark);
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .question-section h3.correct {
+            color: green;
+        }
+        .question-section h3.incorrect {
+            color: red;
+        }
+        .options-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 15px;
+        }
+        .options-list li {
+            padding: 8px 0;
+            border-bottom: 1px dashed var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .options-list li:last-child {
+            border-bottom: none;
+        }
+        .options-list li.correct-answer {
+            font-weight: bold;
+            color: green;
+        }
+        .options-list li.student-answer {
+            color: var(--primary-color);
+        }
+        .options-list li.incorrect-student-answer {
+            color: red;
+            font-weight: bold;
+        }
+        .label {
+            display: inline-block;
+            min-width: 80px;
+            font-weight: normal;
+        }
+        .back-button {
+            display: block;
+            width: fit-content;
+            margin: 30px auto 0;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        .back-button:hover {
+            background-color: var(--primary-color-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="quizNameHeader"></h1>
+        <div class="summary">
+            <div class="summary-item">
+                <h3>Your Score</h3>
+                <p id="scoreDisplay"></p>
+            </div>
+            <div class="summary-item">
+                <h3>Total Marks</h3>
+                <p id="totalMarksDisplay"></p>
+            </div>
+            <div class="summary-item">
+                <h3>Submitted On</h3>
+                <p id="submittedAtDisplay"></p>
+            </div>
+        </div>
+
+        <div id="questionsContainer">
+            <!-- Detailed questions will be loaded here -->
+        </div>
+
+        <a href="/student" class="back-button">Back to Dashboard</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const pathParts = window.location.pathname.split('/');
+            const quizName = decodeURIComponent(pathParts[pathParts.length - 1]);
+
+            document.getElementById('quizNameHeader').textContent = `Detailed Results for ${quizName}`;
+
+            try {
+                const response = await fetch(`/student/result-detail/${quizName}`);
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Detailed quiz data:', data);
+
+                document.getElementById('scoreDisplay').textContent = data.score;
+                document.getElementById('totalMarksDisplay').textContent = data.totalMarks;
+                document.getElementById('submittedAtDisplay').textContent = new Date(data.submittedAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const questionsContainer = document.getElementById('questionsContainer');
+                data.detailedResults.forEach((q, index) => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question-section';
+                    
+                    const isStudentCorrect = q.isCorrect;
+                    let headingClass = '';
+                    let icon = '';
+
+                    if (isStudentCorrect) {
+                        headingClass = 'correct';
+                        icon = '<i class="fas fa-check-circle"></i>';
+                    } else if (q.studentAnswer === null) {
+                        headingClass = ''; // Not answered
+                        icon = '<i class="fas fa-minus-circle"></i>';
+                    } else {
+                        headingClass = 'incorrect';
+                        icon = '<i class="fas fa-times-circle"></i>';
+                    }
+
+                    questionDiv.innerHTML = `
+                        <h3 class="${headingClass}">${icon} Question ${index + 1}: ${q.question} <span style="font-size:0.8em; margin-left: 10px;">(Marks: ${q.marksAwarded})</span></h3>
+                        <ul class="options-list">
+                            ${q.options.map(option => {
+                                let optionClass = '';
+                                if (q.correctAnswers.includes(option)) {
+                                    optionClass += ' correct-answer';
+                                }
+                                if (q.studentAnswer === option && !isStudentCorrect) {
+                                    optionClass += ' incorrect-student-answer';
+                                } else if (q.studentAnswer === option && isStudentCorrect) {
+                                    optionClass += ' student-answer'; // Marked correct by student
+                                }
+                                return `<li class="${optionClass}">
+                                            ${option}
+                                        </li>`;
+                            }).join('')}
+                        </ul>
+                        <p><span class="label">Your Answer:</span> ${q.studentAnswer !== null ? q.studentAnswer : 'Not Answered'}</p>
+                        <p><span class="label">Correct Answer(s):</span> ${q.correctAnswers.join(', ')}</p>
+                    `;
+                    questionsContainer.appendChild(questionDiv);
+                });
+
+            } catch (error) {
+                console.error('Error fetching detailed quiz results:', error);
+                questionsContainer.innerHTML = `<p style="color: red; text-align: center;">Error loading quiz details: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 

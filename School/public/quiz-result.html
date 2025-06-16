@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Result</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fc;
+            margin: 0;
+            padding: 20px;
+            color: #5a5c69;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 30px;
+        }
+        h1 {
+            color: #4e73df;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .quiz-summary,
+        .question-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #f2f4f8;
+            border: 1px solid #e0e0e0;
+        }
+        .quiz-summary p {
+            margin: 5px 0;
+            font-size: 1.1rem;
+        }
+        .question-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px dashed #cccccc;
+        }
+        .question-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .question-text {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .options-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .options-list li {
+            margin-bottom: 5px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            background-color: #ffffff;
+            border: 1px solid #e9e9e9;
+            display: flex;
+            align-items: center;
+        }
+        .options-list li.correct {
+            background-color: #e6ffe6;
+            border-color: #66cc66;
+        }
+        .options-list li.incorrect {
+            background-color: #ffe6e6;
+            border-color: #ff6666;
+        }
+        .options-list li.marked {
+            font-weight: bold;
+        }
+        .options-list li i {
+            margin-right: 8px;
+        }
+        .score {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #28a745;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .no-data {
+            text-align: center;
+            color: #777;
+            padding: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Quiz Result</h1>
+        <div id="quiz-results"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const pathSegments = window.location.pathname.split('/');
+            const quizName = decodeURIComponent(pathSegments[pathSegments.length - 1]);
+            const resultsContainer = document.getElementById('quiz-results');
+
+            try {
+                const response = await fetch(`/student/api/quiz-result/${encodeURIComponent(quizName)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch quiz results');
+                }
+                const data = await response.json();
+
+                if (data.quiz && data.attempt) {
+                    const { quiz, attempt } = data;
+
+                    let htmlContent = `
+                        <div class="quiz-summary">
+                            <h2>Summary: ${quiz.name}</h2>
+                            <p>Score: ${attempt.score} / ${quiz.questions.length}</p>
+                            <p>Total Questions: ${quiz.questions.length}</p>
+                        </div>
+                        <div class="question-section">
+                            <h2>Questions & Answers</h2>
+                    `;
+
+                    quiz.questions.forEach((question, index) => {
+                        const studentAnswer = attempt.answers.find(ans => ans.questionText === question.questionText);
+                        const studentChoice = studentAnswer ? studentAnswer.chosenAnswer : 'N/A';
+                        const isCorrect = studentAnswer ? studentAnswer.isCorrect : false;
+
+                        htmlContent += `
+                            <div class="question-item">
+                                <p class="question-text">${index + 1}. ${question.questionText}</p>
+                                <ul class="options-list">
+                        `;
+
+                        question.options.forEach(option => {
+                            let optionClass = '';
+                            let icon = '';
+
+                            if (option === question.correctAnswer) {
+                                optionClass = 'correct';
+                                icon = '<i class="fas fa-check-circle"></i>';
+                            }
+                            if (option === studentChoice && option !== question.correctAnswer) {
+                                optionClass = 'incorrect';
+                                icon = '<i class="fas fa-times-circle"></i>';
+                            } else if (option === studentChoice && option === question.correctAnswer) {
+                                icon = '<i class="fas fa-check-circle"></i>'; // Already correct, so no extra icon
+                            }
+
+                            htmlContent += `
+                                <li class="${optionClass} ${option === studentChoice ? 'marked' : ''}">
+                                    ${icon} ${option}
+                                </li>
+                            `;
+                        });
+
+                        htmlContent += `
+                                </ul>
+                                <p style="margin-top: 10px;"><b>Correct Answer:</b> ${question.correctAnswer}</p>
+                                <p><b>Your Answer:</b> ${studentChoice}</p>
+                            </div>
+                        `;
+                    });
+
+                    htmlContent += `</div>`;
+                    resultsContainer.innerHTML = htmlContent;
+
+                } else {
+                    resultsContainer.innerHTML = '<p class="no-data">No quiz results found for this quiz.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading quiz results:', error);
+                resultsContainer.innerHTML = '<p class="no-data">Error loading quiz results. Please try again later.</p>';
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -486,3 +486,4 @@ router.post('/submit-quiz', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.loadQuizData = loadQuizData;

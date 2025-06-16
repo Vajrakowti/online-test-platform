@@ -199,28 +199,19 @@ router.post('/update-completed-quizzes', async (req, res) => {
         await client.connect();
         const db = client.db(req.session.adminDb);
         
-        // Get existing attempts
-        const attemptsCollection = db.collection('attempts');
-        const attempts = await attemptsCollection.findOne({ username: studentUsername }) || { username: studentUsername, attempts: [] };
+        const completedQuizzesCollection = db.collection('completedQuizzes');
         
-        // Add new attempts
+        // Insert or update completed quizzes for the student
         for (const quizName of quizNames) {
-            if (!attempts.attempts.some(a => a.quizName === quizName)) {
-                attempts.attempts.push({
-                    quizName,
-                    timestamp: new Date()
-                });
-            }
+            await completedQuizzesCollection.updateOne(
+                { username: studentUsername, quizName: quizName },
+                { $set: { username: studentUsername, quizName: quizName, completedAt: new Date() } },
+                { upsert: true }
+            );
         }
         
-        // Update attempts in MongoDB
-        await attemptsCollection.updateOne(
-            { username: studentUsername },
-            { $set: attempts },
-            { upsert: true }
-        );
-        
         await client.close();
+        
         res.json({ success: true });
     } catch (err) {
         console.error('Error updating completed quizzes:', err);
@@ -228,35 +219,31 @@ router.post('/update-completed-quizzes', async (req, res) => {
     }
 });
 
-// Route to get attempts for a student
-router.get('/attempts', async (req, res) => {
-    if (!req.session.fname || req.session.role !== 'student') {
+// Route to check completed quizzes (for frontend sync)
+router.get('/check-completed-quizzes', async (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
     }
 
     try {
-        const username = req.session.username;
-        
-        // Connect to MongoDB using admin-specific database
+        const studentUsername = req.session.username;
         const client = new MongoClient(url);
         await client.connect();
         const db = client.db(req.session.adminDb);
-        const attemptsCollection = db.collection('attempts');
         
-        // Get all attempts for this student
-        const attempts = await attemptsCollection.find({ studentId: username })
-            .sort({ attemptedAt: -1 })
-            .toArray();
+        const completedQuizzesCollection = db.collection('completedQuizzes');
+        const completedQuizzes = await completedQuizzesCollection.find({ username: studentUsername }).toArray();
         
         await client.close();
-        res.json(attempts);
+        
+        res.json(completedQuizzes.map(q => q.quizName));
     } catch (err) {
-        console.error('Error getting attempts:', err);
-        res.status(500).json({ error: 'Failed to get attempts' });
+        console.error('Error fetching completed quizzes:', err);
+        res.status(500).json({ error: 'Failed to fetch completed quizzes' });
     }
 });
 
-// Route to save quiz attempt
+// Route to save quiz attempt (called by startquiz.js)
 router.post('/save-attempt', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
@@ -278,26 +265,34 @@ router.post('/save-attempt', async (req, res) => {
             quizName,
             score,
             totalQuestions,
-            attemptedAt: new Date(),
-            isRetake: isRetake || false,
-            fromSessionStorage: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            answers: answers || null
+            isRetake,
+            answers,
+            attemptedAt: new Date()
         };
         
-        // Save to MongoDB only
+        // Save to MongoDB
         await attemptsCollection.insertOne(attempt);
+        
+        // Add to completed quizzes if not a retake or if it's the first attempt
+        if (!isRetake) {
+            const completedQuizzesCollection = db.collection('completedQuizzes');
+            await completedQuizzesCollection.updateOne(
+                { username: username, quizName: quizName },
+                { $set: { username: username, quizName: quizName, completedAt: new Date() } },
+                { upsert: true }
+            );
+        }
+
         await client.close();
         
-        res.json({ success: true });
+        res.json({ success: true, message: 'Attempt saved successfully' });
     } catch (err) {
         console.error('Error saving attempt:', err);
         res.status(500).json({ error: 'Failed to save attempt' });
     }
 });
 
-// Route to sync attempts between local storage and MongoDB
+// Route to sync attempts (called by startquiz.js after save/delete)
 router.post('/sync-attempts', async (req, res) => {
     if (!req.session.fname || req.session.role !== 'student') {
         return res.status(401).json({ error: "Not logged in" });
@@ -312,13 +307,15 @@ router.post('/sync-attempts', async (req, res) => {
         const db = client.db(req.session.adminDb);
         const attemptsCollection = db.collection('attempts');
         
-        // Get attempts from MongoDB
-        const attempts = await attemptsCollection.find({ studentId: username })
-            .sort({ attemptedAt: -1 })
-            .toArray();
+        // Get all attempts for the student from MongoDB
+        const mongoAttempts = await attemptsCollection.find({ studentId: username }).toArray();
+        
+        // Note: For a proper sync, you might want to compare local and MongoDB data
+        // and resolve conflicts. For simplicity, this example just fetches.
         
         await client.close();
-        res.json({ success: true, attempts });
+        
+        res.json({ success: true, attempts: mongoAttempts });
     } catch (err) {
         console.error('Error syncing attempts:', err);
         res.status(500).json({ error: 'Failed to sync attempts' });
@@ -347,7 +344,10 @@ router.post('/delete-attempt', async (req, res) => {
             quizName: quizName 
         });
         
-        await client.close();
+        // Also remove from completed quizzes if it was marked as completed
+        const completedQuizzesCollection = db.collection('completedQuizzes');
+        await completedQuizzesCollection.deleteOne({ username: username, quizName: quizName });
+
         res.json({ success: true });
     } catch (err) {
         console.error('Error deleting attempt:', err);
@@ -808,295 +808,65 @@ router.get('/quiz/:quizName', async (req, res) => {
     }
 });
 
-
-// Attempt Result Page
-router.get('/result/:quizName', async (req, res) => {
+// Route to display quiz results (serves the static HTML file)
+router.get('/result/:quizName', (req, res) => {
     if (!req.session.username || req.session.role !== 'student') {
-        return res.redirect('/login');
+        return res.redirect("/login");
+    }
+    res.sendFile(path.join(__dirname, '../public/student.html')); // Changed to student.html
+});
+
+// API endpoint to get quiz and attempt data for results modal
+router.get('/api/quiz-result/:quizName', async (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
     }
 
     const quizName = decodeURIComponent(req.params.quizName);
     const studentUsername = req.session.username;
 
-    let client;
+    console.log(`[DEBUG] Attempting to fetch quiz result for quizName: ${quizName}, studentId: ${studentUsername}`);
+
     try {
-        client = new MongoClient(url);
+        const client = new MongoClient(url);
         await client.connect();
         const db = client.db(req.session.adminDb);
+
+        const quiz = await db.collection('quizzes').findOne({ name: quizName });
+        console.log(`[DEBUG] Quiz found: ${quiz ? quiz.name : 'None'}`);
 
         const attempt = await db.collection('attempts').findOne({
             studentId: studentUsername,
             quizName: quizName
         });
-
-        if (!attempt) {
-            await client.close();
-            return res.status(404).send('Quiz attempt not found.');
-        }
-
-        const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
-
-        if (!quizConfig) {
-            await client.close();
-            return res.status(404).send('Quiz configuration not found.');
-        }
-
-        // Calculate percentage using totalMarks instead of totalQuestions
-        const percentage = (attempt.totalMarks > 0) 
-                           ? ((attempt.score / attempt.totalMarks) * 100).toFixed(2)
-                           : 0; // Handle division by zero
+        console.log(`[DEBUG] Attempt found: ${attempt ? attempt.quizName : 'None'}`);
 
         await client.close();
 
-        // Render the result page with dynamic data
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Quiz Result</title>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-                <style>
-                    body {
-                        font-family: 'Nunito', sans-serif;
-                        margin: 0;
-                        background-color: #f0f2f5;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 100vh;
-                    }
-                    .container {
-                        width: 100%;
-                        max-width: 900px;
-                        padding: 20px;
-                    }
-                    .card {
-                        background-color: white;
-                        border-radius: 12px;
-                        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-                        display: flex;
-                        flex-wrap: wrap; /* Allow wrapping on smaller screens */
-                        overflow: hidden;
-                    }
-                    .card-left {
-                        flex: 1; /* Take available space */
-                        padding: 40px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        align-items: flex-start;
-                        min-width: 300px; /* Ensure a minimum width */
-                    }
-                    .card-right {
-                        flex: 1; /* Take available space */
-                        padding: 40px;
-                        background-color: #f8f9fc;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        align-items: center;
-                        min-width: 300px; /* Ensure a minimum width */
-                    }
-                    .result-header h2 {
-                        color: #4e73df;
-                        font-size: 1.8rem;
-                        margin-bottom: 10px;
-                    }
-                    .result-header h1 {
-                        color: #5a5c69;
-                        font-size: 2.5rem;
-                        margin-bottom: 20px;
-                        line-height: 1.2;
-                    }
-                    .divider {
-                        width: 80px;
-                        height: 4px;
-                        background-color: #4e73df;
-                        margin-bottom: 25px;
-                        border-radius: 2px;
-                    }
-                    .progress-container {
-                        position: relative;
-                        width: 160px;
-                        height: 160px;
-                        margin-bottom: 30px;
-                    }
-                    .progress-circle {
-                        transform: rotate(-90deg);
-                    }
-                    .progress-circle-bg {
-                        stroke: #e6e6e6;
-                        stroke-width: 10;
-                        fill: none;
-                    }
-                    .progress-circle-fill {
-                        stroke: #1cc88a;
-                        stroke-width: 10;
-                        stroke-linecap: round;
-                        fill: none;
-                        transition: stroke-dashoffset 0.5s ease-out;
-                        stroke-dasharray: 440; /* 2 * PI * 70 (radius) */
-                        stroke-dashoffset: calc(440 - (440 * ${percentage}) / 100);
-                    }
-                    .progress-text {
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        font-size: 2.5rem;
-                        font-weight: 700;
-                        color: #1cc88a;
-                    }
-                    .marks-container {
-                        text-align: center;
-                        margin-bottom: 20px;
-                    }
-                    .marks-title {
-                        font-size: 1.2rem;
-                        color: #666;
-                        margin-bottom: 10px;
-                    }
-                    .marks-value {
-                        font-size: 3.5rem;
-                        font-weight: 700;
-                        color: #1cc88a;
-                    }
-                    .marks-value span:last-child {
-                        color: #666;
-                        font-weight: normal;
-                    }
-                    .completed-date {
-                        margin-top: 30px;
-                        font-size: 14px;
-                        color: #888;
-                        text-align: center;
-                    }
-                    .back-button {
-                        display: inline-block;
-                        margin-top: 30px;
-                        padding: 12px 25px;
-                        background-color:rgb(0, 153, 255);
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 6px;
-                        font-weight: 500;
-                        transition: all 0.3s;
-                        border: none;
-                        cursor: pointer;
-                    }
-                    .back-button:hover {
-                        background-color: #6c757d;
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    }
-                    @keyframes progress {
-                        from {
-                            stroke-dashoffset: 440;
-                        }
-                        to {
-                            stroke-dashoffset: calc(440 - (440 * ${percentage}) / 100);
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="card">
-                        <div class="card-left">
-                            <div class="result-header">
-                                <h2>Result</h2>
-                                <h1>Test Name: ${quizName}</h1>
-                            </div>
-                            <div class="divider"></div>
-                            <p>You have successfully completed the quiz. Here's your performance summary:</p>
-                            <a href="/student" class="back-button">Back to Dashboard</a>
-                        </div>
-                        <div class="card-right">
-                            <div class="progress-container">
-                                <svg class="progress-circle" viewBox="0 0 160 160">
-                                    <circle class="progress-circle-bg" cx="80" cy="80" r="70"></circle>
-                                    <circle class="progress-circle-fill" cx="80" cy="80" r="70"></circle>
-                                </svg>
-                                <div class="progress-text">${percentage}%</div>
-                            </div>
-                            <div class="marks-container">
-                                <div class="marks-title">Marks</div>
-                                <div class="marks-value">
-                                    <span>${attempt.score}</span>
-                                    <span> / ${attempt.totalMarks}</span>
-                                </div>
-                            </div>
-                            <div class="completed-date">
-                                Completed on ${new Date(attempt.submittedAt).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                })}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `);
-    } catch (err) {
-        console.error("Failed to read attempts:", err);
-        res.status(500).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Error</title>
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        padding: 20px;
-                        background-color: #f4f4f4;
-                        text-align: center;
-                    }
-                    .error-container {
-                        background: white;
-                        padding: 30px;
-                        border-radius: 8px;
-                        max-width: 500px;
-                        margin: 50px auto;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    }
-                    .back-btn {
-                        display: inline-block;
-                        margin-top: 20px;
-                        padding: 10px 20px;
-                        background-color: #6c757d;
-                        color: white;
-                        text-decoration: none;
-                        border-radius: 4px;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="error-container">
-                    <h2>Error Loading Results</h2>
-                    <p>Failed to load your quiz results. Please try again later.</p>
-                    <p>Error details: ${err.message}</p>
-                    <a href="/student" class="back-btn">Back to Dashboard</a>
-                </div>
-            </body>
-            </html>
-        `);
-    }
-});
+        if (!quiz || !attempt) {
+            console.error(`[DEBUG] Quiz or attempt not found. Quiz: ${!!quiz}, Attempt: ${!!attempt}`);
+            return res.status(404).json({ error: 'Quiz or attempt not found' });
+        }
 
-// Add endpoint to check completed quizzes from session
-router.get('/check-completed-quizzes', (req, res) => {
-    if (!req.session.fname || !req.session.username || req.session.role !== 'student') {
-        return res.status(401).json({ error: "Not logged in" });
+        // Use loadQuizData to ensure quiz.sections includes questions for Excel-based quizzes
+        let processedQuiz;
+        try {
+            processedQuiz = loadQuizData(quiz);
+        } catch (err) {
+            console.error('[DEBUG] Error processing quiz data with loadQuizData:', err);
+            return res.status(500).json({ error: 'Failed to process quiz data' });
+        }
+
+        // Attach sections with questions to the quiz object for frontend compatibility
+        quiz.sections = processedQuiz.sections;
+
+        console.log('[DEBUG] Sending quiz and attempt data:', { quiz: quiz.name, attempt: attempt.quizName, score: attempt.score });
+        res.json({ quiz, attempt });
+
+    } catch (err) {
+        console.error('Error fetching quiz result API:', err);
+        res.status(500).json({ error: 'Failed to fetch quiz results' });
     }
-    
-    // Return completed quizzes from session if available
-    const completedQuizzes = Object.keys(req.session.completedQuizzes || {});
-    
-    res.json(completedQuizzes);
 });
 
 // Student messages routes
@@ -1249,7 +1019,7 @@ router.get('/api/result-data/:quizName', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const quizName = req.params.quizName;
+    const quizName = decodeURIComponent(req.params.quizName);
     const studentUsername = req.session.username;
     let client;
 
@@ -1258,11 +1028,8 @@ router.get('/api/result-data/:quizName', async (req, res) => {
         await client.connect();
         const db = client.db(req.session.adminDb);
 
-        const attemptsCollection = db.collection('attempts');
-        const quizzesCollection = db.collection('quizzes');
-
         // 1. Get the student's attempt
-        const studentAttempt = await attemptsCollection.findOne({
+        const studentAttempt = await db.collection('attempts').findOne({
             quizName: quizName,
             studentId: studentUsername
         });
@@ -1272,16 +1039,16 @@ router.get('/api/result-data/:quizName', async (req, res) => {
             return res.status(404).json({ error: 'Quiz attempt not found.' });
         }
 
-        // 2. Get the quiz configuration to load full questions
-        const quizConfig = await quizzesCollection.findOne({ name: quizName });
+        // 2. Get the quiz configuration
+        const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
 
         if (!quizConfig) {
             await client.close();
             return res.status(404).json({ error: 'Quiz configuration not found.' });
         }
 
-        // 3. Load all questions and correct answers using loadQuizData
-        const fullQuizData = loadQuizData(quizConfig); // This returns { sections: [...] }
+        // 3. Load all questions and correct answers
+        const fullQuizData = loadQuizData(quizConfig);
 
         let allQuestionsFlat = [];
         let globalIdxCounter = 0;
@@ -1302,7 +1069,7 @@ router.get('/api/result-data/:quizName', async (req, res) => {
         const questionsWithResults = allQuestionsFlat.map((q, globalIndex) => {
             const studentAnswerRecord = studentAttempt.answers.find(a => a.questionIndex === globalIndex);
             const studentAnswer = studentAnswerRecord ? studentAnswerRecord.submittedAnswer : 'Not Answered';
-            const isCorrect = studentAnswerRecord ? studentAnswerRecord.isCorrect : false; // Use the isCorrect from attempt
+            const isCorrect = studentAnswerRecord ? studentAnswerRecord.isCorrect : false;
 
             return {
                 question: q.question,
@@ -1505,6 +1272,63 @@ router.get('/quiz-completion/:quizName', (req, res) => {
         </body>
         </html>
     `);
+});
+
+// Route to serve detailed result page
+router.get('/detailed-result/:quizName', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'student') {
+        return res.redirect("/login");
+    }
+
+    const quizName = decodeURIComponent(req.params.quizName);
+    const studentUsername = req.session.username;
+
+    try {
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        // Check if student has attempted this quiz
+        const attempt = await db.collection('attempts').findOne({ 
+            studentId: studentUsername, 
+            quizName: quizName 
+        });
+
+        await client.close();
+
+        if (!attempt) {
+            return res.redirect('/student');
+        }
+
+        res.sendFile(path.join(__dirname, '../public/detailed-result.html'));
+    } catch (err) {
+        console.error('Error serving detailed result page:', err);
+        res.status(500).send('Internal server error');
+    }
+});
+
+// Route to get student attempts
+router.get('/attempts', async (req, res) => {
+    if (!req.session.username || req.session.role !== 'student') {
+        return res.status(401).json({ error: "Not logged in" });
+    }
+
+    try {
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        
+        const attempts = await db.collection('attempts')
+            .find({ studentId: req.session.username })
+            .sort({ submittedAt: -1 })
+            .toArray();
+
+        await client.close();
+        res.json(attempts);
+    } catch (error) {
+        console.error('Error fetching attempts:', error);
+        res.status(500).json({ error: 'Failed to fetch attempts' });
+    }
 });
 
 module.exports = router;

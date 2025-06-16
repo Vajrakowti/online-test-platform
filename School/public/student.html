@@ -409,6 +409,141 @@
     .logout-btn i {
         font-size: 18px;
     }
+
+    /* Modal Styles */
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 1000; /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        /* Removed: display: flex; align-items: center; justify-content: center; */
+    }
+
+    .modal-active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 30px;
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 800px;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        position: relative;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        position: absolute;
+        top: 10px;
+        right: 20px;
+    }
+
+    .close-button:hover,
+    .close-button:focus {
+        color: #000;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .quiz-summary,
+    .question-section {
+        margin-bottom: 25px;
+        padding: 20px;
+        border-radius: 10px;
+        background-color: #f2f4f8;
+        border: 1px solid #e0e0e0;
+    }
+    .quiz-summary p {
+        margin: 5px 0;
+        font-size: 1.1rem;
+    }
+    .question-item {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px dashed #cccccc;
+    }
+    .question-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .question-text {
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #333;
+    }
+    .options-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .options-list li {
+        margin-bottom: 5px;
+        padding: 8px 12px;
+        border-radius: 5px;
+        background-color: #ffffff;
+        border: 1px solid #e9e9e9;
+        display: flex;
+        align-items: center;
+    }
+    .options-list li.correct {
+        background-color: #e6ffe6;
+        border-color: #66cc66;
+    }
+    .options-list li.incorrect {
+        background-color: #ffe6e6;
+        border-color: #ff6666;
+    }
+    .options-list li.marked {
+        font-weight: bold;
+    }
+    .options-list li i {
+        margin-right: 8px;
+    }
+    .no-data {
+        text-align: center;
+        color: #777;
+        padding: 50px;
+    }
+
+    .view-result-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.3s;
+    }
+
+    .view-result-btn:hover {
+        background: var(--primary-light);
+        transform: translateY(-2px);
+    }
+
+    .view-result-btn i {
+        margin-right: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -474,6 +609,16 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- Quiz Result Modal -->
+  <div id="quizResultModal" class="modal">
+      <div class="modal-content">
+          <span class="close-button">&times;</span>
+          <h2 id="modalQuizName"></h2>
+          <div id="modalQuizSummary" class="quiz-summary"></div>
+          <div id="modalQuestionsSection" class="question-section"></div>
+      </div>
   </div>
 
   <script>
@@ -602,8 +747,7 @@
             <td>${attempt.quizName}</td>
           `;
           row.addEventListener('click', () => {
-            const encodedName = encodeURIComponent(attempt.quizName);
-            window.location.href = '/student/result/' + encodedName;
+            openQuizResultModal(attempt.quizName);
           });
           attemptedTbody.appendChild(row);
         });
@@ -670,6 +814,157 @@
       renderAttemptedQuizzes(filtered);
     });
 
+    const quizResultModal = document.getElementById('quizResultModal');
+    const closeButton = document.querySelector('.close-button');
+    const modalQuizName = document.getElementById('modalQuizName');
+    const modalQuizSummary = document.getElementById('modalQuizSummary');
+    const modalQuestionsSection = document.getElementById('modalQuestionsSection');
+
+    closeButton.addEventListener('click', () => {
+        quizResultModal.classList.remove('modal-active');
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target === quizResultModal) {
+            quizResultModal.classList.remove('modal-active');
+        }
+    });
+
+    async function openQuizResultModal(quizName) {
+        modalQuizName.textContent = `Loading results for ${quizName}...`;
+        modalQuizSummary.innerHTML = '';
+        modalQuestionsSection.innerHTML = '';
+        quizResultModal.classList.add('modal-active');
+
+        try {
+            const response = await fetch(`/student/api/quiz-result/${encodeURIComponent(quizName)}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch quiz results');
+            }
+            const data = await response.json();
+
+            if (data.quiz && data.attempt) {
+                const { quiz, attempt } = data;
+
+                // Extract all questions from sections
+                const allQuestions = quiz.sections.flatMap(section => section.questions);
+
+                modalQuizName.textContent = `Quiz Result: ${quiz.name}`;
+                modalQuizSummary.innerHTML = `
+                    <p>Score: ${attempt.score} / ${allQuestions.length}</p>
+                    <p>Total Questions: ${allQuestions.length}</p>
+                `;
+
+                let questionsHtml = '<h2>Questions & Answers</h2>';
+                allQuestions.forEach((question, index) => {
+                    // Defensive: skip undefined or malformed questions
+                    if (!question || typeof question !== 'object' || !question.question || !Array.isArray(question.options)) {
+                        console.warn('[DEBUG] Skipping invalid question entry:', question);
+                        return; // Skip this question
+                    }
+
+                    // Safely find the student's answer for this specific question
+                    const studentAnswer = Array.isArray(attempt.answers) ? attempt.answers.find(ans => {
+                        if (!ans || typeof ans !== 'object') {
+                            console.warn('[DEBUG] Skipping invalid answer entry:', ans);
+                            return false;
+                        }
+                        if (ans.questionText && ans.questionText === question.question) {
+                            return true;
+                        }
+                        if (ans.questionIndex !== undefined && ans.questionIndex === index) {
+                            return true;
+                        }
+                        return false;
+                    }) : undefined;
+
+                    const studentChoice = studentAnswer?.chosenAnswer || studentAnswer?.answer || 'N/A';
+                    
+                    questionsHtml += `
+                        <div class="question-item">
+                            <p class="question-text">${index + 1}. ${question.question}</p>
+                            <ul class="options-list">
+                    `;
+
+                    question.options.forEach(option => {
+                        let optionClass = '';
+                        let icon = '';
+
+                        // Use correctAnswers array for highlighting
+                        if (question.correctAnswers && question.correctAnswers.includes(option)) {
+                            optionClass = 'correct';
+                            icon = '<i class="fas fa-check-circle"></i>';
+                        }
+                        if (option === studentChoice && (!question.correctAnswers || !question.correctAnswers.includes(option))) {
+                            optionClass = 'incorrect';
+                            icon = '<i class="fas fa-times-circle"></i>';
+                        } else if (option === studentChoice && question.correctAnswers && question.correctAnswers.includes(option)) {
+                            icon = '<i class="fas fa-check-circle"></i>'; // Already correct, so no extra icon
+                        }
+
+                        questionsHtml += `
+                            <li class="${optionClass} ${option === studentChoice ? 'marked' : ''}">
+                                ${icon} ${option}
+                            </li>
+                        `;
+                    });
+
+                    questionsHtml += `
+                            </ul>
+                            <p style="margin-top: 10px;"><b>Correct Answer:</b> ${question.correctAnswers ? question.correctAnswers.join(', ') : 'N/A'}</p>
+                            <p><b>Your Answer:</b> ${studentChoice}</p>
+                        </div>
+                    `;
+                });
+                modalQuestionsSection.innerHTML = questionsHtml;
+
+            } else {
+                modalQuizName.textContent = `Results for ${quizName}`;
+                modalQuizSummary.innerHTML = '';
+                modalQuestionsSection.innerHTML = '<p class="no-data">No quiz results found for this quiz.</p>';
+            }
+        } catch (error) {
+            console.error('Error loading quiz results:', error);
+            modalQuizName.textContent = `Error loading results for ${quizName}`;
+            modalQuizSummary.innerHTML = '';
+            modalQuestionsSection.innerHTML = '<p class="no-data">Error loading quiz results. Please try again later.</p>';
+        }
+    }
+
+    // Function to load attempted tests
+    async function loadAttemptedTests() {
+        try {
+            const response = await fetch('/student/attempts');
+            if (!response.ok) throw new Error('Failed to fetch attempts');
+            
+            const attempts = await response.json();
+            const tableBody = document.getElementById('attemptedTestsBody');
+            tableBody.innerHTML = '';
+
+            attempts.forEach(attempt => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${attempt.quizName}</td>
+                    <td>${attempt.score}/${attempt.totalQuestions}</td>
+                    <td>${new Date(attempt.submittedAt).toLocaleString()}</td>
+                    <td>
+                        <a href="/student/detailed-result/${encodeURIComponent(attempt.quizName)}" class="view-result-btn">
+                            <i class="fas fa-eye"></i> View Result
+                        </a>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error loading attempted tests:', error);
+        }
+    }
+
+    // Call loadAttemptedTests when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAttemptedTests();
+        // ... other initialization code ...
+    });
   </script>
 </body>
 </html>
