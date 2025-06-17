@@ -588,6 +588,71 @@
   background-color: #c0392b;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
+
+    /* Add these styles at the top of your file */
+    .notification-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
+
+    .notification {
+      background: white;
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      min-width: 300px;
+      max-width: 400px;
+      transform: translateX(120%);
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .notification.show {
+      transform: translateX(0);
+    }
+
+    .notification.success {
+      border-left: 4px solid #28a745;
+    }
+
+    .notification.error {
+      border-left: 4px solid #dc3545;
+    }
+
+    .notification.warning {
+      border-left: 4px solid #ffc107;
+    }
+
+    .notification-icon {
+      margin-right: 12px;
+      font-size: 20px;
+    }
+
+    .notification.success .notification-icon {
+      color: #28a745;
+    }
+
+    .notification.error .notification-icon {
+      color: #dc3545;
+    }
+
+    .notification.warning .notification-icon {
+      color: #ffc107;
+    }
+
+    .notification-content {
+      flex-grow: 1;
+    }
+
+    .notification-message {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
     }
   </style>
 </head>
@@ -650,6 +715,11 @@
         
         <div id="quiz-alerts"></div>
 
+        <div class="quiz-type-selector">
+          <button type="button" class="quiz-type-btn active" data-type="excel">Excel Upload</button>
+          <button type="button" class="quiz-type-btn" data-type="manual">Manual Entry</button>
+        </div>
+
         <form id="excelQuizForm" class="quiz-section" action="/admin/update-quiz-excel/" method="POST" enctype="multipart/form-data">
           <input type="hidden" name="quizType" value="excel">
           <div class="form-group">
@@ -675,33 +745,50 @@
           </div>
           
           <div class="form-group">
-            <label class="required">Start Time:</label>
+            <label class="required">Exam Date:</label>
+            <input type="date" name="examDate" id="excelExamDate" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Test Duration (minutes):</label>
+            <input type="number" name="testDuration" id="excelTestDuration" min="1" value="60" required>
+            <span class="question-marks-info">(Enter duration in minutes, e.g. 120 for 2 hours)</span>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Test Available From:</label>
             <input type="time" name="startTime" id="excelStartTime" required>
           </div>
           
           <div class="form-group">
-            <label class="required">End Time:</label>
+            <label class="required">Test Available Until:</label>
             <input type="time" name="endTime" id="excelEndTime" required>
           </div>
           
           <div class="form-group">
-            <label>Current Excel File:</label>
-            <div id="currentExcelFile" style="padding: 10px; background: #f8f9fc; border-radius: 6px; margin-bottom: 15px;"></div>
-            
-            <label>Upload New Excel Sheet (Optional):</label>
-            <div class="file-upload-wrapper">
-              <input type="file" name="quizFile" id="quizFile" accept=".xlsx,.xls">
-              <label for="quizFile" class="file-upload-btn">
-                <i class="fas fa-file-excel"></i> Choose Excel File
-              </label>
-              <div id="fileName" class="file-name">No file chosen</div>
-              <div id="uploadProgress" style="display:none; margin-top: 10px;">
-                <div style="height: 5px; width: 100%; background-color: #f0f0f0; border-radius: 3px;">
-                  <div id="progressBar" style="height: 100%; width: 0; background-color: var(--primary-color); border-radius: 3px;"></div>
-                </div>
-                <div id="progressStatus" style="font-size: 12px; margin-top: 5px; text-align: center;">Preparing upload...</div>
-              </div>
+            <label class="required">Negative Marking:</label>
+            <div class="negative-marking-container">
+              <input type="number" name="negativeMarking" id="excelNegativeMarking" min="0" max="1" step="0.25" value="0" required>
+              <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
             </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Question Marks:</label>
+            <div class="question-marks-container">
+              <input type="number" name="questionMarks" id="excelQuestionMarks" min="1" value="1" required>
+              <span class="question-marks-info">(Enter marks for each question, default is 1)</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Quiz Sections:</label>
+            <div id="sectionsContainer">
+              <!-- Sections will be added here dynamically -->
+            </div>
+            <button type="button" class="btn btn-submit" onclick="addSection()">
+              <i class="fas fa-plus"></i> Add Section
+            </button>
           </div>
           
           <button type="submit" class="btn btn-submit">
@@ -734,13 +821,40 @@
           </div>
           
           <div class="form-group">
-            <label class="required">Start Time:</label>
+            <label class="required">Exam Date:</label>
+            <input type="date" name="examDate" id="manualExamDate" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Test Duration (minutes):</label>
+            <input type="number" name="testDuration" id="manualTestDuration" min="1" value="60" required>
+            <span class="question-marks-info">(Enter duration in minutes, e.g. 120 for 2 hours)</span>
+          </div>
+          
+          <div class="form-group">
+            <label class="required">Test Available From:</label>
             <input type="time" name="startTime" id="manualStartTime" required>
           </div>
           
           <div class="form-group">
-            <label class="required">End Time:</label>
+            <label class="required">Test Available Until:</label>
             <input type="time" name="endTime" id="manualEndTime" required>
+          </div>
+
+          <div class="form-group">
+            <label class="required">Negative Marking:</label>
+            <div class="negative-marking-container">
+              <input type="number" name="negativeMarking" id="manualNegativeMarking" min="0" max="1" step="0.25" value="0" required>
+              <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="required">Question Marks:</label>
+            <div class="question-marks-container">
+              <input type="number" name="questionMarks" id="manualQuestionMarks" min="1" value="1" required>
+              <span class="question-marks-info">(Enter marks for each question, default is 1)</span>
+            </div>
           </div>
 
           <button type="button" class="btn add-question-btn" onclick="addQuestion()">
@@ -760,6 +874,8 @@
       </div>
     </main>
   </div>
+
+  <div class="notification-container" id="notification-container"></div>
 
   <script>
     // Global variables
@@ -808,30 +924,63 @@
       const manualForm = document.getElementById('manualQuizForm');
       manualForm.action = `/admin/update-quiz-manual/${encodeURIComponent(quizData.name)}`;
       
-      // Populate form fields
+      // Populate form fields for Excel form
       document.getElementById('excelQuizName').value = quizData.name;
       document.getElementById('excelQuizClass').value = quizData.class;
+      document.getElementById('excelExamDate').value = quizData.examDate;
+      document.getElementById('excelTestDuration').value = quizData.testDuration || 60;
       document.getElementById('excelStartTime').value = quizData.startTime;
       document.getElementById('excelEndTime').value = quizData.endTime;
+      document.getElementById('excelNegativeMarking').value = quizData.negativeMarking || 0;
+      document.getElementById('excelQuestionMarks').value = quizData.questionMarks || 1;
       
+      // Populate form fields for Manual form
       document.getElementById('manualQuizName').value = quizData.name;
       document.getElementById('manualQuizClass').value = quizData.class;
+      document.getElementById('manualExamDate').value = quizData.examDate;
+      document.getElementById('manualTestDuration').value = quizData.testDuration || 60;
       document.getElementById('manualStartTime').value = quizData.startTime;
       document.getElementById('manualEndTime').value = quizData.endTime;
-      
-      // Show current excel file if applicable
-      if (quizData.type === 'excel' && quizData.file) {
-        document.getElementById('currentExcelFile').innerHTML = `
-          <p>Current file: <strong>${quizData.file}</strong></p>
-          <p><small>You can download the current file 
-            <a href="/uploads/${quizData.file}" download style="color: var(--primary-color);">here</a>
-          </small></p>
-        `;
-      }
+      document.getElementById('manualNegativeMarking').value = quizData.negativeMarking || 0;
+      document.getElementById('manualQuestionMarks').value = quizData.questionMarks || 1;
       
       // Show appropriate form
       if (quizData.type === 'excel') {
         excelForm.classList.add('active');
+        
+        // Populate sections if they exist
+        if (quizData.sections && quizData.sections.length > 0) {
+          const sectionsContainer = document.getElementById('sectionsContainer');
+          sectionsContainer.innerHTML = ''; // Clear existing sections
+          
+          quizData.sections.forEach((section, index) => {
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'section-item';
+            sectionDiv.innerHTML = `
+              <div class="section-header">
+                <input type="text" name="sectionNames[]" placeholder="Section Name" value="${section.name}" required>
+                <input type="hidden" name="existingSectionFiles[]" value="${section.file}">
+                <div class="current-file">
+                  <p>Current file: <strong>${section.file}</strong></p>
+                  <p><small>You can download the current file 
+                    <a href="/uploads/${section.file}" download style="color: var(--primary-color);">here</a>
+                  </small></p>
+                </div>
+                <input type="file" name="sectionFiles[]" accept=".xlsx,.xls">
+                <button type="button" class="remove-section-btn" onclick="removeSection(this)">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            `;
+            sectionsContainer.appendChild(sectionDiv);
+          });
+          
+          // Update remove buttons visibility after adding all sections
+          updateSectionRemoveButtons();
+        } else {
+          // If no sections exist, add one default section
+          addSection();
+        }
       } else {
         manualForm.classList.add('active');
         
@@ -861,31 +1010,26 @@
         showAlert('warning', `Warning: This quiz will start in less than ${minutesToStart} minutes. Please complete your edits promptly.`);
       }
 
-      // Add event listener for file upload
-      document.getElementById('quizFile').addEventListener('change', function(e) {
-        const fileInput = e.target;
-        const fileName = fileInput.files[0] ? fileInput.files[0].name : 'No file chosen';
-        document.getElementById('fileName').textContent = fileName;
-        
-        // Reset progress
-        document.getElementById('uploadProgress').style.display = 'none';
-        document.getElementById('progressBar').style.width = '0';
-        
-        // Validate file type
-        if (fileInput.files[0]) {
-          const validExtensions = ['.xlsx', '.xls'];
-          const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-          
-          if (!validExtensions.includes(fileExt)) {
-            showAlert('error', 'Invalid file type. Please select an Excel file (.xlsx or .xls)');
-            fileInput.value = ''; // Clear the selection
-            document.getElementById('fileName').textContent = 'No file chosen';
-          } else if (fileInput.files[0].size > 10 * 1024 * 1024) { // 10MB limit
-            showAlert('error', 'File is too large. Maximum size is 10MB.');
-            fileInput.value = ''; // Clear the selection
-            document.getElementById('fileName').textContent = 'No file chosen';
+      // Remove the quizFile event listener since it doesn't exist in edit page
+      // Instead, add event listeners for section file inputs
+      const sectionFileInputs = document.querySelectorAll('input[name="sectionFiles[]"]');
+      sectionFileInputs.forEach(input => {
+        input.addEventListener('change', function(e) {
+          const fileInput = e.target;
+          if (fileInput.files[0]) {
+            const fileName = fileInput.files[0].name;
+            const validExtensions = ['.xlsx', '.xls'];
+            const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+            
+            if (!validExtensions.includes(fileExt)) {
+              showAlert('error', 'Invalid file type. Please select an Excel file (.xlsx or .xls)');
+              fileInput.value = ''; // Clear the selection
+            } else if (fileInput.files[0].size > 10 * 1024 * 1024) { // 10MB limit
+              showAlert('error', 'File is too large. Maximum size is 10MB.');
+              fileInput.value = ''; // Clear the selection
+            }
           }
-        }
+        });
       });
     }
 
@@ -1121,16 +1265,47 @@
 
     // Show alert message
     function showAlert(type, message) {
-      const alertsContainer = document.getElementById('quiz-alerts');
-      const alertDiv = document.createElement('div');
-      alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type}`;
-      alertDiv.innerHTML = message;
-      alertsContainer.appendChild(alertDiv);
+      const container = document.getElementById('notification-container');
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
       
-      // Automatically remove after 5 seconds
+      // Set icon based on type
+      let icon = '';
+      switch(type) {
+        case 'success':
+          icon = '<i class="fas fa-check-circle notification-icon"></i>';
+          break;
+        case 'error':
+          icon = '<i class="fas fa-exclamation-circle notification-icon"></i>';
+          break;
+        case 'warning':
+          icon = '<i class="fas fa-exclamation-triangle notification-icon"></i>';
+          break;
+        default:
+          icon = '<i class="fas fa-info-circle notification-icon"></i>';
+      }
+      
+      notification.innerHTML = `
+        ${icon}
+        <div class="notification-content">
+          <p class="notification-message">${message}</p>
+        </div>
+      `;
+      
+      container.appendChild(notification);
+      
+      // Trigger animation
       setTimeout(() => {
-        alertDiv.remove();
-      }, 5000);
+        notification.classList.add('show');
+      }, 10);
+      
+      // Remove notification after 3 seconds
+      setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+          notification.remove();
+        }, 300);
+      }, 3000);
     }
 
     // Form validation
@@ -1185,25 +1360,6 @@
     document.getElementById('excelQuizForm').addEventListener('submit', function(event) {
       event.preventDefault();
       
-      if (document.getElementById('quizFile').files.length > 0) {
-        // Show upload progress when a file is selected
-        document.getElementById('uploadProgress').style.display = 'block';
-        document.getElementById('progressBar').style.width = '10%';
-        document.getElementById('progressStatus').textContent = 'Starting upload...';
-        
-        // Simulate progress (since we can't track actual progress with standard form submission)
-        let progress = 10;
-        const progressInterval = setInterval(function() {
-          progress += 5;
-          if (progress <= 90) {
-            document.getElementById('progressBar').style.width = progress + '%';
-            document.getElementById('progressStatus').textContent = 'Uploading... ' + progress + '%';
-          } else {
-            clearInterval(progressInterval);
-          }
-        }, 300);
-      }
-
       // Submit the form using fetch
       const formData = new FormData(this);
       fetch(this.action, {
@@ -1213,19 +1369,44 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          showAlert('success', data.message);
-          // Reset progress bar
-          document.getElementById('uploadProgress').style.display = 'none';
-          document.getElementById('progressBar').style.width = '0';
+          showAlert('success', data.message || 'Quiz updated successfully!');
+          // Redirect to view quizzes page after 3 seconds
+          setTimeout(() => {
+            window.location.href = '/admin/total-quiz';
+          }, 3000);
         } else {
           showAlert('error', data.error || 'Failed to update quiz');
         }
       })
       .catch(error => {
         showAlert('error', 'Error updating quiz: ' + error.message);
-        // Reset progress bar
-        document.getElementById('uploadProgress').style.display = 'none';
-        document.getElementById('progressBar').style.width = '0';
+      });
+    });
+
+    // Add form submission handler for Manual quiz
+    document.getElementById('manualQuizForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      // Submit the form using fetch
+      const formData = new FormData(this);
+      fetch(this.action, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('success', data.message || 'Quiz updated successfully!');
+          // Redirect to view quizzes page after 3 seconds
+          setTimeout(() => {
+            window.location.href = '/admin/total-quiz';
+          }, 3000);
+        } else {
+          showAlert('error', data.error || 'Failed to update quiz');
+        }
+      })
+      .catch(error => {
+        showAlert('error', 'Error updating quiz: ' + error.message);
       });
     });
 
@@ -1263,6 +1444,65 @@
         }
       });
     });
+
+    // Add quiz type selector functionality
+    document.addEventListener('DOMContentLoaded', function() {
+      const quizTypeBtns = document.querySelectorAll('.quiz-type-btn');
+      
+      quizTypeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+          // Update button states
+          quizTypeBtns.forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Show/hide appropriate form
+          const type = this.getAttribute('data-type');
+          document.querySelectorAll('.quiz-section').forEach(section => {
+            section.classList.remove('active');
+          });
+          document.getElementById(type + 'QuizForm').classList.add('active');
+        });
+      });
+    });
+
+    // Add function to add a new section
+    function addSection() {
+      const sectionsContainer = document.getElementById('sectionsContainer');
+      const sectionDiv = document.createElement('div');
+      sectionDiv.className = 'section-item';
+      sectionDiv.innerHTML = `
+        <div class="section-header">
+          <input type="text" name="sectionNames[]" placeholder="Section Name" required>
+          <input type="file" name="sectionFiles[]" accept=".xlsx,.xls" required>
+          <button type="button" class="remove-section-btn" onclick="removeSection(this)">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+      sectionsContainer.appendChild(sectionDiv);
+      
+      // Update remove buttons visibility
+      updateSectionRemoveButtons();
+    }
+
+    // Add function to remove a section
+    function removeSection(button) {
+      const sectionsContainer = document.getElementById('sectionsContainer');
+      const sectionItem = button.closest('.section-item');
+      sectionItem.remove();
+      updateSectionRemoveButtons();
+    }
+
+    // Add function to update section remove buttons visibility
+    function updateSectionRemoveButtons() {
+      const sectionsContainer = document.getElementById('sectionsContainer');
+      const removeButtons = sectionsContainer.querySelectorAll('.remove-section-btn');
+      
+      // Show/hide remove buttons based on number of sections
+      removeButtons.forEach(button => {
+        button.style.display = sectionsContainer.children.length > 1 ? 'block' : 'none';
+      });
+    }
   </script>
 
 <script>

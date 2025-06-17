@@ -490,155 +490,6 @@
             .actions-container button {
                 width: 100%;
             }
-
-
-            .sidebar {
-  width: 260px;
-  min-height: 100vh;
-  background-color: #4361ee;
-  color: white;
-  padding: 20px 0;
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 100;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  margin-bottom: 20px;
-}
-
-.sidebar-header i {
-  font-size: 2.5rem;
-  margin-right: 12px;
-}
-
-.sidebar-title {
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-title h1 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.sidebar-divider {
-  height: 1px;
-  background-color: rgba(255, 255, 255, 0.2);
-  margin: 15px 0;
-}
-
-.sidebar-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.sidebar-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  color: white;
-  text-decoration: none;
-  transition: all 0.3s;
-  border-radius: 0;
-  font-weight: 500;
-  font-size: 1.05rem;
-}
-
-.sidebar-item.active,
-.sidebar-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 0;
-}
-
-.sidebar-item i {
-  font-size: 1.25rem;
-  margin-right: 12px;
-  width: 24px;
-  text-align: center;
-}
-
-.sidebar-dropdown {
-  position: relative;
-}
-
-.dropdown-toggle {
-  justify-content: space-between;
-  cursor: pointer;
-}
-
-.dropdown-icon {
-  margin-left: auto;
-  margin-right: 0;
-  transition: transform 0.3s;
-  font-size: 0.8rem;
-}
-
-.dropdown-toggle.active .dropdown-icon {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  display: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-}
-
-.dropdown-menu.show {
-  display: block;
-}
-
-.dropdown-item {
-  display: block;
-  padding: 10px 20px 10px 56px;
-  color: white;
-  text-decoration: none;
-  transition: background-color 0.3s;
-  font-size: 1rem;
-}
-
-.dropdown-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.signout-container {
-  margin-top: auto;
-  padding: 24px 20px 20px 20px;
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-
-.logout-btn {
-  width: 100%;
-  background-color: #e74a3b;
-  color: white;
-  border: none;
-  padding: 14px 0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  transition: background 0.2s, box-shadow 0.2s;
-}
-
-.logout-btn:hover {
-  background-color: #c0392b;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-}
         }
     </style>
 </head>
@@ -778,23 +629,63 @@
                 </h2>
 
                 <div class="form-group">
-                    <label for="quizName">Quiz Name:</label>
+                    <label class="required">Quiz Name:</label>
                     <input type="text" id="quizName" class="form-control" placeholder="Enter quiz name" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="startTime">Start Time:</label>
+                    <label class="required">Exam Date:</label>
+                    <input type="date" id="examDate" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Test Duration (minutes):</label>
+                    <input type="number" id="testDuration" class="form-control" min="1" value="60" required>
+                    <span class="question-marks-info">(Enter duration in minutes, e.g. 120 for 2 hours)</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Test Available From:</label>
                     <input type="time" id="startTime" class="form-control" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="endTime">End Time:</label>
+                    <label class="required">Test Available Until:</label>
                     <input type="time" id="endTime" class="form-control" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="quizFile">Upload Excel Sheet:</label>
-                    <input type="file" id="quizFile" class="form-control" accept=".xlsx,.xls" required>
+                    <label class="required">Negative Marking:</label>
+                    <div class="negative-marking-container">
+                        <input type="number" id="negativeMarking" class="form-control" min="0" max="1" step="0.25" value="0" required>
+                        <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Question Marks:</label>
+                    <div class="question-marks-container">
+                        <input type="number" id="questionMarks" class="form-control" min="1" value="1" required>
+                        <span class="question-marks-info">(Enter marks for each question, default is 1)</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">Quiz Sections:</label>
+                    <div id="sectionsContainer">
+                        <div class="section-item">
+                            <div class="section-header">
+                                <input type="text" name="sectionNames[]" class="form-control" placeholder="Section Name" required>
+                                <input type="file" name="sectionFiles[]" class="form-control" accept=".xlsx,.xls" required>
+                                <button type="button" class="btn btn-danger remove-section-btn" onclick="removeSection(this)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="addSection()">
+                        <i class="fas fa-plus"></i> Add Section
+                    </button>
                 </div>
 
                 <div class="actions-container">
@@ -881,11 +772,13 @@
     </div>
 
     <script>
-        // Toggle dropdown menus
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize UI elements
             document.getElementById('existingQuizSelection').style.display = 'none';
             document.getElementById('editQuizForm').style.display = 'none';
+            
+            // Load custom classes into the dropdown
+            loadCustomClasses();
             
             const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
             
@@ -1223,15 +1116,28 @@
             });
         }
 
-        // Create quiz function 
+        // Create quiz function
         function createQuizForStudents() {
             const quizName = document.getElementById('quizName').value.trim();
+            const examDate = document.getElementById('examDate').value;
+            const testDuration = document.getElementById('testDuration').value;
             const startTime = document.getElementById('startTime').value;
             const endTime = document.getElementById('endTime').value;
-            const quizFile = document.getElementById('quizFile').files[0];
+            const negativeMarking = document.getElementById('negativeMarking').value;
+            const questionMarks = document.getElementById('questionMarks').value;
             
             if (!quizName) {
                 showAlert('error', 'Please enter a quiz name');
+                return;
+            }
+            
+            if (!examDate) {
+                showAlert('error', 'Please select an exam date');
+                return;
+            }
+            
+            if (!testDuration) {
+                showAlert('error', 'Please enter test duration');
                 return;
             }
             
@@ -1245,8 +1151,16 @@
                 return;
             }
             
-            if (!quizFile) {
-                showAlert('error', 'Please upload an Excel file');
+            const sectionFiles = document.querySelectorAll('input[name="sectionFiles[]"]');
+            let hasFiles = false;
+            sectionFiles.forEach(file => {
+                if (file.files.length > 0) {
+                    hasFiles = true;
+                }
+            });
+            
+            if (!hasFiles) {
+                showAlert('error', 'Please upload at least one Excel file');
                 return;
             }
             
@@ -1260,13 +1174,29 @@
             
             showLoading();
             
-            // Create FormData object to send the file
+            // Create FormData object to send the files
             const formData = new FormData();
             formData.append('quizName', quizName);
+            formData.append('examDate', examDate);
+            formData.append('testDuration', testDuration);
             formData.append('startTime', startTime);
             formData.append('endTime', endTime);
-            formData.append('quizFile', quizFile);
+            formData.append('negativeMarking', negativeMarking);
+            formData.append('questionMarks', questionMarks);
             formData.append('studentUsernames', JSON.stringify(selectedStudents));
+            
+            // Append all section files
+            sectionFiles.forEach((file, index) => {
+                if (file.files.length > 0) {
+                    formData.append(`sectionFile_${index}`, file.files[0]);
+                }
+            });
+            
+            // Append section names
+            const sectionNames = document.querySelectorAll('input[name="sectionNames[]"]');
+            sectionNames.forEach((name, index) => {
+                formData.append(`sectionName_${index}`, name.value);
+            });
             
             fetch('/admin/create-quiz-for-students', {
                 method: 'POST',
@@ -1290,9 +1220,26 @@
                 
                 // Clear form
                 document.getElementById('quizName').value = '';
+                document.getElementById('examDate').value = '';
+                document.getElementById('testDuration').value = '60';
                 document.getElementById('startTime').value = '';
                 document.getElementById('endTime').value = '';
-                document.getElementById('quizFile').value = '';
+                document.getElementById('negativeMarking').value = '0';
+                document.getElementById('questionMarks').value = '1';
+                
+                // Clear sections
+                const sectionsContainer = document.getElementById('sectionsContainer');
+                sectionsContainer.innerHTML = `
+                    <div class="section-item">
+                        <div class="section-header">
+                            <input type="text" name="sectionNames[]" class="form-control" placeholder="Section Name" required>
+                            <input type="file" name="sectionFiles[]" class="form-control" accept=".xlsx,.xls" required>
+                            <button type="button" class="btn btn-danger remove-section-btn" onclick="removeSection(this)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
             })
             .catch(error => {
                 showAlert('error', error.message);
@@ -1301,31 +1248,90 @@
                 hideLoading();
             });
         }
+
+        // Add this new function to load custom classes
+        function loadCustomClasses() {
+            try {
+                const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+                const classSelect = document.getElementById('classSelect');
+                
+                // Remove any existing custom classes (except the "custom" option)
+                Array.from(classSelect.options).forEach(opt => {
+                    if (opt.value !== 'custom' && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(opt.value)) {
+                        opt.remove();
+                    }
+                });
+                
+                // Add custom classes to the dropdown
+                customClasses.forEach(cls => {
+                    if (!Array.from(classSelect.options).some(opt => opt.value === cls)) {
+                        const opt = document.createElement('option');
+                        opt.value = cls;
+                        opt.text = cls;
+                        classSelect.insertBefore(opt, classSelect.querySelector('option[value="custom"]'));
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading custom classes:', error);
+            }
+        }
+
+        // Listen for storage events to update custom classes when changed in other pages
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'customClasses') {
+                loadCustomClasses();
+            }
+        });
+
+        // Add section function
+        function addSection() {
+            const sectionsContainer = document.getElementById('sectionsContainer');
+            const sectionItem = document.createElement('div');
+            sectionItem.className = 'section-item';
+            sectionItem.innerHTML = `
+                <div class="section-header">
+                    <input type="text" name="sectionNames[]" class="form-control" placeholder="Section Name" required>
+                    <input type="file" name="sectionFiles[]" class="form-control" accept=".xlsx,.xls" required>
+                    <button type="button" class="btn btn-danger remove-section-btn" onclick="removeSection(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            sectionsContainer.appendChild(sectionItem);
+        }
+
+        // Remove section function
+        function removeSection(button) {
+            const sectionItem = button.closest('.section-item');
+            if (document.querySelectorAll('.section-item').length > 1) {
+                sectionItem.remove();
+            } else {
+                showAlert('error', 'You must have at least one section in the quiz.');
+            }
+        }
     </script>
 
-
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
-      dropdownToggles.forEach(toggle => {
-        toggle.addEventListener('click', function() {
-          const parent = this.parentElement;
-          const dropdownMenu = parent.querySelector('.dropdown-menu');
-          document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
-            if (menu !== dropdownMenu) menu.classList.remove('show');
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+          dropdownToggles.forEach(toggle => {
+            toggle.addEventListener('click', function() {
+              const parent = this.parentElement;
+              const dropdownMenu = parent.querySelector('.dropdown-menu');
+              document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+                if (menu !== dropdownMenu) menu.classList.remove('show');
+              });
+              dropdownMenu.classList.toggle('show');
+              this.classList.toggle('active');
+            });
           });
-          dropdownMenu.classList.toggle('show');
-          this.classList.toggle('active');
+          document.addEventListener('click', function(event) {
+            if (!event.target.closest('.sidebar-dropdown')) {
+              document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('show'));
+              document.querySelectorAll('.dropdown-toggle').forEach(toggle => toggle.classList.remove('active'));
+            }
+          });
         });
-      });
-      document.addEventListener('click', function(event) {
-        if (!event.target.closest('.sidebar-dropdown')) {
-          document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('show'));
-          document.querySelectorAll('.dropdown-toggle').forEach(toggle => toggle.classList.remove('active'));
-        }
-      });
-    });
     </script>
 </body>
 </html> 
