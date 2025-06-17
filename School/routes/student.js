@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         const db = client.db(req.session.adminDb);
         
         // Get current date and time in IST
-        const now = new Date();
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
         const currentDate = now.toISOString().split('T')[0];
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
                           now.getMinutes().toString().padStart(2, '0');
@@ -389,7 +389,7 @@ router.get('/quiz/:quizName', async (req, res) => {
         }
 
         // Validate quiz date and time
-        const now = new Date();
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
         const currentDate = now.toISOString().split('T')[0];
         const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
                           now.getMinutes().toString().padStart(2, '0');
