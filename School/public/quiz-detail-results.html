@@ -9,96 +9,168 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            color: #22223b;
             margin: 0;
             padding: 20px;
+        }
+        .result-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            background: linear-gradient(90deg, #4f8cff 0%, #38b6ff 100%);
+            color: #fff;
+            border-radius: 12px;
+            padding: 18px 0 18px 0;
+            margin-bottom: 30px;
+            font-size: 1.5em;
+            font-weight: 600;
+            box-shadow: 0 2px 12px rgba(79, 140, 255, 0.08);
+            letter-spacing: 1px;
         }
         .container {
             max-width: 900px;
             margin: 20px auto;
-            background-color: var(--container-bg-color);
+            background: #fff;
             padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 6px 32px rgba(0,0,0,0.08);
         }
         h1, h2 {
-            color: var(--primary-color);
+            color: #4f8cff;
             text-align: center;
             margin-bottom: 20px;
         }
         .summary {
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             margin-bottom: 30px;
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: var(--input-bg-color);
+            padding: 24px 18px;
+            border-radius: 10px;
+            background: #f1f5fa;
+            box-shadow: 0 2px 8px rgba(79, 140, 255, 0.04);
         }
         .summary-item {
             text-align: center;
-            margin: 10px;
+            margin: 10px 0;
+            flex: 1 1 180px;
         }
         .summary-item h3 {
             margin: 0;
-            color: var(--text-color-dark);
-            font-size: 1.2em;
+            color: #22223b;
+            font-size: 1.1em;
+            font-weight: 500;
         }
         .summary-item p {
-            font-size: 1.8em;
+            font-size: 2em;
             font-weight: bold;
-            color: var(--primary-color);
+            color: #4f8cff;
             margin: 5px 0 0;
         }
-        .question-section {
-            margin-bottom: 25px;
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: var(--input-bg-color);
+        .progress-bar {
+            width: 100%;
+            height: 18px;
+            background: #e0e7ff;
+            border-radius: 9px;
+            overflow: hidden;
+            margin: 18px 0 0 0;
         }
-        .question-section h3 {
-            margin-top: 0;
-            color: var(--text-color-dark);
-            font-size: 1.1em;
+        .progress-bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%);
+            border-radius: 9px;
+            transition: width 1s cubic-bezier(.4,2,.6,1);
+        }
+        .question-card {
+            background: #f9fafb;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(79, 140, 255, 0.06);
+            margin-bottom: 28px;
+            padding: 24px 20px 18px 20px;
+            transition: box-shadow 0.2s;
+        }
+        .question-card:hover {
+            box-shadow: 0 6px 24px rgba(79, 140, 255, 0.13);
+        }
+        .question-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
-        .question-section h3.correct {
-            color: green;
+        .question-header.correct {
+            color: #22c55e;
         }
-        .question-section h3.incorrect {
-            color: red;
+        .question-header.incorrect {
+            color: #ef4444;
+        }
+        .question-header.unanswered {
+            color: #64748b;
+        }
+        .marks-badge {
+            background: #e0e7ff;
+            color: #4f8cff;
+            border-radius: 8px;
+            padding: 2px 10px;
+            font-size: 0.9em;
+            margin-left: auto;
         }
         .options-list {
             list-style: none;
             padding: 0;
-            margin-top: 15px;
+            margin: 12px 0 0 0;
         }
         .options-list li {
-            padding: 8px 0;
-            border-bottom: 1px dashed var(--border-color);
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border-radius: 7px;
+            background: #f1f5fa;
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-        .options-list li:last-child {
-            border-bottom: none;
+            font-size: 1em;
+            transition: background 0.2s;
         }
         .options-list li.correct-answer {
-            font-weight: bold;
-            color: green;
+            background: #d1fae5;
+            color: #15803d;
+            font-weight: 600;
         }
         .options-list li.student-answer {
-            color: var(--primary-color);
+            border: 2px solid #4f8cff;
+            background: #e0e7ff;
+            color: #1e40af;
+            font-weight: 600;
         }
         .options-list li.incorrect-student-answer {
-            color: red;
-            font-weight: bold;
+            background: #fee2e2;
+            color: #b91c1c;
+            font-weight: 600;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        .badge.correct {
+            background: #d1fae5;
+            color: #15803d;
+        }
+        .badge.incorrect {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .badge.unanswered {
+            background: #e0e7ff;
+            color: #64748b;
         }
         .label {
             display: inline-block;
@@ -109,21 +181,34 @@
             display: block;
             width: fit-content;
             margin: 30px auto 0;
-            padding: 10px 20px;
-            background-color: var(--primary-color);
+            padding: 12px 28px;
+            background: linear-gradient(90deg, #4f8cff 0%, #38b6ff 100%);
             color: white;
             text-decoration: none;
-            border-radius: 5px;
+            border-radius: 7px;
             text-align: center;
-            transition: background-color 0.3s ease;
+            font-size: 1.1em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(79, 140, 255, 0.08);
+            transition: background 0.3s;
         }
         .back-button:hover {
-            background-color: var(--primary-color-dark);
+            background: linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%);
+        }
+        @media (max-width: 700px) {
+            .container {
+                padding: 10px;
+            }
+            .summary {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div id="resultBanner" class="result-banner" style="display:none;"></div>
         <h1 id="quizNameHeader"></h1>
         <div class="summary">
             <div class="summary-item">
@@ -139,11 +224,10 @@
                 <p id="submittedAtDisplay"></p>
             </div>
         </div>
-
-        <div id="questionsContainer">
-            <!-- Detailed questions will be loaded here -->
+        <div class="progress-bar">
+            <div id="scoreProgressBar" class="progress-bar-inner" style="width:0%"></div>
         </div>
-
+        <div id="questionsContainer" style="margin-top: 32px;"></div>
         <a href="/student" class="back-button">Back to Dashboard</a>
     </div>
 
@@ -164,7 +248,22 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log('Detailed quiz data:', data);
+                // --- Result Banner ---
+                const resultBanner = document.getElementById('resultBanner');
+                const percent = Math.round((data.score / data.totalMarks) * 100);
+                let bannerIcon = '';
+                let bannerText = '';
+                if (percent >= 60) {
+                    bannerIcon = '<i class="fas fa-trophy"></i>';
+                    bannerText = `Congratulations! You Passed (${percent}%)`;
+                    resultBanner.style.background = 'linear-gradient(90deg, #22c55e 0%, #38b6ff 100%)';
+                } else {
+                    bannerIcon = '<i class="fas fa-exclamation-circle"></i>';
+                    bannerText = `Keep Trying! You Scored ${percent}%`;
+                    resultBanner.style.background = 'linear-gradient(90deg, #ef4444 0%, #fbbf24 100%)';
+                }
+                resultBanner.innerHTML = `${bannerIcon} <span>${bannerText}</span>`;
+                resultBanner.style.display = 'flex';
 
                 document.getElementById('scoreDisplay').textContent = data.score;
                 document.getElementById('totalMarksDisplay').textContent = data.totalMarks;
@@ -175,49 +274,56 @@
                     hour: '2-digit',
                     minute: '2-digit'
                 });
+                // Animate progress bar
+                setTimeout(() => {
+                    document.getElementById('scoreProgressBar').style.width = percent + '%';
+                }, 200);
 
                 const questionsContainer = document.getElementById('questionsContainer');
                 data.detailedResults.forEach((q, index) => {
-                    const questionDiv = document.createElement('div');
-                    questionDiv.className = 'question-section';
-                    
-                    const isStudentCorrect = q.isCorrect;
-                    let headingClass = '';
-                    let icon = '';
+                    const card = document.createElement('div');
+                    card.className = 'question-card';
 
-                    if (isStudentCorrect) {
-                        headingClass = 'correct';
+                    let headerClass = 'question-header';
+                    let icon = '';
+                    let badge = '';
+                    if (q.isCorrect) {
+                        headerClass += ' correct';
                         icon = '<i class="fas fa-check-circle"></i>';
+                        badge = '<span class="badge correct">Correct</span>';
                     } else if (q.studentAnswer === null) {
-                        headingClass = ''; // Not answered
+                        headerClass += ' unanswered';
                         icon = '<i class="fas fa-minus-circle"></i>';
+                        badge = '<span class="badge unanswered">Not Answered</span>';
                     } else {
-                        headingClass = 'incorrect';
+                        headerClass += ' incorrect';
                         icon = '<i class="fas fa-times-circle"></i>';
+                        badge = '<span class="badge incorrect">Incorrect</span>';
                     }
 
-                    questionDiv.innerHTML = `
-                        <h3 class="${headingClass}">${icon} Question ${index + 1}: ${q.question} <span style="font-size:0.8em; margin-left: 10px;">(Marks: ${q.marksAwarded})</span></h3>
+                    card.innerHTML = `
+                        <div class="${headerClass}">${icon} Question ${index + 1}: ${q.question}
+                            <span class="marks-badge">Marks: ${q.marksAwarded}</span>
+                            ${badge}
+                        </div>
                         <ul class="options-list">
                             ${q.options.map(option => {
                                 let optionClass = '';
                                 if (q.correctAnswers.includes(option)) {
                                     optionClass += ' correct-answer';
                                 }
-                                if (q.studentAnswer === option && !isStudentCorrect) {
+                                if (q.studentAnswer === option && !q.isCorrect) {
                                     optionClass += ' incorrect-student-answer';
-                                } else if (q.studentAnswer === option && isStudentCorrect) {
-                                    optionClass += ' student-answer'; // Marked correct by student
+                                } else if (q.studentAnswer === option && q.isCorrect) {
+                                    optionClass += ' student-answer';
                                 }
-                                return `<li class="${optionClass}">
-                                            ${option}
-                                        </li>`;
+                                return `<li class="${optionClass}">${option}</li>`;
                             }).join('')}
                         </ul>
-                        <p><span class="label">Your Answer:</span> ${q.studentAnswer !== null ? q.studentAnswer : 'Not Answered'}</p>
+                        <p style="margin-top:10px;"><span class="label">Your Answer:</span> ${q.studentAnswer !== null ? q.studentAnswer : '<span style=\'color:#64748b\'>Not Answered</span>'}</p>
                         <p><span class="label">Correct Answer(s):</span> ${q.correctAnswers.join(', ')}</p>
                     `;
-                    questionsContainer.appendChild(questionDiv);
+                    questionsContainer.appendChild(card);
                 });
 
             } catch (error) {
@@ -227,4 +333,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
