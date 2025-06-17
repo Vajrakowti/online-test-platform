@@ -3697,7 +3697,7 @@ router.post('/create-quiz-for-students', (req, res) => {
     }
 
     try {
-      const { quizName, startTime, endTime } = req.body;
+      const { quizName, startTime, endTime, examDate, testDuration, negativeMarking, questionMarks, quizClass } = req.body;
       let studentUsernames;
       
       try {
@@ -3710,8 +3710,19 @@ router.post('/create-quiz-for-students', (req, res) => {
         return res.status(400).json({ error: 'No students selected' });
       }
 
-      if (!req.file) {
-        return res.status(400).json({ error: 'No Excel file uploaded' });
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No Excel files uploaded' });
+      }
+
+      if (!quizClass) {
+        return res.status(400).json({ error: 'Class information is required' });
+      }
+
+      // Get section names from the request
+      const sectionNames = Array.isArray(req.body.sectionNames) ? req.body.sectionNames : [req.body.sectionNames];
+
+      if (sectionNames.length !== req.files.length) {
+        return res.status(400).json({ error: 'Number of section names must match number of files' });
       }
 
       // Connect to MongoDB
@@ -3729,7 +3740,7 @@ router.post('/create-quiz-for-students', (req, res) => {
       // Validate each student username exists
       const validStudents = [];
       const invalidStudents = [];
-      
+
       for (const username of studentUsernames) {
         let found = false;
         
@@ -3758,38 +3769,58 @@ router.post('/create-quiz-for-students', (req, res) => {
         });
       }
 
-      // Create quiz document for MongoDB
+      // Create quiz object with sections
       const quiz = {
         name: quizName,
+        class: quizClass,
+        examDate: new Date(examDate),
+        testDuration: parseInt(testDuration),
         startTime: startTime,
         endTime: endTime,
-        class: '999', // Special class number for student-specific quizzes
         type: 'excel',
-        file: req.file.filename,
+        sections: sectionNames.map((name, index) => ({
+          name: name,
+          file: req.files[index].filename
+        })),
+        negativeMarking: parseFloat(negativeMarking) || 0,
+        questionMarks: parseInt(questionMarks) || 1,
+        createdAt: new Date(),
         isStudentSpecific: true,
-        allowedStudents: validStudents,
+        studentUsernames: validStudents
+      };
+
+      // Check if quiz already exists in MongoDB
+      const existingQuiz = await db.collection('quizzes').findOne({ name: quizName });
+      if (existingQuiz) {
+        // Delete the uploaded files since quiz already exists
+        req.files.forEach(file => {
+          const filePath = path.join(uploadDir, file.filename);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+        throw new Error('Quiz with this name already exists');
+      }
+
+      // Insert into quizzes collection
+      await db.collection('quizzes').insertOne(quiz);
+
+      // Create retake document
+      const retakeDoc = {
+        quizName: quizName,
+        retakes: validStudents,
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
-      // Save quiz to MongoDB
-      const quizzesCollection = db.collection('quizzes');
-      await quizzesCollection.insertOne(quiz);
+      // Insert into retakes collection
+      await db.collection('retakes').insertOne(retakeDoc);
 
-      // Create retake document in MongoDB
-      const retakesCollection = db.collection('retakes');
-      await retakesCollection.insertOne({
-        quizName,
-        retakes: validStudents,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      console.log('Quiz object stored in MongoDB:', quiz);
+      console.log('Retake document stored in MongoDB:', retakeDoc);
+      console.log('Filenames in uploaded files:', req.files.map(f => f.filename));
 
       await client.close();
-
-      // Log information about the quiz creation
-      console.log(`Created student-specific quiz "${quizName}" for ${validStudents.length} students`);
-      console.log('Student classes:', studentClasses);
 
       res.json({ 
         success: true, 
