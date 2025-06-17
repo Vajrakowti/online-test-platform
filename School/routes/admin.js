@@ -2553,7 +2553,15 @@ router.post('/update-quiz-excel/:quizName', upload.single('quizFile'), async (re
 
     try {
         const quizName = decodeURIComponent(req.params.quizName);
-        const { startTime, endTime, quizClass } = req.body;
+        const { 
+            startTime, 
+            endTime, 
+            quizClass, 
+            testDuration,
+            examDate,
+            negativeMarking,
+            questionMarks
+        } = req.body;
         let file = req.file;
 
         // Connect to MongoDB
@@ -2570,20 +2578,15 @@ router.post('/update-quiz-excel/:quizName', upload.single('quizFile'), async (re
             return res.status(404).json({ error: 'Quiz not found' });
         }
 
-        // Check if quiz has already started
-        const now = getISTNow();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-        if (quiz.startTime <= currentTime) {
-            await client.close();
-            return res.status(400).json({ error: 'Cannot edit quiz after it has started' });
-        }
-
         // Update quiz in MongoDB
         const updateData = {
             startTime,
             endTime,
-            class: quizClass
+            class: quizClass,
+            testDuration: parseInt(testDuration),
+            examDate: new Date(examDate),
+            negativeMarking: parseFloat(negativeMarking) || 0,
+            questionMarks: parseInt(questionMarks) || 1
         };
 
         // If a new file was uploaded, update the file field
@@ -2607,10 +2610,7 @@ router.post('/update-quiz-excel/:quizName', upload.single('quizFile'), async (re
             message: 'Quiz updated successfully',
             quiz: {
                 name: quizName,
-                startTime,
-                endTime,
-                class: quizClass,
-                file: updateData.file || quiz.file
+                ...updateData
             }
         });
     } catch (error) {
@@ -2633,7 +2633,15 @@ router.post('/update-quiz-manual/:quizName', upload.fields([
 
     try {
         const quizName = decodeURIComponent(req.params.quizName);
-        const { startTime, endTime, quizClass } = req.body;
+        const { 
+            startTime, 
+            endTime, 
+            quizClass,
+            testDuration,
+            examDate,
+            negativeMarking,
+            questionMarks
+        } = req.body;
         const files = req.files;
 
         // Connect to MongoDB
@@ -2650,51 +2658,39 @@ router.post('/update-quiz-manual/:quizName', upload.fields([
             return res.status(404).json({ error: 'Quiz not found' });
         }
 
-        // Check if quiz has already started
-        const now = getISTNow();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-        if (quiz.startTime <= currentTime) {
-            await client.close();
-            return res.status(400).json({ error: 'Cannot edit quiz after it has started' });
-        }
-
         // Process questions and their images
         const questions = [];
         let questionIndex = 0;
 
-        while (req.body[`questionText_${questionIndex}`]) {
-            const question = {
-                text: req.body[`questionText_${questionIndex}`],
+        // Process each question
+        while (req.body[`question_${questionIndex}`]) {
+            const questionObj = {
+                question: req.body[`question_${questionIndex}`],
                 options: [
-                    req.body[`questionOption1_${questionIndex}`],
-                    req.body[`questionOption2_${questionIndex}`],
-                    req.body[`questionOption3_${questionIndex}`],
-                    req.body[`questionOption4_${questionIndex}`]
+                    req.body[`option1_${questionIndex}`],
+                    req.body[`option2_${questionIndex}`],
+                    req.body[`option3_${questionIndex}`],
+                    req.body[`option4_${questionIndex}`]
                 ],
-                correctAnswer: parseInt(req.body[`questionCorrect_${questionIndex}`]) - 1
+                correctAnswer: parseInt(req.body[`correctAnswer_${questionIndex}`]),
+                optionImages: [null, null, null, null]
             };
 
-            // Handle question image
-            if (files[`questionImage_${questionIndex}`]) {
-                question.image = `/uploads/${files[`questionImage_${questionIndex}`][0].filename}`;
-            } else if (req.body[`existingQuestionImage_${questionIndex}`]) {
-                question.image = req.body[`existingQuestionImage_${questionIndex}`];
+            // Process question image
+            const questionImages = files ? (files[`questionImage_${questionIndex}`] || []) : [];
+            if (questionImages.length > 0) {
+                questionObj.questionImage = `/quiz-images/${questionImages[0].filename}`;
             }
 
-            // Handle option images
-            question.optionImages = [];
+            // Process option images
             for (let i = 1; i <= 4; i++) {
-                if (files[`questionOption${i}Image_${questionIndex}`]) {
-                    question.optionImages.push(`/uploads/${files[`questionOption${i}Image_${questionIndex}`][0].filename}`);
-                } else if (req.body[`existingOption${i}Image_${questionIndex}`]) {
-                    question.optionImages.push(req.body[`existingOption${i}Image_${questionIndex}`]);
-                } else {
-                    question.optionImages.push(null);
+                const optionImages = files ? (files[`questionOption${i}Image_${questionIndex}`] || []) : [];
+                if (optionImages.length > 0) {
+                    questionObj.optionImages[i-1] = `/quiz-images/${optionImages[0].filename}`;
                 }
             }
 
-            questions.push(question);
+            questions.push(questionObj);
             questionIndex++;
         }
 
@@ -2706,6 +2702,10 @@ router.post('/update-quiz-manual/:quizName', upload.fields([
                     startTime,
                     endTime,
                     class: quizClass,
+                    testDuration: parseInt(testDuration),
+                    examDate: new Date(examDate),
+                    negativeMarking: parseFloat(negativeMarking) || 0,
+                    questionMarks: parseInt(questionMarks) || 1,
                     totalQuestions: questions.length
                 }
             }
@@ -2733,6 +2733,10 @@ router.post('/update-quiz-manual/:quizName', upload.fields([
                 startTime,
                 endTime,
                 class: quizClass,
+                testDuration: parseInt(testDuration),
+                examDate: new Date(examDate),
+                negativeMarking: parseFloat(negativeMarking) || 0,
+                questionMarks: parseInt(questionMarks) || 1,
                 totalQuestions: questions.length
             }
         });

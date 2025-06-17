@@ -917,31 +917,100 @@
 
   <script>
     // Display selected file name for Excel upload
-    document.getElementById('quizFile').addEventListener('change', function(e) {
-      const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-      document.getElementById('fileName').textContent = fileName;
+    document.addEventListener('DOMContentLoaded', function() {
+      const quizFile = document.getElementById('quizFile');
+      if (quizFile) {
+        quizFile.addEventListener('change', function(e) {
+          const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+          const fileNameElement = document.getElementById('fileName');
+          if (fileNameElement) {
+            fileNameElement.textContent = fileName;
+          }
+        });
+      }
+
+      // Quiz type selector functionality
+      document.querySelectorAll('.quiz-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          // Update button states
+          document.querySelectorAll('.quiz-type-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+
+          // Show/hide appropriate form
+          const type = this.getAttribute('data-type');
+          document.querySelectorAll('.quiz-section').forEach(section => {
+            section.classList.remove('active');
+          });
+          const form = document.getElementById(type + 'QuizForm');
+          if (form) {
+            form.classList.add('active');
+          }
+          
+          // If switching to manual form and no questions exist, add one
+          if (type === 'manual' && document.querySelectorAll('.question-container').length === 0) {
+            addQuestion();
+          }
+        });
+      });
+
+      // Initialize math keyboard and load custom classes
+      initMathKeyboard();
+      loadCustomClasses();
     });
 
-    // Quiz type selector functionality
-    document.querySelectorAll('.quiz-type-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        // Update button states
-        document.querySelectorAll('.quiz-type-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-
-        // Show/hide appropriate form
-        const type = this.getAttribute('data-type');
-        document.querySelectorAll('.quiz-section').forEach(section => {
-          section.classList.remove('active');
-        });
-        const form = document.getElementById(type + 'QuizForm');
-        form.classList.add('active');
+    // Load custom classes from localStorage
+    function loadCustomClasses() {
+      try {
+        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+        console.log('Loading custom classes:', customClasses); // Debug log
         
-        // If switching to manual form and no questions exist, add one
-        if (type === 'manual' && document.querySelectorAll('.question-container').length === 0) {
-          addQuestion();
+        const excelQuizClassSelect = document.getElementById('quizClass');
+        const manualQuizClassSelect = document.querySelector('#manualQuizForm select[name="quizClass"]');
+        
+        console.log('Excel select:', excelQuizClassSelect); // Debug log
+        console.log('Manual select:', manualQuizClassSelect); // Debug log
+        
+        // Helper function to update a select element
+        function updateSelect(selectElement) {
+          if (!selectElement) {
+            console.log('Select element not found'); // Debug log
+            return;
+          }
+          
+          // Remove any existing custom classes (except the default ones)
+          Array.from(selectElement.options).forEach(option => {
+            if (!option.value.match(/^[1-9]|10$/)) {
+              selectElement.removeChild(option);
+            }
+          });
+          
+          // Add custom classes
+          customClasses.forEach(cls => {
+            if (!Array.from(selectElement.options).some(opt => opt.value === cls)) {
+              const opt = document.createElement('option');
+              opt.value = cls;
+              opt.text = cls;
+              selectElement.appendChild(opt);
+            }
+          });
+          
+          console.log('Updated select options:', Array.from(selectElement.options).map(opt => opt.value)); // Debug log
         }
-      });
+        
+        // Update both select elements
+        updateSelect(excelQuizClassSelect);
+        updateSelect(manualQuizClassSelect);
+      } catch (error) {
+        console.error('Error loading custom classes:', error);
+      }
+    }
+
+    // Add event listener for storage changes
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'customClasses') {
+        console.log('Storage changed, reloading custom classes'); // Debug log
+        loadCustomClasses();
+      }
     });
 
     // Question counter for unique IDs
@@ -1216,48 +1285,6 @@
     function removeQuestion(index) {
       document.getElementById('question-' + index).remove();
     }
-
-    // Load custom classes from localStorage
-    function loadCustomClasses() {
-      try {
-        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-        const quizClassSelect = document.getElementById('quizClass');
-        
-        // Remove any existing custom classes (except the default ones)
-        Array.from(quizClassSelect.options).forEach(option => {
-          if (!option.value.match(/^[1-9]|10$/)) {
-            quizClassSelect.removeChild(option);
-          }
-        });
-        
-        // Add custom classes
-        customClasses.forEach(cls => {
-          if (!Array.from(quizClassSelect.options).some(opt => opt.value === cls)) {
-            const opt = document.createElement('option');
-            opt.value = cls;
-            opt.text = cls;
-            quizClassSelect.appendChild(opt);
-          }
-        });
-      } catch (error) {
-        console.error('Error loading custom classes:', error);
-      }
-    }
-
-    // Initialize when page loads
-    window.onload = function() {
-      // Initially display Excel form
-      document.querySelector('.quiz-type-btn[data-type="excel"]').click();
-      initMathKeyboard();
-      loadCustomClasses(); // Load custom classes
-    };
-
-    // Add event listener for storage changes
-    window.addEventListener('storage', function(e) {
-      if (e.key === 'customClasses') {
-        loadCustomClasses();
-      }
-    });
 
     function addSection() {
       const sectionsContainer = document.getElementById('sectionsContainer');
