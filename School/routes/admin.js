@@ -2902,7 +2902,7 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                     class: result.class,
                     name: result.name,
                     email: result.email,
-                    score: `${result.score}/${result.totalQuestions}`,
+                    score: `${result.score}/${result.totalMarks}`,
                     percentage: `${result.percentage}%`,
                     attemptedAt: new Date(result.attemptedAt).toLocaleString()
                 });
@@ -3241,7 +3241,7 @@ function renderResultsByClass(results) {
                             <tr>
                                 <td>${result.name}</td>
                                 <td>${result.email}</td>
-                                <td>${result.score}/${result.totalQuestions}</td>
+                                <td>${result.score}/${result.totalMarks}</td>
                                 <td class="percentage-cell">
                                     ${result.percentage}%
                                     <div class="percentage-bar">
