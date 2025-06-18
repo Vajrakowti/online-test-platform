@@ -452,6 +452,7 @@ router.post('/submit-quiz', async (req, res) => {
         });
 
         // Save the attempt
+        const now = new Date();
         await attemptsCollection.insertOne({
             studentId: studentUsername,
             quizName: quizName,
@@ -460,7 +461,8 @@ router.post('/submit-quiz', async (req, res) => {
             answers: studentAnswers,
             negativeMarking: negativeMarking,
             questionMarks: questionMarks,
-            submittedAt: new Date(),
+            submittedAt: now,
+            attemptedAt: now, // Ensure compatibility for admin view
             shuffledQuestions: displayedQuestions // Save the full question objects for accurate result mapping
         });
 

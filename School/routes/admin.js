@@ -7,6 +7,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const nodemailer = require('nodemailer');
 const excel = require('exceljs');
 const xlsx = require('xlsx');
+const Quiz = require('../models/Quiz');
 
 // MongoDB connection URL
 const url = process.env.MONGODB_URI || "mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles";
@@ -2773,6 +2774,19 @@ router.get('/quiz-results/:quizName', async (req, res) => {
         // Get all attempts for this quiz from MongoDB
         const attemptsCollection = db.collection('attempts');
         const attempts = await attemptsCollection.find({ quizName }).toArray();
+
+        // Fetch the quiz config for fallback
+        const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
+        let quizTotalQuestions = 0;
+        let quizQuestionMarks = 1;
+        if (quizConfig) {
+            if (quizConfig.sections && Array.isArray(quizConfig.sections)) {
+                quizTotalQuestions = quizConfig.sections.reduce((sum, section) => sum + (section.questions ? section.questions.length : 0), 0);
+            } else if (quizConfig.questions && Array.isArray(quizConfig.questions)) {
+                quizTotalQuestions = quizConfig.questions.length;
+            }
+            quizQuestionMarks = quizConfig.questionMarks || 1;
+        }
         
         let allResults = [];
         for (const attempt of attempts) {
@@ -2790,13 +2804,46 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                 }
             }
             if (studentDetails && (!classFilter || studentDetails.class === classFilter)) {
+                // Robustly determine totalQuestions and totalMarks
+                let totalQuestions = attempt.totalQuestions;
+                let totalMarks = attempt.totalMarks;
+                if (!totalQuestions) {
+                    if (attempt.shuffledQuestions && Array.isArray(attempt.shuffledQuestions)) {
+                        totalQuestions = attempt.shuffledQuestions.length;
+                    } else {
+                        totalQuestions = quizTotalQuestions;
+                    }
+                }
+                if (!totalMarks) {
+                    totalMarks = totalQuestions * quizQuestionMarks;
+                }
+                // Robust percentage calculation
+                let percentage = (typeof attempt.score === 'number' && typeof totalMarks === 'number' && totalMarks > 0)
+                    ? Math.round((attempt.score / totalMarks) * 100)
+                    : 0;
+                // Robust date display
+                let attemptedAt = '';
+                if (attempt.attemptedAt) {
+                    const dateObj = new Date(attempt.attemptedAt);
+                    attemptedAt = isNaN(dateObj.getTime()) ? 'N/A' : dateObj.toLocaleString();
+                } else if (attempt.submittedAt) {
+                    const dateObj = new Date(attempt.submittedAt);
+                    attemptedAt = isNaN(dateObj.getTime()) ? 'N/A' : dateObj.toLocaleString();
+                } else {
+                    attemptedAt = 'N/A';
+                }
+                // If attemptedAt is still 'Invalid Date', force to 'N/A'
+                if (!attemptedAt || attemptedAt === 'Invalid Date') {
+                    attemptedAt = 'N/A';
+                }
                 allResults.push({
                     ...studentDetails,
                     username: attempt.studentId,
                     score: attempt.score,
-                    totalQuestions: attempt.totalQuestions,
-                    percentage: Math.round((attempt.score / attempt.totalQuestions) * 100),
-                    attemptedAt: attempt.attemptedAt
+                    totalQuestions,
+                    totalMarks,
+                    percentage,
+                    attemptedAt
                 });
             }
         }
@@ -3181,7 +3228,7 @@ function renderResultsByClass(results) {
                                         <div class="percentage-fill" style="width: ${result.percentage}%"></div>
                                     </div>
                                 </td>
-                                <td>${new Date(result.attemptedAt).toLocaleString()}</td>
+                                <td>${result.attemptedAt}</td>
                             </tr>
                         `).join('')}
                     </tbody>
