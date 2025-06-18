@@ -643,6 +643,26 @@ router.post('/add-student', uploadStudentPhoto.single('photo'), async (req, res)
     await client.connect();
     const db = client.db(req.session.adminDb);
     
+    // Check if this is a custom class (not a standard class 1-10)
+    const isCustomClass = !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(studentClass);
+    
+    if (isCustomClass) {
+      // Add custom class to custom_classes collection if it doesn't exist
+      const customClassesCollection = db.collection('custom_classes');
+      const existingClass = await customClassesCollection.findOne({ 
+        adminId: req.session.adminId, 
+        className: studentClass 
+      });
+      
+      if (!existingClass) {
+        await customClassesCollection.insertOne({
+          adminId: req.session.adminId,
+          className: studentClass,
+          createdAt: new Date()
+        });
+      }
+    }
+    
     // Insert into the appropriate class collection
     const collectionName = `class_${studentClass}`;
     await db.collection(collectionName).insertOne(studentData);
@@ -5087,17 +5107,50 @@ router.get('/api/classes', async (req, res) => {
     const client = new MongoClient(url);
     await client.connect();
     const db = client.db(req.session.adminDb);
+    
+    // Get standard class collections
     const collections = await db.listCollections().toArray();
     const classCollections = collections.filter(c => c.name.startsWith('class_'));
     const classes = [];
+    
+    // Add standard classes
     for (const collection of classCollections) {
       const className = collection.name.replace('class_', '');
       const count = await db.collection(collection.name).countDocuments();
       classes.push({ name: className, count });
     }
+    
+    // Get custom classes for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
+    
+    // Add custom classes
+    for (const customClass of customClasses) {
+      const collectionName = `class_${customClass.className}`;
+      const count = await db.collection(collectionName).countDocuments();
+      classes.push({ name: customClass.className, count });
+    }
+    
+    // Sort classes: standard classes first (numerically), then custom classes (alphabetically)
+    classes.sort((a, b) => {
+      const aNum = parseInt(a.name);
+      const bNum = parseInt(b.name);
+      
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      } else if (!isNaN(aNum)) {
+        return -1; // Standard classes first
+      } else if (!isNaN(bNum)) {
+        return 1; // Standard classes first
+      } else {
+        return a.name.localeCompare(b.name); // Alphabetical for custom classes
+      }
+    });
+    
     await client.close();
     res.json(classes);
   } catch (err) {
+    console.error('Error fetching classes:', err);
     res.status(500).json({ error: 'Failed to fetch classes' });
   }
 });
@@ -5111,18 +5164,263 @@ router.get('/stats/class-counts', async (req, res) => {
     const client = new MongoClient(url);
     await client.connect();
     const db = client.db(req.session.adminDb);
+    
+    // Get standard class collections
     const collections = await db.listCollections().toArray();
     const classCollections = collections.filter(c => c.name.startsWith('class_'));
     const classCounts = {};
+    
+    // Count students in standard classes
     for (const collection of classCollections) {
       const className = collection.name.replace('class_', '');
       const count = await db.collection(collection.name).countDocuments();
       classCounts[className] = count;
     }
+    
+    // Get custom classes for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
+    
+    // Add custom classes to counts (they might already be in classCounts from above)
+    for (const customClass of customClasses) {
+      const collectionName = `class_${customClass.className}`;
+      const count = await db.collection(collectionName).countDocuments();
+      classCounts[customClass.className] = count;
+    }
+    
     await client.close();
     res.json(classCounts);
   } catch (error) {
+    console.error('Error fetching class counts:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint to get admin-specific custom classes
+router.get('/api/custom-classes', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Get custom classes for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
+    
+    await client.close();
+    
+    // Extract just the class names
+    const classNames = customClasses.map(cls => cls.className);
+    res.json(classNames);
+  } catch (err) {
+    console.error('Error fetching custom classes:', err);
+    res.status(500).json({ error: 'Failed to fetch custom classes' });
+  }
+});
+
+// API endpoint to add a custom class
+router.post('/api/custom-classes', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { className } = req.body;
+    
+    if (!className || !className.trim()) {
+      return res.status(400).json({ error: 'Class name is required' });
+    }
+
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Check if custom class already exists for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const existingClass = await customClassesCollection.findOne({ 
+      adminId: req.session.adminId, 
+      className: className.trim() 
+    });
+    
+    if (existingClass) {
+      await client.close();
+      return res.status(400).json({ error: 'Custom class already exists' });
+    }
+    
+    // Add new custom class
+    await customClassesCollection.insertOne({
+      adminId: req.session.adminId,
+      className: className.trim(),
+      createdAt: new Date()
+    });
+    
+    await client.close();
+    res.json({ success: true, className: className.trim() });
+  } catch (err) {
+    console.error('Error adding custom class:', err);
+    res.status(500).json({ error: 'Failed to add custom class' });
+  }
+});
+
+// API endpoint to delete a custom class
+router.delete('/api/custom-classes/:className', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const className = decodeURIComponent(req.params.className);
+    
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Check if there are any students in this custom class
+    const collectionName = `class_${className}`;
+    const studentCount = await db.collection(collectionName).countDocuments();
+    
+    // Delete the custom class
+    const customClassesCollection = db.collection('custom_classes');
+    const result = await customClassesCollection.deleteOne({ 
+      adminId: req.session.adminId, 
+      className: className 
+    });
+    
+    if (result.deletedCount === 0) {
+      await client.close();
+      return res.status(404).json({ error: 'Custom class not found' });
+    }
+    
+    // If there were students in the class, delete them from the user collection as well
+    if (studentCount > 0) {
+      try {
+        // Get all students from the class collection
+        const students = await db.collection(collectionName).find({}).toArray();
+        
+        // Delete students from the user collection (for authentication)
+        for (const student of students) {
+          await db.collection("user").deleteOne({ Username: student.Username });
+        }
+        
+        console.log(`Deleted ${studentCount} students from class ${className}`);
+      } catch (studentDeleteErr) {
+        console.error('Error deleting students from user collection:', studentDeleteErr);
+        // Continue with class deletion even if student deletion fails
+      }
+    }
+    
+    // Drop the collection if it exists
+    try {
+      await db.collection(collectionName).drop();
+    } catch (dropErr) {
+      // Collection might not exist, which is fine
+      console.log(`Collection ${collectionName} doesn't exist or already dropped`);
+    }
+    
+    await client.close();
+    
+    const message = studentCount > 0 
+      ? `Custom class "${className}" and ${studentCount} student(s) deleted successfully`
+      : `Custom class "${className}" deleted successfully`;
+      
+    res.json({ success: true, message: message });
+  } catch (err) {
+    console.error('Error deleting custom class:', err);
+    res.status(500).json({ error: 'Failed to delete custom class' });
+  }
+});
+
+// API endpoint to get all classes (standard + custom) for dropdowns
+router.get('/api/all-classes', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Get custom classes for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
+    
+    await client.close();
+    
+    // Standard classes
+    const standardClasses = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    
+    // Custom classes
+    const customClassNames = customClasses.map(cls => cls.className);
+    
+    // Combine and sort
+    const allClasses = [...standardClasses, ...customClassNames].sort((a, b) => {
+      // Sort numerically for standard classes, alphabetically for custom classes
+      const aNum = parseInt(a);
+      const bNum = parseInt(b);
+      
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      } else if (!isNaN(aNum)) {
+        return -1; // Standard classes first
+      } else if (!isNaN(bNum)) {
+        return 1; // Standard classes first
+      } else {
+        return a.localeCompare(b); // Alphabetical for custom classes
+      }
+    });
+    
+    res.json(allClasses);
+  } catch (err) {
+    console.error('Error fetching all classes:', err);
+    res.status(500).json({ error: 'Failed to fetch classes' });
+  }
+});
+
+// Custom Class Management Page
+router.get('/custom-classes', (req, res) => {
+  if (req.session.fname && req.session.role === 'admin') {
+    res.sendFile(path.join(__dirname, "../public/custom-classes.html"));
+  } else {
+    res.redirect("/login");
+  }
+});
+
+// API endpoint to get admin-specific custom classes with student counts
+router.get('/api/custom-classes-with-counts', async (req, res) => {
+  if (!req.session.fname || req.session.role !== 'admin') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const client = new MongoClient(url);
+    await client.connect();
+    const db = client.db(req.session.adminDb);
+    
+    // Get custom classes for this admin
+    const customClassesCollection = db.collection('custom_classes');
+    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
+    
+    // Get student counts for each custom class
+    const classesWithCounts = [];
+    for (const customClass of customClasses) {
+      const collectionName = `class_${customClass.className}`;
+      const studentCount = await db.collection(collectionName).countDocuments();
+      classesWithCounts.push({
+        className: customClass.className,
+        studentCount: studentCount
+      });
+    }
+    
+    await client.close();
+    res.json(classesWithCounts);
+  } catch (err) {
+    console.error('Error fetching custom classes with counts:', err);
+    res.status(500).json({ error: 'Failed to fetch custom classes' });
   }
 });
 

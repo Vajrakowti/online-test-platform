@@ -955,63 +955,50 @@
 
       // Initialize math keyboard and load custom classes
       initMathKeyboard();
-      loadCustomClasses();
+      loadAllClasses();
     });
 
-    // Load custom classes from localStorage
-    function loadCustomClasses() {
+    // Load all classes (standard + custom) from server
+    async function loadAllClasses() {
       try {
-        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-        console.log('Loading custom classes:', customClasses); // Debug log
+        const response = await fetch('/admin/api/all-classes');
+        if (!response.ok) {
+          throw new Error('Failed to fetch classes');
+        }
+        const allClasses = await response.json();
         
         const excelQuizClassSelect = document.getElementById('quizClass');
         const manualQuizClassSelect = document.querySelector('#manualQuizForm select[name="quizClass"]');
         
-        console.log('Excel select:', excelQuizClassSelect); // Debug log
-        console.log('Manual select:', manualQuizClassSelect); // Debug log
-        
         // Helper function to update a select element
         function updateSelect(selectElement) {
           if (!selectElement) {
-            console.log('Select element not found'); // Debug log
+            console.log('Select element not found');
             return;
           }
           
-          // Remove any existing custom classes (except the default ones)
-          Array.from(selectElement.options).forEach(option => {
-            if (!option.value.match(/^[1-9]|10$/)) {
-              selectElement.removeChild(option);
-            }
-          });
+          // Clear existing options except the first "Select Class" option
+          while (selectElement.options.length > 1) {
+            selectElement.remove(1);
+          }
           
-          // Add custom classes
-          customClasses.forEach(cls => {
-            if (!Array.from(selectElement.options).some(opt => opt.value === cls)) {
-              const opt = document.createElement('option');
-              opt.value = cls;
-              opt.text = cls;
-              selectElement.appendChild(opt);
-            }
+          // Add all classes
+          allClasses.forEach(cls => {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.text = cls;
+            selectElement.appendChild(opt);
           });
-          
-          console.log('Updated select options:', Array.from(selectElement.options).map(opt => opt.value)); // Debug log
         }
         
         // Update both select elements
         updateSelect(excelQuizClassSelect);
         updateSelect(manualQuizClassSelect);
+        
       } catch (error) {
-        console.error('Error loading custom classes:', error);
+        console.error('Error loading classes:', error);
       }
     }
-
-    // Add event listener for storage changes
-    window.addEventListener('storage', function(e) {
-      if (e.key === 'customClasses') {
-        console.log('Storage changed, reloading custom classes'); // Debug log
-        loadCustomClasses();
-      }
-    });
 
     // Question counter for unique IDs
     let questionCounter = 0;
@@ -1331,4 +1318,5 @@
     });
   </script>
 </body>
+</html>
 </html>

@@ -1463,6 +1463,9 @@
           document.getElementById(type + 'QuizForm').classList.add('active');
         });
       });
+      
+      // Load all classes (standard + custom) from server
+      loadAllClasses();
     });
 
     // Add function to add a new section
@@ -1502,6 +1505,47 @@
       removeButtons.forEach(button => {
         button.style.display = sectionsContainer.children.length > 1 ? 'block' : 'none';
       });
+    }
+
+    // Load all classes (standard + custom) from server
+    async function loadAllClasses() {
+      try {
+        const response = await fetch('/admin/api/all-classes');
+        if (!response.ok) {
+          throw new Error('Failed to fetch classes');
+        }
+        const allClasses = await response.json();
+        
+        const excelQuizClassSelect = document.getElementById('excelQuizClass');
+        const manualQuizClassSelect = document.getElementById('manualQuizClass');
+        
+        // Helper function to update a select element
+        function updateSelect(selectElement) {
+          if (!selectElement) {
+            return;
+          }
+          
+          // Clear existing options except the first "Select Class" option
+          while (selectElement.options.length > 1) {
+            selectElement.remove(1);
+          }
+          
+          // Add all classes
+          allClasses.forEach(cls => {
+            const opt = document.createElement('option');
+            opt.value = cls;
+            opt.text = cls;
+            selectElement.appendChild(opt);
+          });
+        }
+        
+        // Update both select elements
+        updateSelect(excelQuizClassSelect);
+        updateSelect(manualQuizClassSelect);
+        
+      } catch (error) {
+        console.error('Error loading classes:', error);
+      }
     }
   </script>
 

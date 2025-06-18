@@ -667,10 +667,7 @@
                   <option value="8">Class 8</option>
                   <option value="9">Class 9</option>
                   <option value="10">Class 10</option>
-                  <option value="custom">Custom Class</option>
                 </select>
-                <input type="text" id="customClassInput" placeholder="Enter custom class name" style="display:none; margin-top:8px;" />
-                <div class="error-message" id="customClassError" style="display:none;">Please enter a custom class name</div>
               </div>
 
               <div class="form-group">
@@ -747,144 +744,70 @@
       }
     });
     
-    // Toggle dropdown menus
-    document.addEventListener('DOMContentLoaded', function() {
-        const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
-        
-        dropdownToggles.forEach(toggle => {
-            toggle.addEventListener('click', function() {
-                const parent = this.parentElement;
-                const dropdownMenu = parent.querySelector('.dropdown-menu');
-                
-                // Close all other dropdowns
-                document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
-                    if (menu !== dropdownMenu) {
-                        menu.classList.remove('show');
-                    }
-                });
-                
-                // Toggle current dropdown
-                dropdownMenu.classList.toggle('show');
-                this.classList.toggle('active');
-            });
-        });
-        
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.sidebar-dropdown')) {
-                document.querySelectorAll('.dropdown-menu').forEach(menu => {
-                    menu.classList.remove('show');
-                });
-                document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
-                    toggle.classList.remove('active');
-                });
-            }
-        });
-    });
-
-    // Custom class logic with persistence
+    // Load all classes (standard + custom) from server
     const studentClassSelect = document.getElementById('studentClass');
-    const customClassInput = document.getElementById('customClassInput');
-    const customClassError = document.getElementById('customClassError');
-
-    // Load custom classes from localStorage
-    function loadCustomClasses() {
+    
+    async function loadAllClasses() {
       try {
-        const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-        customClasses.forEach(cls => {
-          if (!Array.from(studentClassSelect.options).some(opt => opt.value === cls)) {
+        const response = await fetch('/admin/api/all-classes');
+        if (!response.ok) {
+          throw new Error('Failed to fetch classes');
+        }
+        const allClasses = await response.json();
+        
+        // Clear existing options except the first "Select a class" option
+        while (studentClassSelect.options.length > 1) {
+          studentClassSelect.remove(1);
+        }
+        
+        // Add standard classes
+        for (let i = 1; i <= 10; i++) {
+          const opt = document.createElement('option');
+          opt.value = i.toString();
+          opt.text = `Class ${i}`;
+          studentClassSelect.appendChild(opt);
+        }
+        
+        // Add custom classes
+        allClasses.forEach(cls => {
+          if (!['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(cls)) {
             const opt = document.createElement('option');
             opt.value = cls;
             opt.text = cls;
-            studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
+            studentClassSelect.appendChild(opt);
           }
         });
+        
       } catch (error) {
-        console.error('Error loading custom classes:', error);
+        console.error('Error loading classes:', error);
       }
     }
-    loadCustomClasses();
 
-    studentClassSelect.addEventListener('change', function() {
-      if (this.value === 'custom') {
-        customClassInput.style.display = 'block';
-        customClassInput.required = true;
-      } else {
-        customClassInput.style.display = 'none';
-        customClassInput.required = false;
-        customClassError.style.display = 'none';
-      }
-    });
-
-    form.addEventListener('submit', function(e) {
-      if (studentClassSelect.value === 'custom' && !customClassInput.value.trim()) {
-        customClassError.style.display = 'block';
-        customClassInput.focus();
-        e.preventDefault();
-        return;
-      } else {
-        customClassError.style.display = 'none';
-      }
-      
-      // Before submit, if custom class is used, set its value to studentClass
-      if (studentClassSelect.value === 'custom') {
-        const customValue = customClassInput.value.trim();
-        if (customValue) {
-          try {
-            // Add to dropdown and localStorage if not already present
-            let exists = Array.from(studentClassSelect.options).some(opt => opt.value === customValue);
-            if (!exists) {
-              let opt = document.createElement('option');
-              opt.value = customValue;
-              opt.text = customValue;
-              opt.selected = true;
-              studentClassSelect.insertBefore(opt, studentClassSelect.querySelector('option[value="custom"]'));
-              
-              // Save to localStorage
-              let customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
-              if (!customClasses.includes(customValue)) {
-                customClasses.push(customValue);
-                localStorage.setItem('customClasses', JSON.stringify(customClasses));
-                
-                // Trigger storage event for other pages
-                window.dispatchEvent(new StorageEvent('storage', {
-                  key: 'customClasses',
-                  newValue: JSON.stringify(customClasses),
-                  oldValue: localStorage.getItem('customClasses'),
-                  storageArea: localStorage
-                }));
-              }
-            }
-            studentClassSelect.value = customValue;
-          } catch (error) {
-            console.error('Error saving custom class:', error);
-          }
-        }
-      }
-    });
+    // Load classes on page load
+    loadAllClasses();
   </script>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
-    dropdownToggles.forEach(toggle => {
-      toggle.addEventListener('click', function() {
-        const parent = this.parentElement;
-        const dropdownMenu = parent.querySelector('.dropdown-menu');
-        document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
-          if (menu !== dropdownMenu) menu.classList.remove('show');
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+      dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+          const parent = this.parentElement;
+          const dropdownMenu = parent.querySelector('.dropdown-menu');
+          document.querySelectorAll('.sidebar-dropdown .dropdown-menu').forEach(menu => {
+            if (menu !== dropdownMenu) menu.classList.remove('show');
+          });
+          dropdownMenu.classList.toggle('show');
+          this.classList.toggle('active');
         });
-        dropdownMenu.classList.toggle('show');
-        this.classList.toggle('active');
+      });
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.sidebar-dropdown')) {
+          document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('show'));
+          document.querySelectorAll('.dropdown-toggle').forEach(toggle => toggle.classList.remove('active'));
+        }
       });
     });
-    document.addEventListener('click', function(event) {
-      if (!event.target.closest('.sidebar-dropdown')) {
-        document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.remove('show'));
-        document.querySelectorAll('.dropdown-toggle').forEach(toggle => toggle.classList.remove('active'));
-      }
-    });
-  });
   </script>
 </body>
 </html>
