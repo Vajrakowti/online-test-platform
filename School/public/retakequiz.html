@@ -566,16 +566,6 @@
                     <label for="classSelect">Class:</label>
                     <select id="classSelect">
                         <option value="">Select Class</option>
-                        <option value="1">Class 1</option>
-                        <option value="2">Class 2</option>
-                        <option value="3">Class 3</option>
-                        <option value="4">Class 4</option>
-                        <option value="5">Class 5</option>
-                        <option value="6">Class 6</option>
-                        <option value="7">Class 7</option>
-                        <option value="8">Class 8</option>
-                        <option value="9">Class 9</option>
-                        <option value="10">Class 10</option>
                     </select>
                 </div>
 
@@ -777,8 +767,8 @@
             document.getElementById('existingQuizSelection').style.display = 'none';
             document.getElementById('editQuizForm').style.display = 'none';
             
-            // Load custom classes into the dropdown
-            loadCustomClasses();
+            // Load all classes (standard + custom) from server
+            loadAllClasses();
             
             const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
             
@@ -1256,39 +1246,36 @@
             });
         }
 
-        // Add this new function to load custom classes
-        function loadCustomClasses() {
+        // Load all classes (standard + custom) from server
+        async function loadAllClasses() {
             try {
-                const customClasses = JSON.parse(localStorage.getItem('customClasses') || '[]');
+                const response = await fetch('/admin/api/all-classes');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch classes');
+                }
+                const allClasses = await response.json();
                 const classSelect = document.getElementById('classSelect');
                 
-                // Remove any existing custom classes (except the "custom" option)
-                Array.from(classSelect.options).forEach(opt => {
-                    if (opt.value !== 'custom' && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(opt.value)) {
-                        opt.remove();
-                    }
+                // Clear existing options except the first "Select Class" option
+                while (classSelect.options.length > 1) {
+                    classSelect.remove(1);
+                }
+                
+                // Add all classes
+                allClasses.forEach(cls => {
+                    const opt = document.createElement('option');
+                    opt.value = cls;
+                    opt.text = cls;
+                    classSelect.appendChild(opt);
                 });
                 
-                // Add custom classes to the dropdown
-                customClasses.forEach(cls => {
-                    if (!Array.from(classSelect.options).some(opt => opt.value === cls)) {
-                        const opt = document.createElement('option');
-                        opt.value = cls;
-                        opt.text = cls;
-                        classSelect.insertBefore(opt, classSelect.querySelector('option[value="custom"]'));
-                    }
-                });
             } catch (error) {
-                console.error('Error loading custom classes:', error);
+                console.error('Error loading classes:', error);
             }
         }
 
-        // Listen for storage events to update custom classes when changed in other pages
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'customClasses') {
-                loadCustomClasses();
-            }
-        });
+        // Load classes on page load
+        loadAllClasses();
 
         // Add section function
         function addSection() {
