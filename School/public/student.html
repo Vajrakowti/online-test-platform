@@ -970,7 +970,7 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${attempt.quizName}</td>
-                    <td>${attempt.score}/${attempt.totalQuestions}</td>
+                    <td>${attempt.score}/${attempt.totalMarks}</td>
                     <td>${new Date(attempt.submittedAt).toLocaleString()}</td>
                     <td>
                         <a href="/student/detailed-result/${encodeURIComponent(attempt.quizName)}" class="view-result-btn">

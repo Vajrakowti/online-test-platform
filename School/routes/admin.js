@@ -2902,7 +2902,7 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                     class: result.class,
                     name: result.name,
                     email: result.email,
-                    score: `${result.score}/${result.totalQuestions}`,
+                    score: `${result.score}/${result.totalMarks}`,
                     percentage: `${result.percentage}%`,
                     attemptedAt: new Date(result.attemptedAt).toLocaleString()
                 });
@@ -3241,7 +3241,7 @@ function renderResultsByClass(results) {
                             <tr>
                                 <td>${result.name}</td>
                                 <td>${result.email}</td>
-                                <td>${result.score}/${result.totalQuestions}</td>
+                                <td>${result.score}/${result.totalMarks}</td>
                                 <td class="percentage-cell">
                                     ${result.percentage}%
                                     <div class="percentage-bar">
@@ -5155,27 +5155,25 @@ router.get('/api/classes', async (req, res) => {
     await client.connect();
     const db = client.db(req.session.adminDb);
     
-    // Get standard class collections
+    const classes = [];
+    const processedClasses = new Set(); // Track processed classes to avoid duplicates
+    
+    // Get all collections that start with 'class_'
     const collections = await db.listCollections().toArray();
     const classCollections = collections.filter(c => c.name.startsWith('class_'));
-    const classes = [];
     
-    // Add standard classes
+    // Process all class collections
     for (const collection of classCollections) {
       const className = collection.name.replace('class_', '');
+      
+      // Skip if already processed
+      if (processedClasses.has(className)) {
+        continue;
+      }
+      
       const count = await db.collection(collection.name).countDocuments();
       classes.push({ name: className, count });
-    }
-    
-    // Get custom classes for this admin
-    const customClassesCollection = db.collection('custom_classes');
-    const customClasses = await customClassesCollection.find({ adminId: req.session.adminId }).toArray();
-    
-    // Add custom classes
-    for (const customClass of customClasses) {
-      const collectionName = `class_${customClass.className}`;
-      const count = await db.collection(collectionName).countDocuments();
-      classes.push({ name: customClass.className, count });
+      processedClasses.add(className);
     }
     
     // Sort classes: standard classes first (numerically), then custom classes (alphabetically)
@@ -5469,6 +5467,25 @@ router.get('/api/custom-classes-with-counts', async (req, res) => {
     console.error('Error fetching custom classes with counts:', err);
     res.status(500).json({ error: 'Failed to fetch custom classes' });
   }
+});
+
+// API endpoint to get count of unread student messages
+router.get('/api/unread-messages-count', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        // Count messages where read: false
+        const count = await db.collection('messages').countDocuments({ read: false });
+        await client.close();
+        res.json({ count });
+    } catch (err) {
+        console.error('Error fetching unread messages count:', err);
+        res.status(500).json({ error: 'Failed to fetch unread messages count' });
+    }
 });
 
 module.exports = router;

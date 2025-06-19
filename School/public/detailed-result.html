@@ -204,10 +204,10 @@
                 
                 // Update header information
                 document.getElementById('quizName').textContent = data.quizName;
-                document.getElementById('score').textContent = `${data.score}/${data.totalQuestions}`;
+                document.getElementById('score').textContent = `${data.score}/${data.totalMarks}`;
                 document.getElementById('percentage').textContent = 
-                    `${Math.round((data.score / data.totalQuestions) * 100)}%`;
-                document.getElementById('totalQuestions').textContent = data.totalQuestions;
+                    `${Math.round((data.score / data.totalMarks) * 100)}%`;
+                document.getElementById('totalQuestions').textContent = data.totalMarks;
 
                 // Group questions by section
                 const questionsBySection = data.questionsWithResults.reduce((acc, q) => {

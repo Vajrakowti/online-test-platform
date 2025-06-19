@@ -1098,7 +1098,7 @@ router.get('/api/result-data/:quizName', async (req, res) => {
             success: true,
             quizName: quizName,
             score: studentAttempt.score,
-            totalQuestions: studentAttempt.totalQuestions,
+            totalMarks: studentAttempt.totalMarks,
             questionsWithResults: questionsWithResults,
             submittedAt: studentAttempt.submittedAt
         });
@@ -1159,7 +1159,7 @@ router.get('/dashboard', async (req, res) => {
         attempts.forEach(attempt => {
             attemptMap[attempt.quizName] = {
                 score: attempt.score,
-                totalQuestions: attempt.totalQuestions,
+                totalMarks: attempt.totalMarks,
                 submittedAt: attempt.submittedAt
             };
         });

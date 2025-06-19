@@ -110,7 +110,7 @@ const quizSchema = new mongoose.Schema({
 });
 
 // Create indexes for better query performance
-quizSchema.index({ name: 1 });
+// quizSchema.index({ name: 1 }); // Removed to avoid duplicate index warning
 quizSchema.index({ class: 1 });
 quizSchema.index({ type: 1 });
 quizSchema.index({ startTime: 1, endTime: 1 });
