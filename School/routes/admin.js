@@ -2780,22 +2780,14 @@ router.get('/quiz-results/:quizName', async (req, res) => {
 
     const quizName = decodeURIComponent(req.params.quizName);
     const classFilter = req.query.class;
-    
     try {
-        // Connect to MongoDB
         const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
         await client.connect();
         const db = client.db(req.session.adminDb);
-        
-        // Get all class collections
         const collections = await db.listCollections().toArray();
         const classCollections = collections.filter(c => c.name.startsWith('class_'));
-        
-        // Get all attempts for this quiz from MongoDB
         const attemptsCollection = db.collection('attempts');
         const attempts = await attemptsCollection.find({ quizName }).toArray();
-
-        // Fetch the quiz config for fallback
         const quizConfig = await db.collection('quizzes').findOne({ name: quizName });
         let quizTotalQuestions = 0;
         let quizQuestionMarks = 1;
@@ -2807,10 +2799,8 @@ router.get('/quiz-results/:quizName', async (req, res) => {
             }
             quizQuestionMarks = quizConfig.questionMarks || 1;
         }
-        
         let allResults = [];
         for (const attempt of attempts) {
-            // Find student details from all class collections
             let studentDetails = null;
             for (const collection of classCollections) {
                 const student = await db.collection(collection.name).findOne({ username: attempt.studentId });
@@ -2824,7 +2814,6 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                 }
             }
             if (studentDetails && (!classFilter || studentDetails.class === classFilter)) {
-                // Robustly determine totalQuestions and totalMarks
                 let totalQuestions = attempt.totalQuestions;
                 let totalMarks = attempt.totalMarks;
                 if (!totalQuestions) {
@@ -2837,11 +2826,9 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                 if (!totalMarks) {
                     totalMarks = totalQuestions * quizQuestionMarks;
                 }
-                // Robust percentage calculation
                 let percentage = (typeof attempt.score === 'number' && typeof totalMarks === 'number' && totalMarks > 0)
                     ? Math.round((attempt.score / totalMarks) * 100)
                     : 0;
-                // Robust date display
                 let attemptedAt = '';
                 if (attempt.attemptedAt) {
                     const dateObj = new Date(attempt.attemptedAt);
@@ -2852,7 +2839,6 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                 } else {
                     attemptedAt = 'N/A';
                 }
-                // If attemptedAt is still 'Invalid Date', force to 'N/A'
                 if (!attemptedAt || attemptedAt === 'Invalid Date') {
                     attemptedAt = 'N/A';
                 }
@@ -2860,6 +2846,7 @@ router.get('/quiz-results/:quizName', async (req, res) => {
                     ...studentDetails,
                     username: attempt.studentId,
                     score: attempt.score,
+                    quizName: attempt.quizName,
                     totalQuestions,
                     totalMarks,
                     percentage,
@@ -2868,323 +2855,303 @@ router.get('/quiz-results/:quizName', async (req, res) => {
             }
         }
         await client.close();
-        
-        // Sort by class then by score (descending)
         allResults.sort((a, b) => {
             if (a.class === b.class) {
                 return b.score - a.score;
             }
             return a.class.localeCompare(b.class);
         });
-
-        // Handle Excel export
-        if (req.query.export === 'excel') {
-            const workbook = new excel.Workbook();
-            const worksheet = workbook.addWorksheet('Quiz Results');
-            
-            // Add headers
-            worksheet.columns = [
-                { header: 'Class', key: 'class', width: 10 },
-                { header: 'Student Name', key: 'name', width: 30 },
-                { header: 'Email', key: 'email', width: 30 },
-                { header: 'Score', key: 'score', width: 15 },
-                { header: 'Percentage', key: 'percentage', width: 15 },
-                { header: 'Attempted At', key: 'attemptedAt', width: 25 }
-            ];
-            
-            // Format header row
-            worksheet.getRow(1).font = { bold: true };
-            worksheet.getRow(1).alignment = { horizontal: 'center' };
-            
-            // Add data rows
-            allResults.forEach(result => {
-                worksheet.addRow({
-                    class: result.class,
-                    name: result.name,
-                    email: result.email,
-                    score: `${result.score}/${result.totalMarks}`,
-                    percentage: `${result.percentage}%`,
-                    attemptedAt: new Date(result.attemptedAt).toLocaleString()
-                });
-            });
-            
-            // Set response headers
-            res.setHeader(
-                'Content-Type',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            );
-            res.setHeader(
-                'Content-Disposition',
-                `attachment; filename="${quizName.replace(/[^a-z0-9]/gi, '_')}_results.xlsx"`
-            );
-            
-            // Send the Excel file
-            return workbook.xlsx.write(res).then(() => {
-                res.end();
-            });
-        }
-
-        // Handle partial requests (AJAX updates)
         if (req.query.partial) {
             return res.json({
                 count: allResults.length,
                 html: allResults.length === 0 ? 
                     '<div class="no-results">No students have attempted this quiz yet.</div>' : 
-                    `<div class="results-container">${renderResultsByClass(allResults)}</div>`
+                    renderResultsByClass(allResults)
             });
         }
-
-        // Full page render
         res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Quiz Results - ${quizName}</title>
-                <style>
-                    body {
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                        padding: 20px;
-                        background-color: #f8f9fa;
-                        margin: 0;
-                        color: #333;
-                    }
-                    .container {
-                        max-width: 1200px;
-                        margin: 0 auto;
-                        padding: 20px;
-                    }
-                    .header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 30px;
-                        flex-wrap: wrap;
-                        gap: 15px;
-                    }
-                    .page-title {
-                        margin: 0;
-                        color: #4e73df;
-                        font-size: 28px;
-                    }
-                    .back-btn {
-                        padding: 10px 16px;
-                        background-color: #36b9cc;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        text-decoration: none;
-                        display: inline-block;
-                        transition: background-color 0.3s;
-                    }
-                    .back-btn:hover {
-                        background-color: #5a6268;
-                    }
-                    .export-btn {
-                        padding: 10px 16px;
-                        background-color: #28a745;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        text-decoration: none;
-                        display: inline-block;
-                        transition: background-color 0.3s;
-                        margin-left: 10px;
-                    }
-                    .export-btn:hover {
-                        background-color: #218838;
-                    }
-                    .quiz-info {
-                        background: white;
-                        padding: 20px;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                        margin-bottom: 30px;
-                    }
-                    .results-container {
-                        background: white;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                        overflow: hidden;
-                    }
-                    .class-header {
-                        background-color: #007bff;
-                        color: white;
-                        padding: 15px 20px;
-                        font-weight: 600;
-                        margin-top: 20px;
-                    }
-                    .results-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    .results-table th {
-                        background-color: #f2f2f2;
-                        padding: 15px;
-                        text-align: left;
-                        font-weight: 600;
-                    }
-                    .results-table td {
-                        padding: 12px 15px;
-                        border-bottom: 1px solid #eee;
-                    }
-                    .results-table tr:last-child td {
-                        border-bottom: none;
-                    }
-                    .results-table tr:hover {
-                        background-color: #f8f9fa;
-                    }
-                    .percentage-cell {
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                    }
-                    .percentage-bar {
-                        flex-grow: 1;
-                        height: 10px;
-                        background-color: #e3f2fd;
-                        border-radius: 5px;
-                        overflow: hidden;
-                    }
-                    .percentage-fill {
-                        height: 100%;
-                        background-color: #4CAF50;
-                    }
-                    .no-results {
-                        text-align: center;
-                        padding: 40px;
-                        color: #666;
-                        font-style: italic;
-                        font-size: 16px;
-                    }
-                    .refresh-status {
-                        margin-left: 10px;
-                        font-size: 14px;
-                        color: #6c757d;
-                    }
-                    .button-group {
-                        display: flex;
-                        gap: 10px;
-                    }
-                    @media (max-width: 768px) {
-                        .header {
-                            flex-direction: column;
-                            align-items: flex-start;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quiz Results: ${quizName}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 950px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(79, 140, 255, 0.13);
+            padding: 32px 28px 32px 28px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+        .page-title {
+            margin: 0;
+            color: #4f8cff;
+            font-size: 2.2em;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .control-btn {
+            padding: 10px 22px;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(79, 140, 255, 0.08);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .back-btn { background: #36b9cc; }
+        .back-btn:hover { background: #2c9fa5; }
+        .excel-btn { background: #28a745; }
+        .excel-btn:hover { background: #218838; }
+        .refresh-btn { background: #17a2b8; }
+        .refresh-btn:hover { background: #138496; }
+        .declare-btn { background: #10b981; }
+        .declare-btn:disabled { background: #6c757d; cursor: not-allowed; }
+        .quiz-info {
+            background: #f1f5fa;
+            padding: 18px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(79, 140, 255, 0.04);
+            margin-bottom: 28px;
+        }
+        .total-students {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #555;
+        }
+        #toast {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background-color: #10b981;
+            color: white;
+            padding: 15px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .results-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .class-header {
+            background: linear-gradient(90deg, #4f8cff 0%, #38b6ff 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-top: 20px;
+            border-radius: 8px 8px 0 0;
+            letter-spacing: 1px;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+        .results-table th, .results-table td {
+            padding: 13px 18px;
+            text-align: left;
+            border-bottom: 1px solid #e0e7ff;
+        }
+        .results-table th {
+            background-color: #f8f9fa;
+            font-weight: 700;
+            color: #4f8cff;
+            font-size: 1em;
+        }
+        .results-table tr:last-child td {
+            border-bottom: none;
+        }
+        .results-table td a {
+            color: #2563eb;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+        .percentage-bar {
+            width: 90px;
+            height: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+            overflow: hidden;
+        }
+        .percentage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #38b6ff 0%, #4f8cff 100%);
+            border-radius: 5px;
+            transition: width 1s cubic-bezier(.4,2,.6,1);
+        }
+        .no-results {
+            padding: 40px;
+            text-align: center;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+        @media (max-width: 700px) {
+            .container { padding: 10px; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .header-controls { width: 100%; justify-content: flex-start; margin-top: 15px; }
+            .results-table th, .results-table td { padding: 8px 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="page-title">Quiz Results: ${quizName}</h1>
+            <div class="header-controls">
+                <a href="javascript:history.back()" class="control-btn back-btn">Back</a>
+                <a href="/admin/quiz-results/${encodeURIComponent(quizName)}?export=excel" class="control-btn excel-btn">Export to Excel</a>
+                <button id="refreshBtn" class="control-btn refresh-btn">Refresh</button>
+                <button id="declareResultBtn" class="control-btn declare-btn"><i class="fas fa-bullhorn"></i> Declare Result</button>
+                <span id="lastUpdated" style="margin-left: 15px; font-size: 0.9em; color: #555;"></span>
+            </div>
+        </div>
+        <div id="toast"></div>
+        <div class="quiz-info">
+            <p class="total-students">Total Students Attempted: <span id="studentCount">${allResults.length}</span></p>
+        </div>
+        <div id="resultsContent">
+            ${allResults.length === 0 ? '<div class="no-results">No students have attempted this quiz yet.</div>' : renderResultsByClass(allResults)}
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var refreshBtn = document.getElementById('refreshBtn');
+            var lastUpdatedSpan = document.getElementById('lastUpdated');
+            var quizName = "${quizName}";
+            function updateTimestamp() {
+                var now = new Date();
+                lastUpdatedSpan.textContent = 'Last updated: ' + now.toLocaleTimeString();
+            }
+            updateTimestamp();
+            refreshBtn.addEventListener('click', function() {
+                var container = document.getElementById('resultsContent');
+                var countSpan = document.getElementById('studentCount');
+                container.innerHTML = '<p>Loading...</p>';
+                fetch('/admin/quiz-results/' + encodeURIComponent(quizName) + '?partial=true')
+                    .then(function(res) {
+                        if (res.status === 401) {
+                            window.location.href = '/login';
+                            return;
                         }
-                        .results-table {
-                            display: block;
-                            overflow-x: auto;
-                        }
-                        .button-group {
-                            flex-direction: column;
-                            width: 100%;
-                        }
-                        .button-group .back-btn,
-                        .button-group .export-btn,
-                        .button-group #refreshBtn {
-                            width: 100%;
-                            margin-left: 0;
-                            margin-top: 5px;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1 class="page-title">Quiz Results: ${quizName}</h1>
-                        <div class="button-group">
-                            <a href="/admin/total-quiz" class="back-btn">Back</a>
-                            <a href="/admin/quiz-results/${encodeURIComponent(quizName)}?export=excel" class="export-btn">Export to Excel</a>
-                            <button id="refreshBtn" class="back-btn">
-                                ↻ Refresh
-                            </button>
-                            <span id="refreshStatus" class="refresh-status"></span>
-                        </div>
-                    </div>
-                    
-                    <div class="quiz-info">
-                        <p>Total Students Attempted: <span id="attemptCount">${allResults.length}</span></p>
-                    </div>
-
-                    <div id="resultsContainer">
-                        ${allResults.length === 0 ? 
-                            '<div class="no-results">No students have attempted this quiz yet.</div>' : 
-                            `<div class="results-container">${renderResultsByClass(allResults)}</div>`
-                        }
-                    </div>
-                </div>
-
-                <script>
-                    // Auto-refresh every 30 seconds
-                    let refreshInterval = setInterval(fetchUpdatedResults, 30000);
-                    let isFetching = false;
-                    
-                    // Manual refresh button
-                    document.getElementById('refreshBtn').addEventListener('click', function() {
-                        if (!isFetching) {
-                            fetchUpdatedResults();
-                        }
-                    });
-                    
-                    // Fetch updated results without page reload
-                    async function fetchUpdatedResults() {
-                        if (isFetching) return;
-                        
-                        isFetching = true;
-                        const statusEl = document.getElementById('refreshStatus');
-                        statusEl.textContent = 'Refreshing...';
-                        statusEl.style.color = '#6c757d';
-                        
-                        try {
-                            const response = await fetch(window.location.pathname + '?partial=true', {
-                                headers: {
-                                    'Cache-Control': 'no-cache'
-                                }
+                        return res.json();
+                    })
+                    .then(function(data) {
+                        container.innerHTML = data.html;
+                        countSpan.textContent = data.count;
+                        updateTimestamp();
+                        setTimeout(function() {
+                            var bars = document.querySelectorAll('.percentage-fill');
+                            bars.forEach(function(bar) {
+                                bar.style.width = bar.getAttribute('data-width');
                             });
-                            
-                            if (!response.ok) throw new Error('Failed to fetch');
-                            
-                            const data = await response.json();
-                            
-                            // Update the results container
-                            if (data.html) {
-                                document.getElementById('resultsContainer').innerHTML = data.html;
-                                document.getElementById('attemptCount').textContent = data.count;
-                                statusEl.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-                                statusEl.style.color = '#28a745';
-                            }
-                        } catch (error) {
-                            console.error('Error fetching updated results:', error);
-                            statusEl.textContent = 'Refresh failed';
-                            statusEl.style.color = '#dc3545';
-                        } finally {
-                            isFetching = false;
-                            
-                            // Reset status message after 5 seconds
-                            setTimeout(() => {
-                                if (!isFetching) {
-                                    statusEl.textContent = '';
-                                }
-                            }, 5000);
+                        }, 100);
+                    })
+                    .catch(function(err) {
+                        console.error(err);
+                        container.innerHTML = '<p style="color:red;">Failed to refresh results.</p>';
+                    });
+            });
+            var declareBtn = document.getElementById('declareResultBtn');
+            var toast = document.getElementById('toast');
+            function checkResultDeclared() {
+                fetch('/admin/api/quiz-info/' + encodeURIComponent(quizName))
+                    .then(function(res) { return res.json(); })
+                    .then(function(quiz) {
+                        if (quiz.resultsDeclared) {
+                            declareBtn.innerHTML = '<i class="fas fa-check"></i> Declared';
+                            declareBtn.disabled = true;
+                            declareBtn.style.cursor = 'not-allowed';
+                        } else {
+                            declareBtn.innerHTML = '<i class="fas fa-bullhorn"></i> Declare Result';
+                            declareBtn.disabled = false;
+                            declareBtn.style.cursor = 'pointer';
                         }
-                    }
-                    
-                    // Initial fetch to set the last updated time
-                    window.addEventListener('DOMContentLoaded', () => {
-                        const statusEl = document.getElementById('refreshStatus');
-                        statusEl.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-                        statusEl.style.color = '#28a745';
+                    })
+                    .catch(function(error) {
+                        console.error("Error checking result declaration:", error);
                     });
-                    
-                    // Clean up interval when leaving the page
-                    window.addEventListener('beforeunload', function() {
-                        clearInterval(refreshInterval);
+            }
+            declareBtn.addEventListener('click', function() {
+                if (!confirm('Are you sure you want to declare results for "' + quizName + '"? This action cannot be undone.')) return;
+                declareBtn.disabled = true;
+                declareBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Declaring...';
+                fetch('/admin/api/quiz/' + encodeURIComponent(quizName) + '/declare-results', { method: 'POST' })
+                    .then(function(res) { return res.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            showToast('Results declared successfully!');
+                            declareBtn.innerHTML = '<i class="fas fa-check"></i> Declared';
+                            declareBtn.disabled = true;
+                            declareBtn.style.cursor = 'not-allowed';
+                        } else {
+                            alert('Failed to declare results: ' + (data.message || 'Unknown error'));
+                            declareBtn.innerHTML = '<i class="fas fa-bullhorn"></i> Declare Result';
+                            declareBtn.disabled = false;
+                        }
                     });
-                </script>
-            </body>
-            </html>
+            });
+            function showToast(message) {
+                toast.textContent = message;
+                toast.style.display = 'block';
+                setTimeout(function() { toast.style.opacity = '1'; }, 10);
+                setTimeout(function() {
+                    toast.style.opacity = '0';
+                    setTimeout(function() { toast.style.display = 'none'; }, 500);
+                }, 3000);
+            }
+            setTimeout(function() {
+                var bars = document.querySelectorAll('.percentage-fill');
+                bars.forEach(function(bar) {
+                    bar.style.width = bar.getAttribute('data-width');
+                });
+            }, 100);
+            checkResultDeclared();
+        });
+    </script>
+</body>
+</html>
         `);
     } catch (err) {
         console.error('Error loading quiz results:', err);
@@ -3208,55 +3175,111 @@ router.get('/quiz-results/:quizName', async (req, res) => {
     }
 });
 
+// Route to get quiz info (like resultsDeclared status)
+router.get('/api/quiz-info/:quizName', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const quizName = decodeURIComponent(req.params.quizName);
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    try {
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        const quiz = await db.collection('quizzes').findOne({ name: quizName });
+        if (!quiz) {
+            return res.status(404).json({ error: 'Quiz not found' });
+        }
+        res.json({
+            resultsDeclared: quiz.resultsDeclared === true
+        });
+    } catch (error) {
+        console.error('Error fetching quiz info:', error);
+        res.status(500).json({ error: 'Server error' });
+    } finally {
+        await client.close();
+    }
+});
 
-// Helper function to render results grouped by class
+// Route to declare results for a quiz
+router.post('/api/quiz/:quizName/declare-results', async (req, res) => {
+    if (!req.session.fname || req.session.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const quizName = decodeURIComponent(req.params.quizName);
+    const client = new MongoClient("mongodb+srv://vajraOnlineTest:vajra@vajrafiles.qex2ed7.mongodb.net/?retryWrites=true&w=majority&appName=VajraFiles");
+    try {
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        const result = await db.collection('quizzes').updateOne(
+            { name: quizName },
+            { $set: { resultsDeclared: true } }
+        );
+        if (result.modifiedCount === 0) {
+            // If the quiz doesn't exist, we should probably let the admin know.
+            const quizExists = await db.collection('quizzes').findOne({ name: quizName });
+            if (!quizExists) {
+                return res.status(404).json({ success: false, message: 'Quiz not found.' });
+            }
+            // If it exists but wasn't modified, it may already be declared.
+            return res.json({ success: true, message: 'Result already declared.' });
+        }
+        res.json({ success: true, message: 'Results declared successfully.' });
+    } catch (error) {
+        console.error('Error declaring results:', error);
+        res.status(500).json({ success: false, message: 'Failed to declare results due to a server error.' });
+    } finally {
+        await client.close();
+    }
+});
+
 function renderResultsByClass(results) {
+    if (!results || results.length === 0) {
+        return '<div class="no-results">No students have attempted this quiz yet.</div>';
+    }
     // Group results by class
     const resultsByClass = results.reduce((acc, result) => {
-        if (!acc[result.class]) {
-            acc[result.class] = [];
+        const key = result.class || 'No Class Assigned';
+        if (!acc[key]) {
+            acc[key] = [];
         }
-        acc[result.class].push(result);
+        acc[key].push(result);
         return acc;
     }, {});
-    
+
     let html = '';
-    
-    for (const [classNum, classResults] of Object.entries(resultsByClass)) {
+    for (const className in resultsByClass) {
+        html += `<div class="class-header">${className}</div>`;
+        html += '<table class="results-table">';
         html += `
-            <div class="class-group">
-                <div class="class-header">Class ${classNum}</div>
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Email</th>
-                            <th>Score</th>
-                            <th>Percentage</th>
-                            <th>Attempted At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${classResults.map(result => `
-                            <tr>
-                                <td>${result.name}</td>
-                                <td>${result.email}</td>
-                                <td>${result.score}/${result.totalMarks}</td>
-                                <td class="percentage-cell">
-                                    ${result.percentage}%
-                                    <div class="percentage-bar">
-                                        <div class="percentage-fill" style="width: ${result.percentage}%"></div>
-                                    </div>
-                                </td>
-                                <td>${result.attemptedAt}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Email</th>
+                    <th>Score</th>
+                    <th>Percentage</th>
+                    <th>Attempted At</th>
+                </tr>
+            </thead>
+            <tbody>
         `;
+        for (const result of resultsByClass[className]) {
+            html += `
+                <tr>
+                    <td><a href="/admin/quiz-detail-results/${encodeURIComponent(result.username)}/${encodeURIComponent(result.quizName)}">${result.name}</a></td>
+                    <td>${result.email}</td>
+                    <td>${result.score}/${result.totalMarks}</td>
+                    <td>
+                        <div class="percentage-bar">
+                            <div class="percentage-fill" style="width: ${result.percentage}%;"></div>
+                        </div>
+                        ${result.percentage}%
+                    </td>
+                    <td>${result.attemptedAt}</td>
+                </tr>
+            `;
+        }
+        html += '</tbody></table>';
     }
-    
     return html;
 }
 
@@ -4663,29 +4686,7 @@ router.post('/create-retake-quiz', async (req, res) => {
             return res.status(400).json({ error: "Invalid retake data" });
         }
         
-        // First save to MongoDB
-        const db = req.app.locals.db;
-        const retakesCollection = db.collection('retakes');
-        
-        // Check if retake already exists
-        const existingRetake = await retakesCollection.findOne({ quizName });
-        if (existingRetake) {
-            // Update existing retake
-            await retakesCollection.updateOne(
-                { quizName },
-                { $set: { retakes: studentUsernames } }
-            );
-        } else {
-            // Create new retake
-            await retakesCollection.insertOne({
-                quizName,
-                retakes: studentUsernames,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            });
-        }
-        
-        // Then save to local file for backward compatibility
+        // Save to local file
         const retakesPath = path.join(__dirname, '../retakes');
         if (!fs.existsSync(retakesPath)) {
             fs.mkdirSync(retakesPath, { recursive: true });
@@ -4693,6 +4694,9 @@ router.post('/create-retake-quiz', async (req, res) => {
         
         const filePath = path.join(retakesPath, `${quizName}.json`);
         fs.writeFileSync(filePath, JSON.stringify(studentUsernames, null, 2));
+        console.log(`Created retake file: ${filePath}`);
+        
+        // The file watcher will automatically sync to MongoDB
         
         res.json({ success: true });
     } catch (err) {
@@ -4896,55 +4900,6 @@ router.use(async (req, res, next) => {
         console.error('Error in retakes initialization:', err);
     }
     next();
-});
-
-// Update create-retake-quiz route
-router.post('/create-retake-quiz', async (req, res) => {
-    if (!req.session.fname || req.session.role !== 'admin') {
-        return res.status(401).json({ error: "Not authorized" });
-    }
-
-    try {
-        const { quizName, studentUsernames } = req.body;
-        
-        if (!quizName || !studentUsernames || !Array.isArray(studentUsernames)) {
-            return res.status(400).json({ error: "Invalid retake data" });
-        }
-        
-        // Save to local file
-        const retakesPath = path.join(__dirname, '../retakes');
-        if (!fs.existsSync(retakesPath)) {
-            fs.mkdirSync(retakesPath, { recursive: true });
-        }
-        
-        const filePath = path.join(retakesPath, `${quizName}.json`);
-        fs.writeFileSync(filePath, JSON.stringify(studentUsernames, null, 2));
-        console.log(`Created retake file: ${filePath}`);
-        
-        // The file watcher will automatically sync to MongoDB
-        
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Error creating retake quiz:', err);
-        res.status(500).json({ error: 'Failed to create retake quiz' });
-    }
-});
-
-// Add route to manually trigger sync
-router.post('/sync-retakes', async (req, res) => {
-    if (!req.session.fname || req.session.role !== 'admin') {
-        return res.status(401).json({ error: "Not authorized" });
-    }
-
-    try {
-        const db = req.app.locals.db;
-        await syncRetakes(db);
-        console.log('Manual retakes sync completed');
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Error in manual retakes sync:', err);
-        res.status(500).json({ error: 'Failed to sync retakes' });
-    }
 });
 
 // Helper to get current IST time as Date object

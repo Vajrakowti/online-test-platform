@@ -848,12 +848,13 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
             return res.status(404).json({ error: 'Quiz or attempt not found' });
         }
 
-        // Check if current time is after quiz end time (IST)
+        // Check if current time is after quiz end time (IST) OR resultsDeclared is true
         const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
         const examDate = new Date(quiz.examDate);
         const [endHour, endMinute] = quiz.endTime.split(':').map(Number);
         examDate.setHours(endHour, endMinute, 0, 0);
-        if (now < examDate) {
+        const resultsDeclared = quiz.resultsDeclared === true;
+        if (now < examDate && !resultsDeclared) {
             return res.json({
                 resultAvailable: false,
                 endTime: quiz.endTime,
