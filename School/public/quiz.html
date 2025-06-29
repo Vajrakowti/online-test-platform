@@ -734,6 +734,8 @@
                 <button class="btn-answered-review" id="answeredReviewBtn">Answered & Mark for Review</button>
             </div>
 
+            <div id="markingInfo" style="margin-bottom: 16px; font-size: 1.08em; color: #333; display: none;"></div>
+
             <div id="questionsContainer">
                 <!-- Questions will be dynamically loaded here, one at a time -->
             </div>
@@ -949,6 +951,19 @@
 
                 // Update question panel to reflect current status
                 renderQuestionPanel();
+
+                // Find the section for the current question and update the negative marking display
+                const section = quizDataGlobal.sections.find(sec => sec.name === currentSectionName);
+                let negativeMarking = 0;
+                if (section && typeof section.negativeMarking !== 'undefined') {
+                    negativeMarking = section.negativeMarking;
+                } else if (typeof quizDataGlobal.negativeMarking !== 'undefined') {
+                    negativeMarking = quizDataGlobal.negativeMarking;
+                }
+                const positiveMarking = quizDataGlobal.questionMarks || 1;
+                const markingInfoDiv = document.getElementById('markingInfo');
+                markingInfoDiv.innerHTML = `Positive Marking: <b style='color:#388e3c;'>+${positiveMarking}</b> &nbsp; | &nbsp; Negative Marking: <b style='color:#d32f2f;'>-${negativeMarking}</b> per wrong`;
+                markingInfoDiv.style.display = 'block';
             } else {
                 // Handle navigation boundaries
                 if (index < 0) {

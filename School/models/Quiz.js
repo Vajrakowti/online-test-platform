@@ -47,6 +47,13 @@ const sectionSchema = new mongoose.Schema({
             },
             message: 'At least one question is required per section'
         }
+    },
+    negativeMarking: {
+        type: Number,
+        required: false,
+        min: 0,
+        max: 1,
+        default: 0
     }
 });
 

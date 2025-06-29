@@ -874,8 +874,39 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
         // Attach sections with questions to the quiz object for frontend compatibility
         quiz.sections = processedQuiz.sections;
 
+        // Calculate section-wise results
+        const sectionResults = {};
+        // Build a map of section name to total questions and negative marking in that section
+        const sectionTotals = {};
+        const sectionNegatives = {};
+        if (quiz.sections && Array.isArray(quiz.sections)) {
+            quiz.sections.forEach(section => {
+                sectionTotals[section.name] = section.questions.length;
+                sectionNegatives[section.name] = typeof section.negativeMarking !== 'undefined' ? section.negativeMarking : (quiz.negativeMarking || 0);
+            });
+        }
+        if (attempt.answers && Array.isArray(attempt.answers)) {
+            attempt.answers.forEach(ans => {
+                const section = ans.sectionName || 'Unknown';
+                if (!sectionResults[section]) {
+                    sectionResults[section] = { marks: 0, questions: 0, totalQuestions: sectionTotals[section] || 0, negativeMarking: sectionNegatives[section] || 0 };
+                }
+                sectionResults[section].marks += ans.marks || 0;
+                sectionResults[section].questions += 1;
+            });
+            // Ensure all sections are present in sectionResults, even if not attempted
+            Object.keys(sectionTotals).forEach(section => {
+                if (!sectionResults[section]) {
+                    sectionResults[section] = { marks: 0, questions: 0, totalQuestions: sectionTotals[section], negativeMarking: sectionNegatives[section] };
+                } else {
+                    sectionResults[section].totalQuestions = sectionTotals[section];
+                    sectionResults[section].negativeMarking = sectionNegatives[section];
+                }
+            });
+        }
+
         console.log('[DEBUG] Sending quiz and attempt data:', { quiz: quiz.name, attempt: attempt.quizName, score: attempt.score });
-        res.json({ resultAvailable: true, quiz, attempt });
+        res.json({ resultAvailable: true, quiz, attempt, sectionResults });
 
     } catch (err) {
         console.error('Error fetching quiz result API:', err);

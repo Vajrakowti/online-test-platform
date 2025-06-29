@@ -1871,6 +1871,7 @@ router.post('/create-quiz', async (req, res) => {
       const { quizName, quizClass, startTime, endTime } = req.body;
       const sectionNames = Array.isArray(req.body.sectionNames) ? req.body.sectionNames : [req.body.sectionNames];
       const sectionFiles = req.files || [];
+      const sectionNegatives = Array.isArray(req.body.sectionNegatives) ? req.body.sectionNegatives : [req.body.sectionNegatives];
 
       // Get negative marking value, default to 0 if not provided
       const negativeMarking = parseFloat(req.body.negativeMarking) || 0;
@@ -1888,8 +1889,8 @@ router.post('/create-quiz', async (req, res) => {
         throw new Error('No Excel files uploaded');
       }
 
-      if (sectionNames.length !== sectionFiles.length) {
-        throw new Error('Number of section names must match number of files');
+      if (sectionNames.length !== sectionFiles.length || sectionNames.length !== sectionNegatives.length) {
+        throw new Error('Number of section names, files, and negative markings must match');
       }
 
       // Create quiz object with sections
@@ -1903,9 +1904,10 @@ router.post('/create-quiz', async (req, res) => {
         type: 'excel',
         sections: sectionNames.map((name, index) => ({
           name: name,
-          file: sectionFiles[index].filename
+          file: sectionFiles[index].filename,
+          negativeMarking: parseFloat(sectionNegatives[index]) || 0
         })),
-        negativeMarking: negativeMarking,
+        negativeMarking: negativeMarking, // keep for backward compatibility
         questionMarks: questionMarks,
         createdAt: new Date()
       };

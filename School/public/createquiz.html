@@ -780,14 +780,6 @@
       </div>
       
       <div class="form-group">
-        <label class="required">Negative Marking:</label>
-        <div class="negative-marking-container">
-          <input type="number" name="negativeMarking" id="negativeMarking" min="0" max="1" step="0.25" value="0" required>
-          <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
-        </div>
-      </div>
-      
-      <div class="form-group">
         <label class="required">Question Marks:</label>
         <div class="question-marks-container">
           <input type="number" name="questionMarks" id="questionMarks" min="1" value="1" required>
@@ -802,6 +794,7 @@
             <div class="section-header">
               <input type="text" name="sectionNames[]" placeholder="Section Name" required>
               <input type="file" name="sectionFiles[]" accept=".xlsx,.xls" required>
+              <input type="number" name="sectionNegatives[]" min="0" max="1" step="0.01" value="0" placeholder="Negative Marking (e.g. 0.25)" required style="width: 140px;" title="Section Negative Marking">
               <button type="button" class="remove-section-btn" onclick="removeSection(this)">
                 <i class="fas fa-times"></i>
               </button>
@@ -861,14 +854,6 @@
       <div class="form-group">
         <label class="required">Test Available Until:</label>
         <input type="time" name="endTime" required>
-      </div>
-
-      <div class="form-group">
-        <label class="required">Negative Marking:</label>
-        <div class="negative-marking-container">
-          <input type="number" name="negativeMarking" min="0" max="1" step="0.25" value="0" required>
-          <span class="negative-marking-info">(Enter value between 0 and 1, e.g. 0.25 for 1/4 negative marking)</span>
-        </div>
       </div>
 
       <div class="form-group">
@@ -1281,6 +1266,7 @@
         <div class="section-header">
           <input type="text" name="sectionNames[]" placeholder="Section Name" required>
           <input type="file" name="sectionFiles[]" accept=".xlsx,.xls" required>
+          <input type="number" name="sectionNegatives[]" min="0" max="1" step="0.01" value="0" placeholder="Negative Marking (e.g. 0.25)" required style="width: 140px;" title="Section Negative Marking">
           <button type="button" class="remove-section-btn" onclick="removeSection(this)">
             <i class="fas fa-times"></i>
           </button>
@@ -1318,5 +1304,4 @@
     });
   </script>
 </body>
-</html>
 </html>

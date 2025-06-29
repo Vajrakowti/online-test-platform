@@ -29,7 +29,8 @@ function loadQuizData(quiz) {
         // Load Excel quiz sections
         const sections = [];
         
-        for (const section of quiz.sections) {
+        for (let i = 0; i < quiz.sections.length; i++) {
+            const section = quiz.sections[i];
             const excelFilePath = path.join(EXCEL_DIR, section.file);
             console.log('Attempting to load Excel file from:', excelFilePath);
             
@@ -97,14 +98,16 @@ function loadQuizData(quiz) {
                     return {
                         question,
                         options: [option1, option2, option3, option4],
-                        correctAnswers
+                        correctAnswers,
+                        sectionName: section.name
                     };
                 }).filter(Boolean); // Remove null entries
                 
                 const shuffledQuestions = shuffleArray(mappedRows);
                 sections.push({
                     name: section.name,
-                    questions: shuffledQuestions
+                    questions: shuffledQuestions,
+                    negativeMarking: typeof quiz.sections[i].negativeMarking !== 'undefined' ? quiz.sections[i].negativeMarking : (quiz.negativeMarking || 0)
                 });
                 console.log(`Successfully loaded ${mappedRows.length} questions for section: ${section.name}`);
                 console.log(`[Shuffle Debug] Shuffled questions for section '${section.name}':`, shuffledQuestions.map(q => q.question));
@@ -132,7 +135,8 @@ function loadQuizData(quiz) {
             options: q.options,
             correctAnswers: [q.options[q.correctAnswer]], // Assuming single correct answer for manual
             questionImage: q.questionImage || null,
-            optionImages: q.optionImages || [null, null, null, null]
+            optionImages: q.optionImages || [null, null, null, null],
+            sectionName: 'Questions'
         }));
         
         const shuffledFormattedQuestions = shuffleArray(formattedQuestions);
@@ -426,28 +430,48 @@ router.post('/submit-quiz', async (req, res) => {
             totalMarks += questionMarks; // Add to total possible marks
         });
 
+        // Helper: Build a map of sectionName to negativeMarking
+        const sectionNegativeMap = {};
+        if (quizConfig.sections && Array.isArray(quizConfig.sections)) {
+            quizConfig.sections.forEach(section => {
+                // Always parse as float and default to 0 if not set
+                sectionNegativeMap[section.name] = typeof section.negativeMarking !== 'undefined'
+                    ? parseFloat(section.negativeMarking) || 0
+                    : 0;
+            });
+        }
+
         // Process each answer
         answers.forEach(answer => {
             const { questionIndex, answer: studentAnswer } = answer;
             const correctAnswers = correctAnswersMap.get(questionIndex);
-            
+            // Find the section for this question
+            const sectionName = (displayedQuestions[questionIndex] && displayedQuestions[questionIndex].sectionName) || null;
+            let sectionNegative = 0;
+            if (sectionName && typeof sectionNegativeMap[sectionName] !== 'undefined') {
+                sectionNegative = sectionNegativeMap[sectionName];
+            } else {
+                sectionNegative = 0; // Always default to 0
+            }
+            // Debug logging
+            console.log(`Scoring: Q#${questionIndex}, Section: ${sectionName}, Section Negative: ${sectionNegative}, Map:`, sectionNegativeMap);
             if (correctAnswers) {
                 if (correctAnswers.includes(studentAnswer)) {
                     score += questionMarks; // Correct answer with question marks
                 } else if (studentAnswer !== null) {
-                    // Calculate negative marks based on the question marks
-                    const negativeMarks = questionMarks * negativeMarking;
+                    // Calculate negative marks based on the question marks and section negative marking
+                    const negativeMarks = questionMarks * sectionNegative;
                     score -= negativeMarks; // Wrong answer with negative marking
-                    console.log(`Debug - Question Index: ${questionIndex}, Student Answer: ${studentAnswer}, Correct Answers: ${correctAnswers}, Marks Deducted: ${negativeMarks}, Current Score: ${score}`);
+                    console.log(`Debug - Question Index: ${questionIndex}, Student Answer: ${studentAnswer}, Correct Answers: ${correctAnswers}, Section: ${sectionName}, Section Negative: ${sectionNegative}, Marks Deducted: ${negativeMarks}, Current Score: ${score}`);
                 }
             }
-            
             studentAnswers.push({
                 questionIndex,
                 answer: studentAnswer,
                 isCorrect: correctAnswers ? correctAnswers.includes(studentAnswer) : false,
                 marks: correctAnswers && correctAnswers.includes(studentAnswer) ? questionMarks : 
-                       (studentAnswer !== null ? -(questionMarks * negativeMarking) : 0)
+                       (studentAnswer !== null ? -(questionMarks * sectionNegative) : 0),
+                sectionName: sectionName
             });
         });
 
