@@ -434,10 +434,10 @@ router.post('/submit-quiz', async (req, res) => {
         const sectionNegativeMap = {};
         if (quizConfig.sections && Array.isArray(quizConfig.sections)) {
             quizConfig.sections.forEach(section => {
-                // Always parse as float and default to 0 if not set
-                sectionNegativeMap[section.name] = typeof section.negativeMarking !== 'undefined'
-                    ? parseFloat(section.negativeMarking) || 0
-                    : 0;
+                // Only add section-specific negative marking to the map if it is explicitly defined
+                if (typeof section.negativeMarking !== 'undefined') {
+                    sectionNegativeMap[section.name] = parseFloat(section.negativeMarking) || 0;
+                }
             });
         }
 
@@ -447,12 +447,13 @@ router.post('/submit-quiz', async (req, res) => {
             const correctAnswers = correctAnswersMap.get(questionIndex);
             // Find the section for this question
             const sectionName = (displayedQuestions[questionIndex] && displayedQuestions[questionIndex].sectionName) || null;
-            let sectionNegative = 0;
+            
+            // Default to quiz-level negative marking, but override with section-specific if it exists
+            let sectionNegative = negativeMarking; // Fallback to quiz-level
             if (sectionName && typeof sectionNegativeMap[sectionName] !== 'undefined') {
-                sectionNegative = sectionNegativeMap[sectionName];
-            } else {
-                sectionNegative = 0; // Always default to 0
+                sectionNegative = sectionNegativeMap[sectionName]; // Use section-specific value
             }
+
             // Debug logging
             console.log(`Scoring: Q#${questionIndex}, Section: ${sectionName}, Section Negative: ${sectionNegative}, Map:`, sectionNegativeMap);
             if (correctAnswers) {
