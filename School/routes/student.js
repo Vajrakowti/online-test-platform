@@ -873,6 +873,8 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
 
         // Attach sections with questions to the quiz object for frontend compatibility
         quiz.sections = processedQuiz.sections;
+        // Flatten all questions from all sections into a single questions array
+        quiz.questions = processedQuiz.sections.reduce((acc, section) => acc.concat(section.questions), []);
 
         // Calculate section-wise results
         const sectionResults = {};
@@ -905,8 +907,58 @@ router.get('/api/quiz-result/:quizName', async (req, res) => {
             });
         }
 
+        // --- ENHANCEMENT: Add mapped text for student and correct answers ---
+        // Build a flat list of all questions in the order of shuffledQuestions
+        let flatQuestions = [];
+        if (attempt.shuffledQuestions && Array.isArray(attempt.shuffledQuestions)) {
+            flatQuestions = attempt.shuffledQuestions;
+        } else if (quiz.questions && Array.isArray(quiz.questions)) {
+            flatQuestions = quiz.questions;
+        }
+        // Attach mapped text to each answer (robust fallback version)
+        const answersWithText = (attempt.answers || []).map((ans, idx) => {
+            // Try all possible sources for the options array
+            let q = (attempt.shuffledQuestions && attempt.shuffledQuestions[ans.questionIndex]) ||
+                    (quiz.questions && quiz.questions[ans.questionIndex]) ||
+                    {};
+            let options = q.options || [];
+
+            // Fallback: try to find options by matching question text
+            if ((!options || options.length === 0) && quiz.questions) {
+                const found = quiz.questions.find(qq => qq.question === q.question);
+                if (found && found.options) options = found.options;
+            }
+            // Fallback: try all sections
+            if ((!options || options.length === 0) && quiz.sections) {
+                for (const section of quiz.sections) {
+                    if (section.questions) {
+                        const found = section.questions.find(qq => qq.question === q.question);
+                        if (found && found.options) {
+                            options = found.options;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Student answer indices
+            const studentIndices = Array.isArray(ans.answer) ? ans.answer : (typeof ans.answer === 'number' ? [ans.answer] : []);
+            // Correct answer indices
+            const correctIndices = Array.isArray(q.correctAnswer) ? q.correctAnswer : (typeof q.correctAnswer === 'number' ? [q.correctAnswer] : []);
+            // Map indices to text, fallback to indices in brackets if mapping fails
+            const studentAnswerText = studentIndices.map(i => options[i] !== undefined ? options[i] : `[${i}]`);
+            const correctAnswerText = correctIndices.map(i => options[i] !== undefined ? options[i] : `[${i}]`);
+            // Debug log for each answer mapping
+            console.log('[DEBUG][RESULT-MAP] Q:', q.question, '\nOptions:', options, '\nStudent Indices:', studentIndices, '\nStudent Text:', studentAnswerText, '\nCorrect Indices:', correctIndices, '\nCorrect Text:', correctAnswerText);
+            return {
+                ...ans,
+                studentAnswerText,
+                correctAnswerText
+            };
+        });
+
         console.log('[DEBUG] Sending quiz and attempt data:', { quiz: quiz.name, attempt: attempt.quizName, score: attempt.score });
-        res.json({ resultAvailable: true, quiz, attempt, sectionResults });
+        res.json({ resultAvailable: true, quiz, attempt: { ...attempt, answers: answersWithText }, sectionResults });
 
     } catch (err) {
         console.error('Error fetching quiz result API:', err);

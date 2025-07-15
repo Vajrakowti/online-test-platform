@@ -115,47 +115,100 @@
                 }
                 const data = await response.json();
 
-                if (data.quiz && data.attempt) {
+                // DEBUG: Print raw data for troubleshooting
+                resultsContainer.innerHTML = `<pre style='background:#f8f8f8; color:#333; border:1px solid #ccc; padding:10px; max-height:300px; overflow:auto;'>${JSON.stringify(data, null, 2)}</pre>`;
+
+                // Use shuffledQuestions for display and match to original quiz.questions for correct answers
+                if (data.quiz && data.attempt && data.attempt.shuffledQuestions) {
                     const { quiz, attempt } = data;
 
                     let htmlContent = `
                         <div class="quiz-summary">
                             <h2>Summary: ${quiz.name}</h2>
-                            <p>Score: ${attempt.score} / ${quiz.questions.length}</p>
-                            <p>Total Questions: ${quiz.questions.length}</p>
+                            <p>Score: ${attempt.score} / ${attempt.shuffledQuestions.length}</p>
+                            <p>Total Questions: ${attempt.shuffledQuestions.length}</p>
                         </div>
                         <div class="question-section">
                             <h2>Questions & Answers</h2>
                     `;
 
-                    quiz.questions.forEach((question, index) => {
-                        const studentAnswer = attempt.answers.find(ans => ans.questionText === question.questionText);
-                        const studentChoice = studentAnswer ? studentAnswer.chosenAnswer : 'N/A';
-                        const isCorrect = studentAnswer ? studentAnswer.isCorrect : false;
+                    attempt.shuffledQuestions.forEach((question, index) => {
+                        const studentAnswer = attempt.answers[index];
+                        // Get the student's selected answer indices (array or single index)
+                        let studentChoices = [];
+                        if (studentAnswer && Array.isArray(studentAnswer.answer)) {
+                            studentChoices = studentAnswer.answer;
+                        } else if (studentAnswer && typeof studentAnswer.answer === 'number') {
+                            studentChoices = [studentAnswer.answer];
+                        } else {
+                            studentChoices = [];
+                        }
+                        // Always use correctAnswer from shuffledQuestions, handle both array and number
+                        let correctIndices = [];
+                        if (Array.isArray(question.correctAnswer)) {
+                            correctIndices = question.correctAnswer;
+                        } else if (typeof question.correctAnswer === 'number') {
+                            correctIndices = [question.correctAnswer];
+                        } else {
+                            correctIndices = [];
+                        }
+                        // Map correct answer indices to text (prefer correctAnswerText if available)
+                        let correctOptions = '';
+                        if (studentAnswer && Array.isArray(studentAnswer.correctAnswerText) && studentAnswer.correctAnswerText.length > 0) {
+                            correctOptions = studentAnswer.correctAnswerText.join(', ');
+                        } else if (correctIndices.length > 0 && question.options) {
+                            correctOptions = correctIndices
+                                .map(idx => (typeof idx === 'number' && question.options[idx] !== undefined) ? question.options[idx] : '[Invalid Option]')
+                                .join(', ');
+                        } else {
+                            correctOptions = '<span style="color:orange">No correct answer set for this question!</span>';
+                        }
+                        // Map student answer indices to text (prefer studentAnswerText if available)
+                        let studentOptions = '';
+                        if (studentAnswer && Array.isArray(studentAnswer.studentAnswerText) && studentAnswer.studentAnswerText.length > 0) {
+                            studentOptions = studentAnswer.studentAnswerText.join(', ');
+                        } else if (studentChoices.length > 0 && question.options) {
+                            studentOptions = studentChoices
+                                .map(idx => (typeof idx === 'number' && question.options[idx] !== undefined) ? question.options[idx] : '[Invalid Option]')
+                                .join(', ');
+                        } else {
+                            studentOptions = '<span style="color:orange">No answer selected</span>';
+                        }
+                        const isCorrect = studentAnswer?.isCorrect;
+
+                        // If mapping fails, show warning (not indices)
+                        if (correctOptions.includes('[Invalid Option]')) {
+                            correctOptions += ' <span style="color:gray; font-size:smaller">[Warning: Could not map all correct answers to text]</span>';
+                        }
+                        if (studentOptions.includes('[Invalid Option]')) {
+                            studentOptions += ' <span style="color:gray; font-size:smaller">[Warning: Could not map all your answers to text]</span>';
+                        }
 
                         htmlContent += `
                             <div class="question-item">
-                                <p class="question-text">${index + 1}. ${question.questionText}</p>
+                                <p class="question-text">${index + 1}. ${question.question}</p>
                                 <ul class="options-list">
                         `;
 
-                        question.options.forEach(option => {
+                        question.options.forEach((option, oIdx) => {
                             let optionClass = '';
                             let icon = '';
+                            const isOptionCorrect = correctIndices.includes(oIdx);
+                            const isOptionChosen = studentChoices.includes(oIdx);
 
-                            if (option === question.correctAnswer) {
+                            if (isOptionCorrect) {
                                 optionClass = 'correct';
                                 icon = '<i class="fas fa-check-circle"></i>';
                             }
-                            if (option === studentChoice && option !== question.correctAnswer) {
+                            if (isOptionChosen && !isOptionCorrect) {
                                 optionClass = 'incorrect';
                                 icon = '<i class="fas fa-times-circle"></i>';
-                            } else if (option === studentChoice && option === question.correctAnswer) {
-                                icon = '<i class="fas fa-check-circle"></i>'; // Already correct, so no extra icon
+                            } else if (isOptionChosen && isOptionCorrect) {
+                                icon = '<i class="fas fa-check-circle"></i>';
                             }
 
                             htmlContent += `
-                                <li class="${optionClass} ${option === studentChoice ? 'marked' : ''}">
+                                <li class="${optionClass} ${isOptionChosen ? 'marked' : ''}">
                                     ${icon} ${option}
                                 </li>
                             `;
@@ -163,14 +216,15 @@
 
                         htmlContent += `
                                 </ul>
-                                <p style="margin-top: 10px;"><b>Correct Answer:</b> ${question.correctAnswer}</p>
-                                <p><b>Your Answer:</b> ${studentChoice}</p>
+                                <p style="margin-top: 10px;"><b>Correct Answer:</b> ${correctOptions}</p>
+                                <p><b>Your Answer:</b> ${studentOptions} ${isCorrect ? '<span style="color:green;">&#10004; Correct</span>' : '<span style="color:red;">&#10008; Incorrect</span>'}</p>
+                                <details style='margin-top:8px;'><summary style='color:#888;'>Debug info</summary><pre style='background:#f8f8f8; color:#333; border:1px solid #ccc; padding:6px; font-size:12px;'>${JSON.stringify({question, options: question.options, correctAnswer: question.correctAnswer, correctAnswers: question.correctAnswers, studentAnswer}, null, 2)}</pre></details>
                             </div>
                         `;
                     });
 
                     htmlContent += `</div>`;
-                    resultsContainer.innerHTML = htmlContent;
+                    resultsContainer.innerHTML += htmlContent;
 
                 } else {
                     resultsContainer.innerHTML = '<p class="no-data">No quiz results found for this quiz.</p>';

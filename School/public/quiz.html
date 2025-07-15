@@ -273,7 +273,7 @@
             border-color: var(--primary-color);
         }
         
-        .option input[type="radio"] {
+        .option input[type="checkbox"] {
             margin: 0;
             transform: scale(1.2);
             cursor: pointer;
@@ -795,7 +795,7 @@
         // 1: Answered (Green)
         // 2: Marked for Review (Yellow)
         // 3: Not Answered (Red, when visited but no answer)
-        // 4: Answered & Marked for Review (Blue/Info)
+        // 4: Answered and Marked for Review (Blue/Info)
         let questionStatuses = []; 
 
         // Add these new variables at the top of your script
@@ -826,7 +826,7 @@
                     allQuestionsFlat.push({
                         question: question.question,
                         options: question.options,
-                        correctAnswers: question.correctAnswers,
+                        correctAnswers: question.correctAnswers || question.correctAnswer,
                         sectionName: section.name,
                         globalIndex: globalIdxCounter,
                         sectionIndex: sectionIdx,
@@ -845,6 +845,8 @@
 
             // Render all questions, but initially hide all except the first one
             allQuestionsFlat.forEach((q, globalIdx) => {
+                const isMultiCorrect = (q.correctAnswers && q.correctAnswers.length > 1) || (q.correctAnswer && q.correctAnswer.length > 1);
+                const inputType = isMultiCorrect ? 'checkbox' : 'radio';
                 const questionDiv = document.createElement('div');
                 questionDiv.className = 'question-container';
                 questionDiv.id = `q-${globalIdx}`;
@@ -858,10 +860,10 @@
                     <div class="options">
                         ${q.options.map((option, oIdx) => `
                             <div class="option">
-                                <input type="radio" 
+                                <input type="${inputType}"
                                        name="question_${globalIdx}" 
                                        id="q${globalIdx}_o${oIdx}" 
-                                       value="${option}">
+                                       value="${oIdx}">
                                 <label for="q${globalIdx}_o${oIdx}">${option}</label>
                             </div>
                         `).join('')}
@@ -929,21 +931,23 @@
                     questionStatuses[currentQuestionIndex] = 3; // Change to Not Answered
                 }
 
-                // Re-check selected radio button if an answer exists for this question
+                // Re-check selected checkboxes if an answer exists for this question
                 const savedAnswer = answers[currentQuestionIndex];
-                if (savedAnswer) {
-                    const selectedRadio = document.querySelector(`input[name="question_${currentQuestionIndex}"][value="${savedAnswer.answer}"]`);
-                    if (selectedRadio) {
-                        selectedRadio.checked = true;
-                    }
+                if (savedAnswer && Array.isArray(savedAnswer.answer)) {
+                    savedAnswer.answer.forEach(selectedIndex => {
+                        const selectedCheckbox = document.querySelector(`input[name="question_${currentQuestionIndex}"][value="${selectedIndex}"]`);
+                        if (selectedCheckbox) {
+                            selectedCheckbox.checked = true;
+                        }
+                    });
                 } else {
-                    // If no saved answer, ensure no radio button is checked
-                    const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
-                    currentQuestionRadios.forEach(radio => radio.checked = false);
+                    // If no saved answer, ensure no checkbox is checked
+                    const currentQuestionCheckboxes = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+                    currentQuestionCheckboxes.forEach(checkbox => checkbox.checked = false);
                 }
 
                 // Setup radio button listeners for the current question
-                setupRadioButtonListeners();
+                setupCheckboxListeners();
 
                 // Update navigation buttons visibility
                 document.getElementById('prevQuestionBtn').style.display = currentQuestionIndex === 0 ? 'none' : 'block';
@@ -1042,11 +1046,12 @@
 
         // Modified saveAnswer to correctly update statuses
         function saveAnswer() {
-            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
-            if (selectedOption) {
+            const selectedOptions = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOptions.length > 0) {
+                const selectedValues = Array.from(selectedOptions).map(option => parseInt(option.value));
                 answers[currentQuestionIndex] = {
                     questionIndex: currentQuestionIndex,
-                    answer: selectedOption.value
+                    answer: selectedValues
                 };
                 // If the question was Not Visited (0) or Not Answered (3), change to Answered (1)
                 if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
@@ -1069,15 +1074,17 @@
             renderQuestionPanel(); // Update question panel status
         }
 
-        // Add event listeners for radio buttons to update status immediately
-        function setupRadioButtonListeners() {
-            const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
-            currentQuestionRadios.forEach(radio => {
-                radio.addEventListener('change', function() {
-                    if (this.checked) {
+        // Add event listeners for checkboxes to update status immediately
+        function setupCheckboxListeners() {
+            const currentQuestionCheckboxes = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+            currentQuestionCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const selectedOptions = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]:checked`);
+                    if (selectedOptions.length > 0) {
+                        const selectedValues = Array.from(selectedOptions).map(option => parseInt(option.value));
                         answers[currentQuestionIndex] = {
                             questionIndex: currentQuestionIndex,
-                            answer: this.value
+                            answer: selectedValues
                         };
                         // Update status to Answered (1) if it was Not Visited (0) or Not Answered (3)
                         if (questionStatuses[currentQuestionIndex] === 0 || questionStatuses[currentQuestionIndex] === 3) {
@@ -1087,15 +1094,21 @@
                         if (questionStatuses[currentQuestionIndex] === 2) {
                             questionStatuses[currentQuestionIndex] = 4;
                         }
-                        renderQuestionPanel();
+                    } else {
+                        // No options selected
+                        answers[currentQuestionIndex] = null;
+                        if (questionStatuses[currentQuestionIndex] === 1 || questionStatuses[currentQuestionIndex] === 4) {
+                            questionStatuses[currentQuestionIndex] = 3;
+                        }
                     }
+                    renderQuestionPanel();
                 });
             });
         }
 
         function clearResponse() {
-            const currentQuestionRadios = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
-            currentQuestionRadios.forEach(radio => radio.checked = false);
+            const currentQuestionCheckboxes = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]`);
+            currentQuestionCheckboxes.forEach(checkbox => checkbox.checked = false);
             answers[currentQuestionIndex] = null;
             questionStatuses[currentQuestionIndex] = 3; // Mark as Not Answered
             renderQuestionPanel();
@@ -1164,12 +1177,11 @@
                 body: JSON.stringify({
                     quizName: quizDataGlobal.quizName,
                     answers: finalAnswers,
-                    // Include the shuffled questions data so backend can use the same order
-                    shuffledQuestions: allQuestionsFlat.map(q => ({ 
-                        question: q.question, 
-                        options: q.options, 
-                        correctAnswers: q.correctAnswers, 
-                        sectionName: q.sectionName 
+                    shuffledQuestions: allQuestionsFlat.map(q => ({
+                        question: q.question,
+                        options: q.options,
+                        correctAnswer: q.correctAnswers || q.correctAnswer,
+                        sectionName: q.sectionName
                     }))
                 })
             })
@@ -1229,8 +1241,8 @@
 
         // Add event listeners for the new review buttons
         document.getElementById('markReviewBtn').addEventListener('click', function() {
-            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
-            if (selectedOption) {
+            const selectedOptions = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOptions.length > 0) {
                 // If answered, mark as Answered & Marked for Review (4)
                 questionStatuses[currentQuestionIndex] = 4;
             } else {
@@ -1241,8 +1253,8 @@
         });
 
         document.getElementById('answeredReviewBtn').addEventListener('click', function() {
-            const selectedOption = document.querySelector(`input[name="question_${currentQuestionIndex}"]:checked`);
-            if (selectedOption) {
+            const selectedOptions = document.querySelectorAll(`input[name="question_${currentQuestionIndex}"]:checked`);
+            if (selectedOptions.length > 0) {
                 // Only mark as Answered & Marked for Review (4) if there's an answer
                 questionStatuses[currentQuestionIndex] = 4;
                 renderQuestionPanel();

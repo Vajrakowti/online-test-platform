@@ -17,10 +17,19 @@ const questionSchema = new mongoose.Schema({
         }
     },
     correctAnswer: {
-        type: Number,
+        type: [Number],
         required: true,
-        min: 0,
-        max: 3
+        validate: {
+            validator: function(v) {
+                // Must have at least one correct answer
+                if (!Array.isArray(v) || v.length === 0) {
+                    return false;
+                }
+                // All values must be between 0 and 3 (valid option indices)
+                return v.every(answer => Number.isInteger(answer) && answer >= 0 && answer <= 3);
+            },
+            message: 'At least one correct answer is required, and all answers must be valid option indices (0-3)'
+        }
     }
 });
 

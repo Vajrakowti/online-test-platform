@@ -1,6 +1,5 @@
 [
   {
-    "text": "rain",
     "options": [
       "12",
       "13",
@@ -13,6 +12,7 @@
       null,
       null,
       null
-    ]
+    ],
+    "question": "rain"
   }
 ]

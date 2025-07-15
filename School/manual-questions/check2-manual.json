@@ -7,7 +7,9 @@
       "comrom",
       "rom"
     ],
-    "correctAnswer": 0,
+    "correctAnswer": [
+      0
+    ],
     "optionImages": [
       null,
       null,

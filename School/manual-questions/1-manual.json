@@ -1,18 +1,20 @@
 [
   {
-    "text": "10",
     "options": [
       "00",
       "121",
       "11",
       "1212"
     ],
-    "correctAnswer": 0,
+    "correctAnswer": [
+      0
+    ],
     "optionImages": [
       null,
       null,
       null,
       null
-    ]
+    ],
+    "question": "10"
   }
 ]

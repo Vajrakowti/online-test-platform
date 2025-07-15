@@ -1000,7 +1000,11 @@
             if (!response.ok) throw new Error('Failed to fetch attempts');
             
             const attempts = await response.json();
-            const tableBody = document.getElementById('attemptedTestsBody');
+            const tableBody = document.querySelector('#attemptedTable tbody');
+            if (!tableBody) {
+                console.warn("Attempted quizzes table body not found. Skipping attempted tests rendering.");
+                return;
+            }
             tableBody.innerHTML = '';
 
             attempts.forEach(attempt => {

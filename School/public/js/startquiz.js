@@ -2,6 +2,9 @@ let currentQuiz = null;
 let timeLeft = 0;
 let timerInterval = null;
 
+// Add this global variable if not present
+let allQuestionsFlat = [];
+
 // Function to display the quiz
 function displayQuiz(quizData) {
     const questionsContainer = document.getElementById('questions');
@@ -17,19 +20,19 @@ function displayQuiz(quizData) {
             <p>${questionText}</p>
             <div class="options">
                 <label>
-                    <input type="radio" name="q${index}" value="${option1}">
+                    <input type="checkbox" name="q${index}" value="0">
                     ${option1}
                 </label>
                 <label>
-                    <input type="radio" name="q${index}" value="${option2}">
+                    <input type="checkbox" name="q${index}" value="1">
                     ${option2}
                 </label>
                 <label>
-                    <input type="radio" name="q${index}" value="${option3}">
+                    <input type="checkbox" name="q${index}" value="2">
                     ${option3}
                 </label>
                 <label>
-                    <input type="radio" name="q${index}" value="${option4}">
+                    <input type="checkbox" name="q${index}" value="3">
                     ${option4}
                 </label>
             </div>
@@ -70,6 +73,34 @@ async function submitQuiz() {
 
     const quizName = quizDataGlobal.quiz.name; // Get quizName from the global data
 
+    // --- FIX: Ensure shuffledQuestions are always objects with question/options/correctAnswer ---
+    const shuffledQuestions = allQuestionsFlat.map(q => {
+        // If already an object with question/options/correctAnswer, return as is
+        if (q && typeof q === 'object' && q.question && q.options && q.correctAnswer) {
+            return q;
+        }
+        // If array format: [question, option1, option2, option3, option4, correctAnswers]
+        if (Array.isArray(q)) {
+            const [question, option1, option2, option3, option4, correctAnswers] = q;
+            let correctArr = [];
+            if (Array.isArray(correctAnswers)) {
+                correctArr = correctAnswers;
+            } else if (typeof correctAnswers === 'number') {
+                correctArr = [correctAnswers];
+            } else if (typeof correctAnswers !== 'undefined') {
+                correctArr = [parseInt(correctAnswers)];
+            }
+            return {
+                question,
+                options: [option1, option2, option3, option4],
+                correctAnswer: correctArr
+            };
+        }
+        // Fallback: return as is
+        return q;
+    });
+    // --- END FIX ---
+
     let client;
     try {
         // The /submit-quiz endpoint is in startquiz.js on the server side
@@ -80,7 +111,8 @@ async function submitQuiz() {
             },
             body: JSON.stringify({
                 quizName,
-                answers: studentAnswers // Send the collected answers
+                answers: studentAnswers, // Send the collected answers
+                shuffledQuestions // Use the fixed/normalized array
             })
         });
 
@@ -105,7 +137,32 @@ async function submitQuiz() {
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof quiz !== 'undefined' && quiz) {
         currentQuiz = quiz;
-        displayQuiz(quiz);
+        // --- FIX: Populate allQuestionsFlat with correct structure ---
+        allQuestionsFlat = quiz.map(q => {
+            if (typeof q === 'object' && q.question && q.options && q.correctAnswer) {
+                return q;
+            }
+            // If array format: [question, option1, option2, option3, option4, correctAnswers]
+            if (Array.isArray(q)) {
+                const [question, option1, option2, option3, option4, correctAnswers] = q;
+                let correctArr = [];
+                if (Array.isArray(correctAnswers)) {
+                    correctArr = correctAnswers;
+                } else if (typeof correctAnswers === 'number') {
+                    correctArr = [correctAnswers];
+                } else if (typeof correctAnswers !== 'undefined') {
+                    correctArr = [parseInt(correctAnswers)];
+                }
+                return {
+                    question,
+                    options: [option1, option2, option3, option4],
+                    correctAnswer: correctArr
+                };
+            }
+            return q;
+        });
+        // --- END FIX ---
+        displayQuiz(allQuestionsFlat);
         startTimer(duration);
     } else {
         console.error('Quiz data not found');

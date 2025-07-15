@@ -54,51 +54,35 @@ function loadQuizData(quiz) {
                 const dataRows = rows.slice(1);
                 console.log(`Processing ${dataRows.length} data rows.`);
                 
-                // Map each row to [question, option1, option2, option3, option4, correctAnswers]
+                // Map each row to [question, option1, option2, option3, option4, ...correctAnswers]
                 const mappedRows = dataRows.map(row => {
-                    // Defensive: ensure at least 6 columns
+                    // Defensive: ensure at least 6 columns (question + 4 options + at least 1 answer)
                     if (!row || row.length < 6) return null;
-                    const [question, option1, option2, option3, option4, answerCol, secondAnswerCol] = row;
+                    const [question, option1, option2, option3, option4, ...answerCols] = row;
                     let correctAnswers = [];
-                    
-                    // Map A/B/C/D to the correct option value for the first answer
-                    switch ((answerCol || '').toString().trim().toUpperCase()) {
-                        case 'A':
-                            correctAnswers.push(option1);
-                            break;
-                        case 'B':
-                            correctAnswers.push(option2);
-                            break;
-                        case 'C':
-                            correctAnswers.push(option3);
-                            break;
-                        case 'D':
-                            correctAnswers.push(option4);
-                            break;
-                    }
-                    
-                    // If there's a second answer column, process it
-                    if (secondAnswerCol) {
-                        switch ((secondAnswerCol || '').toString().trim().toUpperCase()) {
+                    answerCols.forEach(answerCol => {
+                        const ans = (answerCol || '').toString().trim().toUpperCase();
+                        switch (ans) {
                             case 'A':
-                                correctAnswers.push(option1);
+                                correctAnswers.push(0);
                                 break;
                             case 'B':
-                                correctAnswers.push(option2);
+                                correctAnswers.push(1);
                                 break;
                             case 'C':
-                                correctAnswers.push(option3);
+                                correctAnswers.push(2);
                                 break;
                             case 'D':
-                                correctAnswers.push(option4);
+                                correctAnswers.push(3);
                                 break;
                         }
-                    }
-                    
+                    });
+                    // Remove duplicates and sort
+                    correctAnswers = Array.from(new Set(correctAnswers)).sort();
                     return {
                         question,
                         options: [option1, option2, option3, option4],
-                        correctAnswers,
+                        correctAnswer: correctAnswers,
                         sectionName: section.name
                     };
                 }).filter(Boolean); // Remove null entries
@@ -128,12 +112,11 @@ function loadQuizData(quiz) {
         if (!quiz.questions || !Array.isArray(quiz.questions)) {
             throw new Error('Invalid quiz format: questions not found');
         }
-        
         // Convert to the same format as Excel data and wrap in a single section
         const formattedQuestions = quiz.questions.map(q => ({
             question: q.question,
             options: q.options,
-            correctAnswers: [q.options[q.correctAnswer]], // Assuming single correct answer for manual
+            correctAnswer: Array.isArray(q.correctAnswer) ? q.correctAnswer : [q.correctAnswer],
             questionImage: q.questionImage || null,
             optionImages: q.optionImages || [null, null, null, null],
             sectionName: 'Questions'
@@ -375,6 +358,62 @@ router.get('/api/quiz-data/:quizName', async (req, res) => {
     }
 });
 
+// Add new route for quiz data (for studentquiz.html compatibility)
+router.get('/data/:quizName', async (req, res) => {
+    const quizName = req.params.quizName;
+    try {
+        // Check if user is logged in as a student
+        if (!req.session.username || req.session.role !== 'student') {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const client = new MongoClient(url);
+        await client.connect();
+        const db = client.db(req.session.adminDb);
+        const quiz = await db.collection('quizzes').findOne({ name: quizName });
+        if (!quiz) {
+            await client.close();
+            return res.status(404).json({ success: false, message: 'Quiz not found.' });
+        }
+
+        // Check if quiz has started and calculate duration
+        const now = getISTNow();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+        if (!quiz.startTime || !quiz.endTime) {
+            await client.close();
+            return res.status(400).json({ success: false, message: 'Quiz start or end time is not defined.' });
+        }
+        if (quiz.startTime > currentTime) {
+            await client.close();
+            return res.status(400).json({ success: false, message: 'This quiz has not started yet.' });
+        }
+        if (quiz.endTime < currentTime) {
+            await client.close();
+            return res.status(400).json({ success: false, message: 'This quiz has already ended.' });
+        }
+
+        // Calculate duration in seconds
+        let durationSec = 0;
+        if (quiz.testDuration) {
+            durationSec = parseInt(quiz.testDuration) * 60;
+        } else {
+            durationSec = 60 * 60; // default 1 hour
+        }
+
+        // Use loadQuizData to get sections
+        const processedQuizData = loadQuizData(quiz); // { sections: [...] }
+        await client.close();
+        return res.json({
+            success: true,
+            quizSections: processedQuizData.sections,
+            durationSec
+        });
+    } catch (error) {
+        console.error('Error loading quiz data for /data/:quizName:', error);
+        return res.status(500).json({ success: false, message: 'Failed to load quiz data.' });
+    }
+});
+
 router.post('/submit-quiz', async (req, res) => {
     if (!req.session.username || req.session.role !== 'student') {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -426,7 +465,7 @@ router.post('/submit-quiz', async (req, res) => {
         const correctAnswersMap = new Map();
         // Build correctAnswersMap and totalMarks based on the displayedQuestions
         displayedQuestions.forEach((q, globalIdx) => {
-            correctAnswersMap.set(globalIdx, q.correctAnswers);
+            correctAnswersMap.set(globalIdx, q.correctAnswer);
             totalMarks += questionMarks; // Add to total possible marks
         });
 
@@ -454,24 +493,27 @@ router.post('/submit-quiz', async (req, res) => {
                 sectionNegative = sectionNegativeMap[sectionName]; // Use section-specific value
             }
 
-            // Debug logging
-            console.log(`Scoring: Q#${questionIndex}, Section: ${sectionName}, Section Negative: ${sectionNegative}, Map:`, sectionNegativeMap);
-            if (correctAnswers) {
-                if (correctAnswers.includes(studentAnswer)) {
-                    score += questionMarks; // Correct answer with question marks
-                } else if (studentAnswer !== null) {
-                    // Calculate negative marks based on the question marks and section negative marking
-                    const negativeMarks = questionMarks * sectionNegative;
-                    score -= negativeMarks; // Wrong answer with negative marking
-                    console.log(`Debug - Question Index: ${questionIndex}, Student Answer: ${studentAnswer}, Correct Answers: ${correctAnswers}, Section: ${sectionName}, Section Negative: ${sectionNegative}, Marks Deducted: ${negativeMarks}, Current Score: ${score}`);
-                }
+            // Ensure both are arrays
+            const studentAnsArr = Array.isArray(studentAnswer) ? studentAnswer.slice().sort() : [];
+            const correctAnsArr = Array.isArray(correctAnswers) ? correctAnswers.slice().sort() : [];
+
+            // Compare arrays for exact match
+            const isCorrect = studentAnsArr.length === correctAnsArr.length && studentAnsArr.every((val, idx) => val === correctAnsArr[idx]);
+            let marks = 0;
+            if (isCorrect) {
+                marks = questionMarks;
+                score += questionMarks;
+            } else if (studentAnsArr.length > 0) {
+                // If attempted but not correct, apply negative marking if any
+                const negativeMarks = questionMarks * sectionNegative;
+                marks = -negativeMarks;
+                score -= negativeMarks;
             }
             studentAnswers.push({
                 questionIndex,
-                answer: studentAnswer,
-                isCorrect: correctAnswers ? correctAnswers.includes(studentAnswer) : false,
-                marks: correctAnswers && correctAnswers.includes(studentAnswer) ? questionMarks : 
-                       (studentAnswer !== null ? -(questionMarks * sectionNegative) : 0),
+                answer: studentAnsArr,
+                isCorrect,
+                marks,
                 sectionName: sectionName
             });
         });

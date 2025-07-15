@@ -92,9 +92,9 @@
             background: #f0f0f0;
             border-color: #cceeff;
         }
-        .options-container input[type="radio"] {
+        .options-container input[type="checkbox"] {
             margin-right: 10px;
-            transform: scale(1.1);
+            transform: scale(1.2);
         }
         .options-container label.selected {
             background-color: #e0f2fe;
@@ -352,11 +352,12 @@
 
         function recordAnswer(sectionIndex, questionIndex) {
             const questionCard = document.getElementById(`question-${sectionIndex}-${questionIndex}`);
-            const selectedOption = questionCard.querySelector(`input[name="question-${sectionIndex}-${questionIndex}"]:checked`);
+            const selectedOptions = questionCard.querySelectorAll(`input[name="question-${sectionIndex}-${questionIndex}"]:checked`);
             const questionNavBtn = document.querySelector(`.question-nav-btn[data-section="${sectionIndex}"][data-question="${questionIndex}"]`);
 
-            if (selectedOption) {
-                studentAnswers[`${sectionIndex}-${questionIndex}`] = selectedOption.value;
+            if (selectedOptions.length > 0) {
+                const selectedValues = Array.from(selectedOptions).map(option => parseInt(option.value));
+                studentAnswers[`${sectionIndex}-${questionIndex}`] = selectedValues;
                 if (questionNavBtn) {
                     questionNavBtn.classList.add('answered');
                     questionNavBtn.classList.remove('skipped');
@@ -370,9 +371,9 @@
             }
             // Update selected class for labels
             questionCard.querySelectorAll('label').forEach(label => label.classList.remove('selected'));
-            if (selectedOption) {
-                selectedOption.closest('label').classList.add('selected');
-            }
+            selectedOptions.forEach(option => {
+                option.closest('label').classList.add('selected');
+            });
         }
 
         sectionNavigation.addEventListener('click', (event) => {
@@ -395,7 +396,7 @@
         });
 
         quizQuestionsContainer.addEventListener('change', (event) => {
-            if (event.target.tagName === 'INPUT' && event.target.type === 'radio') {
+            if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox') {
                 const questionCard = event.target.closest('.card');
                 if (questionCard) {
                     const sectionIndex = parseInt(questionCard.dataset.section);
@@ -490,23 +491,27 @@
             // Render question sections and cards
             quizQuestionsContainer.innerHTML = quizSections.map((section, sectionIndex) => `
                 <div class="question-section" id="section-${sectionIndex}">
-                    ${section.questions.map((q, qIndex) => `
-                        <div class="card" id="question-${sectionIndex}-${qIndex}" data-section="${sectionIndex}" data-question="${qIndex}">
-                            <h3>Question ${qIndex + 1}: ${q.question}</h3>
-                            ${q.questionImage ? `<img src="${q.questionImage}" class="question-image" alt="Question Image">` : ''}
-                            <div class="options-container">
-                                ${q.options.map((option, oIndex) => `
-                                    <label>
-                                        <div class="option-label-content">
-                                            <input type="radio" name="question-${sectionIndex}-${qIndex}" value="${option}">
-                                            ${option}
-                                            ${q.optionImages && q.optionImages[oIndex] ? `<img src="${q.optionImages[oIndex]}" class="option-image" alt="Option Image">` : ''}
-                                        </div>
-                                    </label>
-                                `).join('')}
+                    ${section.questions.map((q, qIndex) => {
+                        const isMultiCorrect = (q.correctAnswer && q.correctAnswer.length > 1);
+                        const inputType = isMultiCorrect ? 'checkbox' : 'radio';
+                        return `
+                            <div class="card" id="question-${sectionIndex}-${qIndex}" data-section="${sectionIndex}" data-question="${qIndex}">
+                                <h3>Question ${qIndex + 1}: ${q.question}</h3>
+                                ${q.questionImage ? `<img src="${q.questionImage}" class="question-image" alt="Question Image">` : ''}
+                                <div class="options-container">
+                                    ${q.options.map((option, oIndex) => `
+                                        <label>
+                                            <div class="option-label-content">
+                                                <input type="${inputType}" name="question-${sectionIndex}-${qIndex}" value="${oIndex}">
+                                                ${option}
+                                                ${q.optionImages && q.optionImages[oIndex] ? `<img src="${q.optionImages[oIndex]}" class="option-image" alt="Option Image">` : ''}
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `).join('');
 

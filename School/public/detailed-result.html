@@ -235,16 +235,14 @@
                         q.options.forEach(option => {
                             let optionClass = '';
                             let icon = '';
-                            
-                            if (option === q.correctAnswers) {
+                            if (Array.isArray(q.correctAnswers) && q.correctAnswers.includes(option)) {
                                 optionClass = 'correct';
                                 icon = '<i class="fas fa-check-circle" style="color: var(--success-color);"></i>';
                             }
-                            if (option === q.studentAnswer && option !== q.correctAnswers) {
+                            if (option === q.studentAnswer && (!Array.isArray(q.correctAnswers) || !q.correctAnswers.includes(option))) {
                                 optionClass = 'incorrect';
                                 icon = '<i class="fas fa-times-circle" style="color: var(--error-color);"></i>';
                             }
-                            
                             const isMarked = option === q.studentAnswer;
                             optionsHtml += `
                                 <li class="option ${optionClass} ${isMarked ? 'marked' : ''}">
@@ -253,11 +251,19 @@
                             `;
                         });
 
+                        // Show mapped text for answers if available
+                        let correctAnswerText = Array.isArray(q.correctAnswerText) && q.correctAnswerText.length > 0 ? q.correctAnswerText.join(', ') : (Array.isArray(q.correctAnswers) ? q.correctAnswers.join(', ') : q.correctAnswers || 'N/A');
+                        let studentAnswerText = Array.isArray(q.studentAnswerText) && q.studentAnswerText.length > 0 ? q.studentAnswerText.join(', ') : (Array.isArray(q.studentAnswer) ? q.studentAnswer.join(', ') : q.studentAnswer || 'N/A');
+
                         questionDiv.innerHTML = `
                             <p class="question-text">${index + 1}. ${q.question}</p>
                             <ul class="options-list">
                                 ${optionsHtml}
                             </ul>
+                            <div style="margin-top: 8px; font-size: 1em;">
+                                <span style="font-weight:600;">Correct Answer:</span> <span style="color:#388e3c;">${correctAnswerText}</span><br>
+                                <span style="font-weight:600;">Your Answer:</span> <span style="color:#d32f2f; font-weight:600;">${studentAnswerText}</span>
+                            </div>
                         `;
                         
                         sectionDiv.appendChild(questionDiv);
